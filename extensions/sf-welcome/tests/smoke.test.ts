@@ -104,8 +104,6 @@ describe("sf-welcome", () => {
       slackConnected: true,
       monthlyCost: 450.5,
       monthlyBudget: 3000,
-
-      lifetimeCost: 0,
     };
 
     const overlay = new SfWelcomeOverlay(data);
@@ -128,8 +126,6 @@ describe("sf-welcome", () => {
       slackConnected: true,
       monthlyCost: 450.5,
       monthlyBudget: 3000,
-
-      lifetimeCost: 0,
     };
 
     const overlay = new SfWelcomeOverlay(data);
@@ -150,8 +146,6 @@ describe("sf-welcome", () => {
       slackConnected: false,
       monthlyCost: 0,
       monthlyBudget: 3000,
-
-      lifetimeCost: 0,
     };
 
     const header = new SfWelcomeHeader(data);
@@ -171,7 +165,6 @@ describe("sf-welcome", () => {
       slackConnected: false,
       monthlyCost: 0,
       monthlyBudget: 3000,
-      lifetimeCost: 0,
     };
 
     const header = new SfWelcomeHeader(data);
@@ -181,6 +174,47 @@ describe("sf-welcome", () => {
 
     header.setCountdown(12);
     expect(stripAnsi(header.render(100).join("\n"))).toContain("auto-dismiss in 12s");
+  });
+
+  it("renders gateway status from probe state instead of provider name", async () => {
+    const { SfWelcomeOverlay } = await import("../lib/splash-component.ts");
+    const baseData = {
+      modelName: "Claude Sonnet 4 Gateway",
+      providerName: "sf-llm-gateway-internal",
+      loadedCounts: { extensions: 3, skills: 1, promptTemplates: 0 },
+      recentSessions: [],
+      extensionHealth: [],
+      slackConnected: false,
+      monthlyCost: 0,
+      monthlyBudget: 3000,
+    };
+
+    const checking = stripAnsi(new SfWelcomeOverlay(baseData).render(100).join("\n"));
+    expect(checking).toContain("LLM Gateway");
+    expect(checking).toContain("Checking");
+    expect(checking).not.toContain("Connected");
+
+    const connected = stripAnsi(
+      new SfWelcomeOverlay({
+        ...baseData,
+        gatewayStatus: { kind: "connected", source: "user-info" as const },
+      })
+        .render(100)
+        .join("\n"),
+    );
+    expect(connected).toContain("LLM Gateway");
+    expect(connected).toContain("Connected");
+
+    const authFailed = stripAnsi(
+      new SfWelcomeOverlay({
+        ...baseData,
+        gatewayStatus: { kind: "auth-failed", source: "user-info" as const },
+      })
+        .render(100)
+        .join("\n"),
+    );
+    expect(authFailed).toContain("Auth failed");
+    expect(authFailed).not.toContain("✓ Connected");
   });
 
   it("renders compact SF CLI status without org environment details", async () => {
@@ -194,8 +228,6 @@ describe("sf-welcome", () => {
       slackConnected: false,
       monthlyCost: 0,
       monthlyBudget: 3000,
-
-      lifetimeCost: 0,
       sfCli: {
         installed: true,
         installedVersion: "2.130.9",
@@ -249,8 +281,6 @@ describe("sf-welcome", () => {
       slackConnected: true,
       monthlyCost: 850.25,
       monthlyBudget: null,
-
-      lifetimeCost: 0,
       monthlyUsageSource: "gateway" as const,
     };
 
@@ -273,8 +303,6 @@ describe("sf-welcome", () => {
       slackConnected: false,
       monthlyCost: 186,
       monthlyBudget: 3000,
-
-      lifetimeCost: 0,
       monthlyUsageSource: "sessions" as const,
     };
 
@@ -294,7 +322,6 @@ describe("sf-welcome", () => {
       slackConnected: true,
       monthlyCost: 0,
       monthlyBudget: null,
-      lifetimeCost: 0,
       monthlyUsageSource: "gateway" as const,
       recommendations: {
         total: 8,
@@ -338,7 +365,6 @@ describe("sf-welcome", () => {
       slackConnected: true,
       monthlyCost: 0,
       monthlyBudget: null,
-      lifetimeCost: 0,
       monthlyUsageSource: "gateway" as const,
     };
 
@@ -366,8 +392,6 @@ describe("sf-welcome", () => {
       slackConnected: false,
       monthlyCost: 0,
       monthlyBudget: 3000,
-
-      lifetimeCost: 0,
     };
 
     const overlay = new SfWelcomeOverlay(data);
@@ -389,8 +413,6 @@ describe("sf-welcome", () => {
       slackConnected: true,
       monthlyCost: 0,
       monthlyBudget: null,
-
-      lifetimeCost: 0,
       monthlyUsageSource: "gateway" as const,
     };
 
@@ -424,8 +446,6 @@ describe("sf-welcome", () => {
       slackConnected: true,
       monthlyCost: 0,
       monthlyBudget: null,
-
-      lifetimeCost: 0,
     };
 
     const overlay = new SfWelcomeOverlay(data);
@@ -454,7 +474,6 @@ describe("sf-welcome", () => {
         slackConnected: true,
         monthlyCost: 123,
         monthlyBudget: null,
-        lifetimeCost: 0,
         monthlyUsageSource: "gateway" as const,
       };
       const overlay = new SfWelcomeOverlay(data);

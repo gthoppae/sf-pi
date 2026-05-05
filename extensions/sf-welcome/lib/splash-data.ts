@@ -17,7 +17,7 @@ import {
   projectSettingsPath,
 } from "../../../lib/common/pi-paths.ts";
 import { discoverExtensionHealth } from "./extension-health.ts";
-import { estimateLifetimeCost, estimateMonthlyCost, getRecentSessions } from "./session-data.ts";
+import { estimateMonthlyCost, getRecentSessions } from "./session-data.ts";
 import { detectTokenSource } from "../../sf-slack/lib/auth.ts";
 import { getMonthlyUsageState } from "../../../lib/common/monthly-usage/store.ts";
 import { buildWhatsNewPayload } from "./whats-new.ts";
@@ -48,7 +48,7 @@ export type {
 } from "./types.ts";
 export { discoverExtensionHealth } from "./extension-health.ts";
 export { detectSfCliStatus, isVersionCurrent, parseSfCliVersion } from "./sf-cli-status.ts";
-export { estimateLifetimeCost, estimateMonthlyCost, getRecentSessions } from "./session-data.ts";
+export { estimateMonthlyCost, getRecentSessions } from "./session-data.ts";
 export { buildWhatsNewPayload, readCurrentPiVersion } from "./whats-new.ts";
 export {
   buildAnnouncementsSync,
@@ -251,21 +251,6 @@ export function resolveMonthlyUsage(monthlyBudgetFallback: number = 3000): {
   };
 }
 
-/**
- * Compute the lifetime-usage payload shown on the splash.
- *
- * Uses the local all-session estimate. The gateway's `/key/info.spend` is
- * spend for the current API key only, so it resets whenever a user rotates
- * keys and is not a valid lifetime counter. Current-key spend still appears
- * in `/sf-llm-gateway-internal` status.
- */
-export function resolveLifetimeUsage(): {
-  lifetimeCost: number;
-  lifetimeUsageSource: "gateway" | "sessions";
-} {
-  return { lifetimeCost: estimateLifetimeCost(), lifetimeUsageSource: "sessions" };
-}
-
 export function collectInitialSplashData(
   modelName: string,
   providerName: string,
@@ -289,8 +274,8 @@ export function collectInitialSplashData(
         : null
       : monthlyBudgetFallback,
     monthlyUsageSource: gatewayUsage ? "gateway" : "sessions",
-    lifetimeCost: estimateLifetimeCost(),
-    lifetimeUsageSource: "sessions",
+    gatewayStatus: gatewayState.connectionStatus ?? null,
+    gatewayLoading: gatewayState.connectionStatus?.kind === "checking",
     loading: true,
     slackLoading: true,
     extensionHealthLoading: true,
@@ -311,7 +296,7 @@ export function collectSplashData(
   // extensionHealth is still surfaced in the splash header counter; no other
   // consumer needs the derived list anymore now that Tips is gone.
   const usage = resolveMonthlyUsage(monthlyBudgetFallback);
-  const lifetime = resolveLifetimeUsage();
+  const gatewayState = getMonthlyUsageState();
 
   // Resolve the What's New panel eagerly so the splash can include it on
   // the very first render. Returns undefined on first-ever launch or when
@@ -355,8 +340,8 @@ export function collectSplashData(
     monthlyCost: usage.monthlyCost,
     monthlyBudget: usage.monthlyBudget,
     monthlyUsageSource: usage.monthlyUsageSource,
-    lifetimeCost: lifetime.lifetimeCost,
-    lifetimeUsageSource: lifetime.lifetimeUsageSource,
+    gatewayStatus: gatewayState.connectionStatus ?? null,
+    gatewayLoading: gatewayState.connectionStatus?.kind === "checking",
     recommendations: collectRecommendationsStatus(cwd),
     skillSources: summarizeAvailableSkillSources() ?? undefined,
     doctor,

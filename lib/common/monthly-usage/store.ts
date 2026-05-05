@@ -49,6 +49,23 @@ export interface GatewayHealth {
   fetchedAt: string;
 }
 
+export type GatewayConnectionKind =
+  | "checking"
+  | "connected"
+  | "not-configured"
+  | "auth-failed"
+  | "url-invalid"
+  | "unreachable"
+  | "degraded"
+  | "unknown";
+
+export interface GatewayConnectionStatus {
+  kind: GatewayConnectionKind;
+  detail?: string;
+  checkedAt?: string;
+  source?: "user-info" | "key-info" | "models" | "health" | "config";
+}
+
 export interface MonthlyUsageSnapshot {
   monthlyUsage: GatewayMonthlyUsage | null;
   monthlyUsageError: string | null;
@@ -56,6 +73,7 @@ export interface MonthlyUsageSnapshot {
   keyInfoError: string | null;
   health: GatewayHealth | null;
   healthError: string | null;
+  connectionStatus?: GatewayConnectionStatus | null;
 }
 
 export type MonthlyUsageRefresher = (force: boolean, cwd: string) => Promise<void>;
@@ -71,6 +89,7 @@ const EMPTY_SNAPSHOT: MonthlyUsageSnapshot = {
   keyInfoError: null,
   health: null,
   healthError: null,
+  connectionStatus: null,
 };
 
 // -----------------------------------------------------------------------------

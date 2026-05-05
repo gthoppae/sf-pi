@@ -77,19 +77,6 @@ export function estimateMonthlyCost(): number {
   return sumSessionCosts(monthStart);
 }
 
-/**
- * Sum the cost recorded in every local Pi session file, all-time.
- *
- * Used for the splash's Lifetime Usage line. The value is intentionally
- * approximate: it covers only sessions whose .jsonl files still exist on this
- * machine and only turns where the assistant logged a `usage.cost.total`.
- * Gateway `/key/info.spend` is per-key and resets on key rotation, so it is
- * surfaced separately as current-key spend instead of lifetime usage.
- */
-export function estimateLifetimeCost(): number {
-  return sumSessionCosts(0);
-}
-
 /** Sum assistant-turn costs across every session file modified after `sinceMs`. */
 function sumSessionCosts(sinceMs: number): number {
   const sessionsDir = globalAgentPath("sessions");

@@ -3,7 +3,8 @@
  * sf-welcome — Salesforce-branded splash screen for sf-pi.
  *
  * Displays a two-column overlay on startup with:
- *   Left column:  Gradient Pi logo, model info, monthly cost bar, extension health, Slack status
+ *   Left column:  Gradient Pi logo, model info, monthly cost bar, extension health,
+ *                 Slack, Gateway, and SF CLI status
  *   Right column: Announcements, What's New, loaded counts, recent sessions,
  *                  recommended extensions, attribution
  *
@@ -56,7 +57,6 @@ import {
   detectSfCliStatus,
   readCurrentPiVersion,
   refreshAnnouncementsSummary,
-  resolveLifetimeUsage,
   resolveMonthlyUsage,
 } from "./lib/splash-data.ts";
 import { acknowledgeAnnouncementsRevision } from "../../lib/common/catalog-state/announcements-state.ts";
@@ -72,6 +72,7 @@ import {
 import { buildExecFn } from "../../lib/common/exec-adapter.ts";
 import { requirePiVersion } from "../../lib/common/pi-compat.ts";
 import {
+  getMonthlyUsageState,
   refreshMonthlyUsage,
   subscribeMonthlyUsageState,
 } from "../../lib/common/monthly-usage/store.ts";
@@ -336,7 +337,7 @@ export default function sfWelcome(pi: ExtensionAPI) {
     // handler, and extension load order is not guaranteed — if sf-welcome
     // runs first, this call is a no-op against an empty store. Instead we
     // subscribe to the store below and repaint on every publish.
-    void refreshMonthlyUsage(false, ctx.cwd).catch(() => undefined);
+    void refreshMonthlyUsage(true, ctx.cwd).catch(() => undefined);
 
     const data = collectInitialSplashData(modelName, providerName, MONTHLY_BUDGET_FALLBACK);
     const doctorReport = runDoctorDiagnostics({ cwd: ctx.cwd });
@@ -429,12 +430,12 @@ export default function sfWelcome(pi: ExtensionAPI) {
     unsubscribeUsageStore = subscribeMonthlyUsageState(() => {
       if (runId !== startupRunId || !isActiveSession(ctx, generation)) return;
       const usage = resolveMonthlyUsage(MONTHLY_BUDGET_FALLBACK);
-      const lifetime = resolveLifetimeUsage();
+      const gatewayState = getMonthlyUsageState();
       data.monthlyCost = usage.monthlyCost;
       data.monthlyBudget = usage.monthlyBudget;
       data.monthlyUsageSource = usage.monthlyUsageSource;
-      data.lifetimeCost = lifetime.lifetimeCost;
-      data.lifetimeUsageSource = lifetime.lifetimeUsageSource;
+      data.gatewayStatus = gatewayState.connectionStatus ?? null;
+      data.gatewayLoading = gatewayState.connectionStatus?.kind === "checking";
 
       refreshMountedSplash(ctx, generation);
     });
@@ -532,7 +533,7 @@ export default function sfWelcome(pi: ExtensionAPI) {
           ? ` (${((data.monthlyCost / data.monthlyBudget) * 100).toFixed(1)}%)`
           : "";
       const sourceSuffix = data.monthlyUsageSource === "sessions" ? " (local estimate)" : "";
-      const lifetimeSuffix = data.lifetimeUsageSource === "sessions" ? " (local estimate)" : "";
+      const gatewayStatus = data.gatewayStatus?.kind ?? "not checked";
 
       const lines = [
         "sf-pi Welcome Summary",
@@ -541,7 +542,7 @@ export default function sfWelcome(pi: ExtensionAPI) {
         `Provider: ${data.providerName}`,
         "",
         `Monthly cost: $${data.monthlyCost.toFixed(2)} / ${budgetLabel}${costPercent}${sourceSuffix}`,
-        `Lifetime cost: $${data.lifetimeCost.toFixed(2)}${lifetimeSuffix}`,
+        `Gateway: ${gatewayStatus}`,
         `Slack: ${data.slackConnected ? "✓ Connected" : "✗ Not connected"}`,
         "",
         "sf-pi Extensions:",

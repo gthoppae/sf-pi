@@ -50,6 +50,7 @@
  * - /sf-llm-gateway-internal beta                  show beta header state
  * - /sf-llm-gateway-internal beta <name> on|off    toggle a beta header at runtime
  * - /sf-llm-gateway-internal models                list discovered models
+ * - /sf-llm-gateway-internal usage-probe           classify user/key usage scope
  *
  * Behavior matrix:
  *
@@ -69,6 +70,7 @@
  *   /command on                 | credentials present                | Save config, set default, register, discover
  *   /command off                | —                                  | Disable, remove pattern, switch to off-default
  *   /command refresh            | —                                  | Re-discover, refresh monthly usage
+ *   /command usage-probe        | —                                  | Force read-only usage probe
  *   /command beta <name> on     | —                                  | Toggle beta, re-register provider
  *   Monthly usage fetch         | cached < 60 s old                  | Use cache
  *   Monthly usage fetch         | stale or forced                    | Fetch from gateway /user/info
@@ -208,6 +210,7 @@ type CommandArgs = {
     | "models"
     | "debug"
     | "doctor"
+    | "usage-probe"
     | "on"
     | "off"
     | "setup";
@@ -235,8 +238,15 @@ type CommandArgs = {
 let lastAppliedThinkingLevel: string | undefined;
 
 function getRuntimeStatusState() {
-  const { monthlyUsage, monthlyUsageError, keyInfo, keyInfoError, health, healthError } =
-    getMonthlyUsageState();
+  const {
+    monthlyUsage,
+    monthlyUsageError,
+    keyInfo,
+    keyInfoError,
+    health,
+    healthError,
+    connectionStatus,
+  } = getMonthlyUsageState();
   return {
     discovery: getLastDiscovery(),
     monthlyUsage,
@@ -245,6 +255,7 @@ function getRuntimeStatusState() {
     keyInfoError,
     health,
     healthError,
+    connectionStatus: connectionStatus ?? null,
     runtimeBetaOverrides: getBetaOverrides(),
     runtimeExtraBetas: getBetaExtras(),
   };
@@ -303,6 +314,7 @@ export default function sfLlmGatewayInternalExtension(pi: ExtensionAPI) {
         "beta",
         "debug",
         "doctor",
+        "usage-probe",
         "help",
       ];
       const tokens = prefix.trim().split(/\s+/);
@@ -496,6 +508,8 @@ async function handleCommand(
       return handleDebugCommand(pi, ctx, parsed.positional ?? []);
     case "doctor":
       return handleDoctorCommand(pi, ctx);
+    case "usage-probe":
+      return handleUsageProbeCommand(pi, ctx);
     case "beta":
       return handleBetaCommandImpl(pi, ctx, parsed.betaArgs ?? [], (summary, details, level) =>
         emitCommandOutput(pi, ctx, summary, details, level),
@@ -549,6 +563,37 @@ async function handleDoctorCommand(pi: ExtensionAPI, ctx: ExtensionCommandContex
     "SF LLM Gateway Internal doctor.",
     formatGatewayDoctorReport(report),
     report.checks.some((check) => !check.ok) ? "warning" : "info",
+  );
+}
+
+async function handleUsageProbeCommand(
+  pi: ExtensionAPI,
+  ctx: ExtensionCommandContext,
+): Promise<void> {
+  await refreshMonthlyUsage(true, ctx.cwd);
+  const { monthlyUsage, monthlyUsageError, keyInfo, keyInfoError, connectionStatus } =
+    getMonthlyUsageState();
+  const lines = [
+    "Gateway usage probe",
+    "",
+    `Connection: ${connectionStatus?.kind ?? "not checked"}${connectionStatus?.source ? ` via ${connectionStatus.source}` : ""}`,
+    `Monthly/user usage: ${monthlyUsage ? `$${monthlyUsage.spend.toFixed(2)} spent${monthlyUsage.budgetResetAt ? `, resets ${monthlyUsage.budgetResetAt}` : ""}` : (monthlyUsageError ?? "not loaded")}`,
+    `Current key spend: ${keyInfo ? `$${keyInfo.spend.toFixed(2)}${keyInfo.keyName ? ` on ${keyInfo.keyName}` : ""}` : (keyInfoError ?? "not loaded")}`,
+    "",
+    "Conclusion:",
+    "- /key/info is key-scoped and can reset when keys rotate.",
+    monthlyUsage?.budgetResetAt || monthlyUsage?.budgetDuration
+      ? "- /user/info appears user-scoped but budget-windowed, so it is not a lifetime counter."
+      : "- /user/info did not prove a true lifetime user counter.",
+    "- The welcome splash does not show Lifetime Usage unless a true user-lifetime endpoint exists.",
+  ];
+
+  await emitCommandOutput(
+    pi,
+    ctx,
+    "SF LLM Gateway Internal usage probe.",
+    lines.join("\n"),
+    connectionStatus?.kind === "connected" ? "info" : "warning",
   );
 }
 
@@ -686,6 +731,7 @@ async function handleHelpCommand(pi: ExtensionAPI, ctx: ExtensionCommandContext)
     `- /${COMMAND_NAME} set-default [global|project]`,
     `- /${COMMAND_NAME} models`,
     `- /${COMMAND_NAME} doctor`,
+    `- /${COMMAND_NAME} usage-probe`,
     `- /${COMMAND_NAME} debug <modelId> [reasoning=<level>] [tool] [adaptive]`,
     `- /${COMMAND_NAME} beta`,
     `- /${COMMAND_NAME} beta <name> on|off`,
@@ -750,6 +796,9 @@ export function parseCommandArgs(args: string): CommandArgs {
   }
   if (sub === "doctor" || sub === "dr") {
     return { subcommand: "doctor", scope };
+  }
+  if (sub === "usage-probe" || sub === "usage") {
+    return { subcommand: "usage-probe", scope };
   }
   if (sub === "debug") {
     return { subcommand: "debug", scope, positional: tokens.slice(1) };

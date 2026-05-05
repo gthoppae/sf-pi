@@ -271,6 +271,31 @@ function formatGlyphInfoRow(
   return formatInfoRow(glyph(iconKey, mode), label, value, iconColor);
 }
 
+function formatGatewayStatusValue(data: SplashData, mode: GlyphMode): string {
+  const status = data.gatewayStatus;
+  if (data.gatewayLoading || !status || status.kind === "checking") {
+    return MUTED(`${glyph("hourglass", mode)} Checking`);
+  }
+
+  switch (status.kind) {
+    case "connected":
+      return `${SF_GREEN("✓")} ${SF_GREEN("Connected")}`;
+    case "not-configured":
+      return `${SF_ORANGE("!")} ${SF_ORANGE("Configure")}`;
+    case "auth-failed":
+      return `${SF_RED("✗")} ${SF_RED("Auth failed")}`;
+    case "url-invalid":
+      return `${SF_ORANGE("!")} ${SF_ORANGE("URL issue")}`;
+    case "unreachable":
+      return `${SF_ORANGE("!")} ${SF_ORANGE("Unreachable")}`;
+    case "degraded":
+      return `${SF_ORANGE("!")} ${SF_ORANGE("Degraded")}`;
+    case "unknown":
+    default:
+      return `${SF_ORANGE("!")} ${SF_ORANGE("Unknown")}`;
+  }
+}
+
 function formatSfCliStatusValue(data: SplashData, mode: GlyphMode): string {
   const cli = data.sfCli;
 
@@ -389,19 +414,6 @@ function buildLeftColumn(
       `${costColor(formatCost(data.monthlyCost))} ${MUTED("/")} ${MUTED(formatBudget(budget))}${sourceHint}`,
     ),
   );
-  // Lifetime usage is a local all-session estimate. Gateway `/key/info.spend`
-  // is current-key spend and resets on key rotation, so it is not suitable here.
-  const lifetimeHint =
-    data.lifetimeUsageSource === "sessions" ? ` ${MUTED("(local estimate)")}` : "";
-  lines.push(
-    formatGlyphInfoRow(
-      "lifetime",
-      mode,
-      "Lifetime Usage",
-      `${SF_CYAN(formatCost(data.lifetimeCost))}${lifetimeHint}`,
-      SF_CYAN,
-    ),
-  );
   lines.push("");
 
   // Extension health (heading only — individual items removed)
@@ -423,18 +435,14 @@ function buildLeftColumn(
       : `${SF_RED("✗")} ${SF_RED("Not connected")}`;
   lines.push(formatGlyphInfoRow("slack", mode, "Slack", slackValue));
 
-  // LLM Gateway status (detect from provider name)
+  // LLM Gateway status. Presence is still keyed off the active provider/model,
+  // but the value comes from the shared auth-gated probe state, not that name.
   const isGateway =
     data.providerName.toLowerCase().includes("gateway") ||
     data.modelName.toLowerCase().includes("gateway");
   if (isGateway) {
     lines.push(
-      formatGlyphInfoRow(
-        "gateway",
-        mode,
-        "LLM Gateway",
-        `${SF_GREEN("✓")} ${SF_GREEN("Connected")}`,
-      ),
+      formatGlyphInfoRow("gateway", mode, "LLM Gateway", formatGatewayStatusValue(data, mode)),
     );
   }
 

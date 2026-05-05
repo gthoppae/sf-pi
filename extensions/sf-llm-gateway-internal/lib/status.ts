@@ -26,7 +26,12 @@ import {
   isDefaultAnthropicBeta,
 } from "./models.ts";
 import type { GatewayDiscoveryState } from "./discovery.ts";
-import type { GatewayHealth, GatewayKeyInfo, GatewayMonthlyUsage } from "./monthly-usage.ts";
+import type {
+  GatewayConnectionStatus,
+  GatewayHealth,
+  GatewayKeyInfo,
+  GatewayMonthlyUsage,
+} from "./monthly-usage.ts";
 import { formatProviderSignalBadge, getActiveProviderSignal } from "./provider-telemetry.ts";
 import { getWireTraceFile, isWireTraceEnabled } from "./wire-trace.ts";
 import { glyph, resolveGlyphMode } from "../../../lib/common/glyph-policy.ts";
@@ -44,6 +49,7 @@ export interface GatewayRuntimeStatusState {
   keyInfoError: string | null;
   health: GatewayHealth | null;
   healthError: string | null;
+  connectionStatus?: GatewayConnectionStatus | null;
   runtimeBetaOverrides: Set<string> | null;
   runtimeExtraBetas: Set<string>;
 }
@@ -89,6 +95,7 @@ export function buildStatusReport(
     `Context usage: ${contextUsage ? `${formatTokens(contextUsage.tokens)} / ${formatTokens(contextUsage.contextWindow)}` : "unknown"}`,
     `Monthly usage: ${formatMonthlyUsageReportLine(state.monthlyUsage, state.monthlyUsageError)}`,
     `Key spend: ${formatKeyInfoReportLine(state.keyInfo, state.keyInfoError)}`,
+    `Gateway connection: ${formatConnectionReportLine(state.connectionStatus)}`,
     `Gateway health: ${formatHealthReportLine(state.health, state.healthError)}`,
     "",
     `Model discovery: ${discovery?.source ?? "not run"}${discovery?.error ? ` ⚠ ${discovery.error}` : ""}`,
@@ -185,6 +192,16 @@ function formatMonthlyUsageReportLine(
   }
 
   return monthlyUsageError ?? "not loaded yet";
+}
+
+function formatConnectionReportLine(
+  connectionStatus: GatewayConnectionStatus | null | undefined,
+): string {
+  if (!connectionStatus) return "not checked yet";
+  const parts: string[] = [connectionStatus.kind];
+  if (connectionStatus.source) parts.push(`via ${connectionStatus.source}`);
+  if (connectionStatus.detail) parts.push(connectionStatus.detail);
+  return parts.join(", ");
 }
 
 function formatKeyInfoReportLine(

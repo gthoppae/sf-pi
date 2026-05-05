@@ -17,7 +17,8 @@ Registers the gateway as a single unified Pi-native provider and routes
 Claude vs non-Claude traffic to the transport each family was designed for.
 Supports dynamic model discovery, monthly budget tracking, runtime beta
 header toggling, additive vs exclusive scoped-model behavior, a TUI setup
-wizard, and an in-app "paste your token" flow under `/login` (pi ≥ 0.72).
+wizard, a read-only usage probe, and an in-app "paste your token" flow under
+`/login` (pi ≥ 0.72).
 
 ## Key Architecture: One Provider, Two Transports
 
@@ -179,6 +180,7 @@ separately via the monthly usage endpoint (`/user/info`).
 | /command off              | additive scope                        | Disable, remove gateway pattern, switch to off-default                |
 | /command off              | exclusive scope                       | Disable, restore previous scoped models, switch to off-default        |
 | /command refresh          | —                                     | Re-discover, refresh monthly usage                                    |
+| /command usage-probe      | —                                     | Force a read-only usage probe and classify key/user spend scope       |
 | /command beta \<name\> on | —                                     | Toggle beta, re-register provider                                     |
 | Monthly usage fetch       | cached < 60 s old                     | Use cache                                                             |
 | Monthly usage fetch       | stale or forced                       | Fetch from gateway /user/info                                         |
@@ -221,6 +223,7 @@ extensions/sf-llm-gateway-internal/
     global-config.test.ts   ← unit / smoke test
     migrate-unify-provider.test.ts← unit / smoke test
     models.test.ts          ← unit / smoke test
+    monthly-usage.test.ts   ← unit / smoke test
     opus47-regression.test.ts← unit / smoke test
     provider-telemetry.test.ts← unit / smoke test
     retry-telemetry.test.ts ← unit / smoke test
@@ -272,6 +275,16 @@ requests fail. It is read-only and checks the configured URL, the normalized
 OpenAI-compatible route, the Claude/admin root route, API key presence, model
 discovery, and gateway health. It interprets common failures such as 401 auth
 errors, SSO/browser redirects, and `model=v1` routing mistakes.
+
+## Usage probe: `/sf-llm-gateway-internal usage-probe`
+
+Run `/sf-llm-gateway-internal usage-probe` after key rotation or when usage
+numbers look surprising. It forces a read-only `/user/info` + `/key/info` refresh,
+reports the live gateway connection classification, shows monthly/user spend and
+current-key spend separately, and explicitly explains whether the available data
+proves a true lifetime user counter. The welcome splash does not render a Lifetime
+Usage line because the currently available gateway endpoints do not prove true
+user-lifetime spend.
 
 ## Debugging: `/sf-llm-gateway-internal debug`
 

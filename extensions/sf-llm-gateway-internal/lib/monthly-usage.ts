@@ -17,6 +17,7 @@
  * registered and consumers see the empty snapshot.
  */
 import type {
+  GatewayConnectionStatus,
   GatewayHealth,
   GatewayKeyInfo,
   GatewayMonthlyUsage,
@@ -42,6 +43,7 @@ const FETCH_TIMEOUT_MS = 10_000;
 // Re-export types so existing imports (e.g. status.ts) keep working without
 // reaching into lib/common directly.
 export type {
+  GatewayConnectionStatus,
   GatewayHealth,
   GatewayKeyInfo,
   GatewayMonthlyUsage,
@@ -51,6 +53,20 @@ export { getMonthlyUsageState };
 
 let lastFetchAt = 0;
 let refreshInFlight: Promise<void> | null = null;
+
+type GatewayProbeSource = NonNullable<GatewayConnectionStatus["source"]>;
+
+class GatewayRequestError extends Error {
+  constructor(
+    message: string,
+    readonly source: GatewayProbeSource,
+    readonly status?: number,
+    readonly bodyPreview: string = "",
+  ) {
+    super(message);
+    this.name = "GatewayRequestError";
+  }
+}
 
 /**
  * Register the gateway refresher with the shared store. Call once at
@@ -78,13 +94,24 @@ export async function refreshMonthlyUsage(force: boolean, cwd: string): Promise<
   refreshInFlight = (async () => {
     const config = getGatewayConfig(cwd);
     if (!config.baseUrl) {
-      publishError("Missing base URL configuration.");
+      publishError("Missing base URL configuration.", {
+        kind: "not-configured",
+        detail: "Missing base URL configuration.",
+        checkedAt: new Date().toISOString(),
+        source: "config",
+      });
       lastFetchAt = Date.now();
       return;
     }
 
     if (!config.apiKey) {
-      publishError(`Missing ${API_KEY_ENV} or saved API key.`);
+      const message = `Missing ${API_KEY_ENV} or saved API key.`;
+      publishError(message, {
+        kind: "not-configured",
+        detail: message,
+        checkedAt: new Date().toISOString(),
+        source: "config",
+      });
       lastFetchAt = Date.now();
       return;
     }
@@ -105,6 +132,7 @@ export async function refreshMonthlyUsage(force: boolean, cwd: string): Promise<
       keyInfoError: null,
       health: null,
       healthError: null,
+      connectionStatus: null,
     };
 
     if (usageResult.status === "fulfilled") {
@@ -132,6 +160,7 @@ export async function refreshMonthlyUsage(force: boolean, cwd: string): Promise<
           : String(healthResult.reason);
     }
 
+    snapshot.connectionStatus = resolveConnectionStatus(usageResult, keyResult, healthResult);
     setMonthlyUsageState(snapshot);
     lastFetchAt = Date.now();
   })();
@@ -143,7 +172,7 @@ export async function refreshMonthlyUsage(force: boolean, cwd: string): Promise<
   }
 }
 
-function publishError(message: string): void {
+function publishError(message: string, connectionStatus: GatewayConnectionStatus): void {
   setMonthlyUsageState({
     monthlyUsage: null,
     monthlyUsageError: message,
@@ -151,7 +180,117 @@ function publishError(message: string): void {
     keyInfoError: message,
     health: null,
     healthError: message,
+    connectionStatus,
   });
+}
+
+function resolveConnectionStatus(
+  usageResult: PromiseSettledResult<GatewayMonthlyUsage>,
+  keyResult: PromiseSettledResult<GatewayKeyInfo>,
+  healthResult: PromiseSettledResult<GatewayHealth>,
+): GatewayConnectionStatus {
+  const checkedAt = new Date().toISOString();
+  if (usageResult.status === "fulfilled") {
+    return healthResult.status === "fulfilled"
+      ? { kind: "connected", checkedAt, source: "user-info" }
+      : {
+          kind: "degraded",
+          detail: formatSettledError(healthResult),
+          checkedAt,
+          source: "user-info",
+        };
+  }
+  if (keyResult.status === "fulfilled") {
+    return healthResult.status === "fulfilled"
+      ? { kind: "connected", checkedAt, source: "key-info" }
+      : {
+          kind: "degraded",
+          detail: formatSettledError(healthResult),
+          checkedAt,
+          source: "key-info",
+        };
+  }
+
+  const failures = [usageResult, keyResult, healthResult]
+    .filter((result): result is PromiseRejectedResult => result.status === "rejected")
+    .map((result) => result.reason);
+  const requestErrors = failures.filter(
+    (error): error is GatewayRequestError => error instanceof GatewayRequestError,
+  );
+  const authFailure = requestErrors.find(
+    (error) =>
+      error.status === 401 ||
+      error.status === 403 ||
+      /unauthorized|authentication/i.test(error.bodyPreview),
+  );
+  if (authFailure) {
+    return {
+      kind: "auth-failed",
+      detail: authFailure.message,
+      checkedAt,
+      source: authFailure.source,
+    };
+  }
+
+  const urlFailure = requestErrors.find(
+    (error) =>
+      error.status === 302 ||
+      error.status === 307 ||
+      error.status === 404 ||
+      /openid-connect|oauth|Found<\/a>|<html/i.test(error.bodyPreview),
+  );
+  if (urlFailure) {
+    return {
+      kind: "url-invalid",
+      detail: urlFailure.message,
+      checkedAt,
+      source: urlFailure.source,
+    };
+  }
+
+  const unreachable = failures.find((error) => !(error instanceof GatewayRequestError));
+  if (unreachable) {
+    return { kind: "unreachable", detail: formatError(unreachable), checkedAt };
+  }
+
+  const first = requestErrors[0];
+  if (first && typeof first.status === "number" && first.status >= 500) {
+    return { kind: "unreachable", detail: first.message, checkedAt, source: first.source };
+  }
+
+  return {
+    kind: "unknown",
+    detail: first?.message ?? "Gateway probe failed.",
+    checkedAt,
+    source: first?.source,
+  };
+}
+
+function formatSettledError(result: PromiseSettledResult<unknown>): string | undefined {
+  return result.status === "rejected" ? formatError(result.reason) : undefined;
+}
+
+function formatError(error: unknown): string {
+  return error instanceof Error ? error.message : String(error);
+}
+
+async function gatewayRequestError(
+  label: string,
+  source: GatewayProbeSource,
+  response: Response,
+): Promise<GatewayRequestError> {
+  let bodyPreview: string;
+  try {
+    bodyPreview = (await response.text()).slice(0, 240);
+  } catch {
+    bodyPreview = "";
+  }
+  return new GatewayRequestError(
+    `${label} request failed (${response.status}).`,
+    source,
+    response.status,
+    bodyPreview,
+  );
 }
 
 async function fetchMonthlyUsage(baseUrl: string, apiKey: string): Promise<GatewayMonthlyUsage> {
@@ -168,7 +307,7 @@ async function fetchMonthlyUsage(baseUrl: string, apiKey: string): Promise<Gatew
   );
 
   if (!response.ok) {
-    throw new Error(`Monthly usage request failed (${response.status}).`);
+    throw await gatewayRequestError("Monthly usage", "user-info", response);
   }
 
   const json = (await response.json()) as {
@@ -209,7 +348,7 @@ async function fetchKeyInfo(baseUrl: string, apiKey: string): Promise<GatewayKey
   );
 
   if (!response.ok) {
-    throw new Error(`Key info request failed (${response.status}).`);
+    throw await gatewayRequestError("Key info", "key-info", response);
   }
 
   const json = (await response.json()) as {
@@ -249,7 +388,7 @@ async function fetchHealth(baseUrl: string, apiKey: string): Promise<GatewayHeal
   );
 
   if (!response.ok) {
-    throw new Error(`Health request failed (${response.status}).`);
+    throw await gatewayRequestError("Health", "health", response);
   }
 
   const json = (await response.json()) as {

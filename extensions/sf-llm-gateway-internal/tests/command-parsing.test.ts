@@ -95,6 +95,16 @@ describe("parseCommandArgs", () => {
     expect(result.subcommand).toBe("doctor");
   });
 
+  it("parses 'usage-probe'", () => {
+    const result = parseCommandArgs("usage-probe");
+    expect(result.subcommand).toBe("usage-probe");
+  });
+
+  it("parses 'usage' as usage-probe alias", () => {
+    const result = parseCommandArgs("usage");
+    expect(result.subcommand).toBe("usage-probe");
+  });
+
   it("parses 'dr' as doctor alias", () => {
     const result = parseCommandArgs("dr");
     expect(result.subcommand).toBe("doctor");

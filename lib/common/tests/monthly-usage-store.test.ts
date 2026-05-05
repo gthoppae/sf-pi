@@ -38,6 +38,7 @@ const SAMPLE: MonthlyUsageSnapshot = {
   keyInfoError: null,
   health: null,
   healthError: null,
+  connectionStatus: null,
 };
 
 describe("monthly-usage store", () => {
