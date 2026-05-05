@@ -8,11 +8,19 @@
  * These are the most breakable helpers — they determine whether the provider
  * gets registered and which settings patterns are written.
  */
+import { mkdtempSync, rmSync } from "node:fs";
+import { tmpdir } from "node:os";
+import path from "node:path";
 import { describe, it, expect } from "vitest";
 import {
+  API_KEY_ENV,
+  BASE_URL_ENV,
   OFF_DEFAULT_MODEL_ID,
+  getGatewayConfig,
   normalizeBaseUrl,
+  projectGatewayConfigPath,
   resolveSavedExclusiveScopeStatus,
+  writeGatewaySavedConfig,
 } from "../lib/config.ts";
 import {
   applyGatewayModelScope,
@@ -60,9 +68,19 @@ describe("normalizeBaseUrl", () => {
     expect(normalizeBaseUrl("https://example.com/")).toBe("https://example.com");
   });
 
-  it("keeps path segments intact", () => {
-    expect(normalizeBaseUrl("https://gateway.example.com/v1")).toBe(
-      "https://gateway.example.com/v1",
+  it("keeps arbitrary path segments intact", () => {
+    expect(normalizeBaseUrl("https://gateway.example.com/team-proxy")).toBe(
+      "https://gateway.example.com/team-proxy",
+    );
+  });
+
+  it("strips known gateway route suffixes", () => {
+    expect(normalizeBaseUrl("https://gateway.example.com/v1")).toBe("https://gateway.example.com");
+    expect(normalizeBaseUrl("https://gateway.example.com/bedrock")).toBe(
+      "https://gateway.example.com",
+    );
+    expect(normalizeBaseUrl("https://gateway.example.com/bedrock/v1")).toBe(
+      "https://gateway.example.com",
     );
   });
 
@@ -84,6 +102,40 @@ describe("normalizeBaseUrl", () => {
 
   it("preserves port numbers", () => {
     expect(normalizeBaseUrl("https://gateway.local:4443")).toBe("https://gateway.local:4443");
+  });
+});
+
+// -------------------------------------------------------------------------------------------------
+// getGatewayConfig precedence
+// -------------------------------------------------------------------------------------------------
+
+describe("getGatewayConfig precedence", () => {
+  it("prefers saved config over env vars so stale shell exports cannot shadow setup", () => {
+    const cwd = mkdtempSync(path.join(tmpdir(), "sf-pi-gateway-config-"));
+    const previousBaseUrl = process.env[BASE_URL_ENV];
+    const previousApiKey = process.env[API_KEY_ENV];
+
+    try {
+      process.env[BASE_URL_ENV] = "https://stale-env.example.com/v1";
+      process.env[API_KEY_ENV] = "stale-env-key";
+      writeGatewaySavedConfig(projectGatewayConfigPath(cwd), {
+        baseUrl: "https://saved.example.com/bedrock",
+        apiKey: "saved-key",
+      });
+
+      const config = getGatewayConfig(cwd);
+
+      expect(config.baseUrl).toBe("https://saved.example.com");
+      expect(config.baseUrlSource).toBe("saved");
+      expect(config.apiKey).toBe("saved-key");
+      expect(config.apiKeySource).toBe("saved");
+    } finally {
+      if (previousBaseUrl === undefined) delete process.env[BASE_URL_ENV];
+      else process.env[BASE_URL_ENV] = previousBaseUrl;
+      if (previousApiKey === undefined) delete process.env[API_KEY_ENV];
+      else process.env[API_KEY_ENV] = previousApiKey;
+      rmSync(cwd, { recursive: true, force: true });
+    }
   });
 });
 

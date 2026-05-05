@@ -29,12 +29,13 @@
  * - Keeps the runtime spine in this file while pushing settings/status helpers to lib/
  *
  * Configuration:
- * - SF_LLM_GATEWAY_INTERNAL_BASE_URL   required — the gateway endpoint, configured via
- *                                       the setup wizard or env var. This extension has
- *                                       no built-in default because it targets a
- *                                       Salesforce-internal endpoint that is not publicly
- *                                       reachable.
- * - SF_LLM_GATEWAY_INTERNAL_API_KEY    required for real requests and monthly usage
+ * - SF_LLM_GATEWAY_INTERNAL_BASE_URL   optional automation fallback. Normal users
+ *                                       should configure the endpoint via setup.
+ *                                       Saved config wins over env vars to avoid
+ *                                       stale shell/Keychain exports shadowing new
+ *                                       pasted values.
+ * - SF_LLM_GATEWAY_INTERNAL_API_KEY    optional automation fallback. Normal users
+ *                                       should paste/rotate keys with /login or setup.
  * - SF_LLM_GATEWAY_INTERNAL_BETAS      optional — comma-separated Anthropic beta
  *                                       header values. When set, only listed values are
  *                                       active. When unset, model defaults apply.
@@ -273,7 +274,7 @@ export default function sfLlmGatewayInternalExtension(pi: ExtensionAPI) {
   // Register a static catalog synchronously so Pi's startup can resolve
   // defaultProvider/defaultModel and enabledModels patterns immediately.
   // Uses a minimal registration that does not need cwd — the config layer
-  // still reads env vars and the global saved config for credentials.
+  // reads global saved config first, then env vars as automation fallback.
   registerProviderIfConfigured(pi, getBetaOverrides(), getBetaExtras());
 
   // Rendering hook for any sendMessage traffic the extension emits on behalf
@@ -692,8 +693,8 @@ async function handleHelpCommand(pi: ExtensionAPI, ctx: ExtensionCommandContext)
     "Beta aliases:",
     ...KNOWN_BETAS.map((b) => `- ${b.aliases[0]} → ${b.value}`),
     "",
-    "Built-in default base URL: (none — set via setup wizard or env)",
-    `Env vars (optional overrides / credentials): ${BASE_URL_ENV}, ${API_KEY_ENV}`,
+    "Built-in default base URL: (none — set via setup wizard)",
+    `Automation fallback env vars (used only when saved config is blank): ${BASE_URL_ENV}, ${API_KEY_ENV}`,
     `Optional env: ${BETAS_ENV} (comma-separated Anthropic betas; unset = model defaults)`,
     `Setup also supports additive vs exclusive scoped model behavior.`,
     `Beta command accepts either a known alias or a raw Anthropic beta value.`,
@@ -1125,8 +1126,8 @@ async function promptAndSaveBaseUrl(
 
   const hint =
     resolved.baseUrlSource === "env"
-      ? `\nCurrent value comes from ${BASE_URL_ENV}; a saved value is used only when the env var is absent.`
-      : "\nLeave this blank to clear the saved value for this scope. This extension has no built-in default URL — you must provide one via env var or setup.";
+      ? `\nCurrently using ${BASE_URL_ENV} because no saved value exists. Saving here makes pi ignore stale shell/Keychain exports.`
+      : "\nLeave this blank to clear the saved value for this scope. This extension has no built-in default URL — use setup for normal onboarding or env vars for automation.";
 
   const value = await ctx.ui.input(
     `SF LLM Gateway base URL (${scope})${hint}`,
@@ -1184,7 +1185,7 @@ async function promptAndSaveApiKey(
 
   const hint =
     resolved.apiKeySource === "env"
-      ? `\nCurrent value comes from ${API_KEY_ENV}; a saved value is used only when the env var is absent.`
+      ? `\nCurrently using ${API_KEY_ENV} because no saved key exists. Saving here makes pi ignore stale shell/Keychain exports.`
       : "";
 
   const value = await ctx.ui.input(`SF LLM Gateway API key (${scope})${hint}`, "");

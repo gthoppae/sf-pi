@@ -5,8 +5,8 @@
 > External users cannot use this extension. It is included in the public
 > repo because the sf-pi manager expects a known set of bundled extensions,
 > but you must either (a) provide your own compatible gateway via
-> `SF_LLM_GATEWAY_INTERNAL_BASE_URL` + `SF_LLM_GATEWAY_INTERNAL_API_KEY`, or
-> (b) disable this extension via `/sf-pi disable sf-llm-gateway-internal`.
+> `/sf-llm-gateway-internal setup` (or env vars for automation), or (b) disable
+> this extension via `/sf-pi disable sf-llm-gateway-internal`.
 
 This document explains the design and runtime flow of the Salesforce LLM Gateway
 provider extension. Read this before making changes.
@@ -132,26 +132,28 @@ Extension loads
 Configuration follows a three-tier cascade:
 
 ```
-env var  →  saved config  →  built-in default
+saved config  →  env var fallback  →  built-in default/missing
 ```
 
-- **Base URL**: `SF_LLM_GATEWAY_INTERNAL_BASE_URL` > saved > built-in default
-- **API key**: `SF_LLM_GATEWAY_INTERNAL_API_KEY` > saved > missing
+- **Base URL**: saved > `SF_LLM_GATEWAY_INTERNAL_BASE_URL` > built-in default
+- **API key**: saved > `SF_LLM_GATEWAY_INTERNAL_API_KEY` > missing
 - **Saved config**: `~/.pi/agent/sf-llm-gateway-internal.json` (global),
   `.pi/sf-llm-gateway-internal.json` (project)
 - **Scoped model mode**: saved config can keep gateway scope **additive**
   (prepend `sf-llm-gateway-internal/*`) or **exclusive**
   (replace scoped models with only gateway models and restore the prior scope on disable)
 
-Project-scoped saved config overrides global. Env vars override everything.
+Project-scoped saved config overrides global. Env vars are intentionally only a
+fallback for CI/automation when no saved config exists, so stale shell exports or
+macOS Keychain-backed env commands cannot shadow a freshly pasted key.
 
 Configure the base URL as your organization's gateway **root URL**, for
-example `https://your-internal-gateway.example.com`. Do not include deployment
-or API path suffixes such as `/bedrock` or `/v1` in the saved value. Runtime
-endpoint helpers derive the correct routes: OpenAI-compatible chat/model
-discovery uses the gateway's `/v1` route, Anthropic Messages uses the gateway
-root because the SDK appends `/v1/messages`, and admin calls such as
-`/user/info` use the gateway root.
+example `https://your-internal-gateway.example.com`. If a user pastes a known
+route suffix such as `/bedrock`, `/v1`, or `/bedrock/v1`, the config layer
+canonicalizes it back to the root. Runtime endpoint helpers then derive the
+correct routes: OpenAI-compatible chat/model discovery uses the gateway's `/v1`
+route, Anthropic Messages uses the gateway root because the SDK appends
+`/v1/messages`, and admin calls such as `/user/info` use the gateway root.
 
 ## Zero-cost gateway billing
 
@@ -209,6 +211,7 @@ extensions/sf-llm-gateway-internal/
     betas.test.ts           ← unit / smoke test
     codex-regression.test.ts← unit / smoke test
     command-parsing.test.ts ← unit / smoke test
+    config-panel-paste.test.ts← unit / smoke test
     config.test.ts          ← unit / smoke test
     cwd-migration.test.ts   ← unit / smoke test
     debug.test.ts           ← unit / smoke test
@@ -330,13 +333,16 @@ finished on this first run. The bootstrap catalog now seeds both Claude and
 gateway. If it persists, run `/sf-llm-gateway-internal refresh`.
 
 **Gateway fails on startup or tool calls error out immediately:**
-Confirm `SF_LLM_GATEWAY_INTERNAL_BASE_URL` and `SF_LLM_GATEWAY_INTERNAL_API_KEY`
-are set (env vars win over saved config). The base URL should be the gateway
-root, for example `https://your-internal-gateway.example.com`, not a deployment
-or API path such as `/bedrock` or `/v1`. Run `/sf-llm-gateway-internal setup`
-for an interactive wizard, `/sf-llm-gateway-internal doctor` for endpoint/key
-preflight checks, or `/sf-llm-gateway-internal debug <model>` to inspect the
-exact upstream payload LiteLLM would send.
+Run `/sf-llm-gateway-internal setup` for first-time onboarding, or `/login` to
+rotate only the key. Env vars are only a fallback when saved config is blank.
+The base URL should be the gateway root, for example
+`https://your-internal-gateway.example.com`. If a user pastes
+a route with a known suffix such as `/bedrock`, `/v1`, or `/bedrock/v1`, the
+extension canonicalizes it back to the gateway root before building OpenAI,
+Claude, and admin endpoints. Run `/sf-llm-gateway-internal setup` for an
+interactive wizard, `/sf-llm-gateway-internal doctor` for endpoint/key preflight
+checks, or `/sf-llm-gateway-internal debug <model>` to inspect the exact upstream
+payload LiteLLM would send.
 
 **Claude responses appear to truncate and the agent asks you to type "continue":**
 This is the pi-ai OpenAI-compat translator splitting Claude thinking + text

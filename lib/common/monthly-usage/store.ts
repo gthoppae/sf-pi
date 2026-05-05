@@ -28,7 +28,7 @@ export interface GatewayMonthlyUsage {
 }
 
 export interface GatewayKeyInfo {
-  /** Lifetime spend on this specific API key. */
+  /** Cumulative spend on this specific API key. Resets when users rotate keys. */
   spend: number;
   /** Per-key RPM limit, when set by the gateway admin. */
   rpmLimit?: number;

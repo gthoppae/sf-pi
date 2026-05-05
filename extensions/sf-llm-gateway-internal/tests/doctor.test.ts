@@ -10,6 +10,12 @@ describe("interpretGatewayHttpResult", () => {
     );
   });
 
+  it("points blocked keys at /login instead of env or Keychain rotation", () => {
+    expect(interpretGatewayHttpResult(401, "Authentication Error, Key is blocked")).toContain(
+      "Run /login",
+    );
+  });
+
   it("recognizes browser/SSO redirects", () => {
     expect(interpretGatewayHttpResult(302, "openid-connect/auth")).toContain(
       "interactive login route",
@@ -35,12 +41,12 @@ describe("formatGatewayDoctorReport", () => {
       baseUrlSource: "saved",
       apiKeyPresent: true,
       apiKeyDescription: "sk-1…abcd (saved)",
-      openAiBaseUrl: "https://gateway.example.com/bedrock/v1",
+      openAiBaseUrl: "https://gateway.example.com/v1",
       anthropicRootUrl: "https://gateway.example.com",
       checks: [
         {
           name: "Model discovery",
-          url: "https://gateway.example.com/bedrock/v1/models",
+          url: "https://gateway.example.com/v1/models",
           status: 200,
           ok: true,
           interpretation: "OK",
@@ -50,7 +56,7 @@ describe("formatGatewayDoctorReport", () => {
     });
 
     expect(out).toContain("SF LLM Gateway Doctor");
-    expect(out).toContain("OpenAI route: https://gateway.example.com/bedrock/v1");
+    expect(out).toContain("OpenAI route: https://gateway.example.com/v1");
     expect(out).toContain("Claude/admin root: https://gateway.example.com");
     expect(out).toContain("Model discovery: OK (200)");
     expect(out).toContain("Gateway preflight passed.");

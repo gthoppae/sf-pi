@@ -352,31 +352,16 @@ For the canonical machine-readable bundle list, see [`catalog/index.json`](./cat
 > Salesforce-internal gateway endpoint and is not usable by external
 > developers. If you are not on the Salesforce corporate network, disable
 > it with `/sf-pi disable sf-llm-gateway-internal` or supply your own
-> OpenAI-compatible gateway via
-> `SF_LLM_GATEWAY_INTERNAL_BASE_URL` + `SF_LLM_GATEWAY_INTERNAL_API_KEY`.
+> OpenAI-compatible gateway with `/sf-llm-gateway-internal setup`.
 
 ## SF LLM Gateway Internal Quick Start
 
-The gateway extension requires you to set a base URL and API key. There is
-no built-in default URL because the target endpoint is not publicly
-reachable. Use your organization's gateway **root URL** only:
-
-```bash
-export SF_LLM_GATEWAY_INTERNAL_BASE_URL="https://your-internal-gateway.example.com"
-export SF_LLM_GATEWAY_INTERNAL_API_KEY="your-gateway-key"
-```
-
-Do not include deployment or API path suffixes in the configured base URL.
-For example, configure `https://your-internal-gateway.example.com`, not
-`https://your-internal-gateway.example.com/bedrock` or
-`https://your-internal-gateway.example.com/v1`. sf-pi derives the correct
-routes internally: OpenAI-compatible models use the gateway's `/v1` route, and
-Claude models use the native Anthropic `/v1/messages` route.
-
-Or configure directly inside pi with the built-in setup wizard:
+The normal setup path is inside pi. Run the built-in setup wizard and paste your
+organization's gateway root URL plus API key:
 
 ```text
 /sf-llm-gateway-internal setup              # Single overlay setup form
+/login                                      # Rotate only the saved API key
 /sf-llm-gateway-internal on                 # Enable provider + set default model
 /sf-llm-gateway-internal off                # Disable provider + restore previous default
 /sf-llm-gateway-internal refresh            # Re-discover models + refresh budget
@@ -386,6 +371,12 @@ Or configure directly inside pi with the built-in setup wizard:
 /sf-llm-gateway-internal beta               # Show beta header state
 /sf-llm-gateway-internal beta context-1m off # Toggle a beta header
 ```
+
+The extension stores setup in pi's saved config. Env vars are still supported as
+an automation fallback when saved config is blank, but they are no longer the
+recommended onboarding path and cannot override a saved key. Known pasted URL
+suffixes such as `/bedrock`, `/v1`, and `/bedrock/v1` are canonicalized to the
+gateway root automatically.
 
 ### Session storage location
 

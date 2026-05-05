@@ -254,21 +254,15 @@ export function resolveMonthlyUsage(monthlyBudgetFallback: number = 3000): {
 /**
  * Compute the lifetime-usage payload shown on the splash.
  *
- * Prefers the gateway's per-key lifetime counter (`/key/info.spend`) so the
- * splash matches the gateway status report. Falls back to a best-effort
- * sum across local session files for users who aren't on the gateway
- * (bring-your-own-keys). The fallback is clearly labeled as an estimate on
- * the splash so the user knows the number is local-only.
+ * Uses the local all-session estimate. The gateway's `/key/info.spend` is
+ * spend for the current API key only, so it resets whenever a user rotates
+ * keys and is not a valid lifetime counter. Current-key spend still appears
+ * in `/sf-llm-gateway-internal` status.
  */
 export function resolveLifetimeUsage(): {
   lifetimeCost: number;
   lifetimeUsageSource: "gateway" | "sessions";
 } {
-  const gatewayState = getMonthlyUsageState();
-  const keyInfo = gatewayState.keyInfo;
-  if (keyInfo && typeof keyInfo.spend === "number") {
-    return { lifetimeCost: keyInfo.spend, lifetimeUsageSource: "gateway" };
-  }
   return { lifetimeCost: estimateLifetimeCost(), lifetimeUsageSource: "sessions" };
 }
 
@@ -295,8 +289,8 @@ export function collectInitialSplashData(
         : null
       : monthlyBudgetFallback,
     monthlyUsageSource: gatewayUsage ? "gateway" : "sessions",
-    lifetimeCost: typeof gatewayState.keyInfo?.spend === "number" ? gatewayState.keyInfo.spend : 0,
-    lifetimeUsageSource: gatewayState.keyInfo ? "gateway" : "sessions",
+    lifetimeCost: estimateLifetimeCost(),
+    lifetimeUsageSource: "sessions",
     loading: true,
     slackLoading: true,
     extensionHealthLoading: true,

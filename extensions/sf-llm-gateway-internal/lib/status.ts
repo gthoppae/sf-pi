@@ -192,7 +192,7 @@ function formatKeyInfoReportLine(
   keyInfoError: string | null,
 ): string {
   if (keyInfo) {
-    const parts = [`${formatUsd(keyInfo.spend)} lifetime on ${keyInfo.keyName ?? "current key"}`];
+    const parts = [`${formatUsd(keyInfo.spend)} spent on ${keyInfo.keyName ?? "current key"}`];
     if (typeof keyInfo.rpmLimit === "number") {
       parts.push(`rpm=${keyInfo.rpmLimit}`);
     }

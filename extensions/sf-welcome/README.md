@@ -9,7 +9,7 @@ Salesforce-branded splash screen that displays on startup with an animated Pi + 
 - Animated Pi + SALESFORCE wordmark with Salesforce-blue and pastel-rainbow palettes
 - Active model name and provider
 - Monthly cost usage line with color-coded progress (green → orange → red)
-- Lifetime usage line — per-key spend from the gateway, or a local session-file estimate for bring-your-own-keys users
+- Lifetime usage line — local all-session cost estimate that does not reset when gateway keys rotate
 - sf-pi extension health grid (active/disabled/locked indicators)
 - Slack, LLM Gateway, and lightweight SF CLI install/latest status
 

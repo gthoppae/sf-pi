@@ -124,12 +124,9 @@ function unifiedStream(
  *
  * The block writes the pasted token to the GLOBAL saved config file, which
  * is the same file `/sf-llm-gateway-internal setup global` writes to. That
- * keeps a single source of truth and means existing env-var / saved-config
- * users are never forced through this flow.
- *
- * `getApiKey` always re-reads global config so the env var (if set) still
- * takes precedence over the saved credential — matching the rest of the
- * extension's precedence rules.
+ * makes `/login` the key-rotation path for normal users. Saved config is
+ * intentionally primary over env vars so stale shell/Keychain exports cannot
+ * shadow a freshly pasted token.
  */
 function buildOAuthBlock(
   pi: ExtensionAPI,
@@ -177,8 +174,8 @@ function buildOAuthBlock(
     },
 
     getApiKey(_credentials: OAuthCredentials): string {
-      // Always re-read from the extension's config so env-var overrides
-      // and later `setup` updates stay authoritative.
+      // Always re-read from the extension's config so /login and later setup
+      // updates take effect immediately without a shell restart.
       return getGlobalOnlyGatewayConfig().apiKey ?? "";
     },
   };
@@ -192,7 +189,7 @@ function registerProviders(
   cwd?: string,
 ): boolean {
   // When called from the factory before session_start, cwd is undefined.
-  // Fall back to global-only config (env vars + global Pi agent saved config).
+  // Fall back to global-only config (global saved config, then env fallback).
   const config = cwd ? getGatewayConfig(cwd) : getGlobalOnlyGatewayConfig();
   if (!config.enabled || !config.baseUrl) {
     pi.unregisterProvider(PROVIDER_NAME);

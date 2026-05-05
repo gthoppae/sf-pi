@@ -62,6 +62,14 @@ function maskApiKeyForDisplay(value: string): string {
   return `${value.slice(0, 4)}…${value.slice(-4)}`;
 }
 
+export function normalizePastedTextFieldInput(data: string): string {
+  return data
+    .replace(/\x1b\[200~/g, "")
+    .replace(/\x1b\[201~/g, "")
+    .replace(/[\r\n\t]/g, "")
+    .replace(/[\x00-\x1f\x7f]/g, "");
+}
+
 // -------------------------------------------------------------------------------------------------
 // Config panel component
 // -------------------------------------------------------------------------------------------------
@@ -188,13 +196,13 @@ export class GatewayConfigPanelComponent implements Focusable {
     );
     lines.push(
       pad(
-        ` ${theme.fg("dim", "Saved fields are fallbacks. Matching env vars override them when present.")}`,
+        ` ${theme.fg("dim", "Saved fields are primary. Env vars are only fallbacks when saved values are blank.")}`,
       ),
     );
     lines.push(pad(""));
 
     // Base URL field
-    lines.push(pad(` ${this.renderFieldLabel("baseUrl", "Saved base URL fallback")}`));
+    lines.push(pad(` ${this.renderFieldLabel("baseUrl", "Saved base URL")}`));
     lines.push(pad(`   ${this.renderTextField("baseUrl", width - 4)}`));
     lines.push(
       pad(
@@ -203,7 +211,9 @@ export class GatewayConfigPanelComponent implements Focusable {
     );
     if (this.state.effectiveConfig.baseUrlSource === "env") {
       lines.push(
-        pad(`   ${theme.fg("dim", `${BASE_URL_ENV} currently overrides the saved fallback.`)}`),
+        pad(
+          `   ${theme.fg("dim", `Using ${BASE_URL_ENV} because no saved base URL is configured.`)}`,
+        ),
       );
     } else if (
       this.scope === "project" &&
@@ -225,7 +235,7 @@ export class GatewayConfigPanelComponent implements Focusable {
     lines.push(pad(""));
 
     // API key field
-    lines.push(pad(` ${this.renderFieldLabel("apiKey", "Saved API key fallback")}`));
+    lines.push(pad(` ${this.renderFieldLabel("apiKey", "Saved API key")}`));
     lines.push(pad(`   ${this.renderTextField("apiKey", width - 4)}`));
     lines.push(
       pad(
@@ -234,7 +244,9 @@ export class GatewayConfigPanelComponent implements Focusable {
     );
     if (this.state.effectiveConfig.apiKeySource === "env") {
       lines.push(
-        pad(`   ${theme.fg("dim", `${API_KEY_ENV} currently overrides the saved fallback.`)}`),
+        pad(
+          `   ${theme.fg("dim", `Using ${API_KEY_ENV} because no saved API key is configured.`)}`,
+        ),
       );
     } else if (
       this.scope === "project" &&
@@ -379,8 +391,7 @@ export class GatewayConfigPanelComponent implements Focusable {
     const focused = this.currentFocus() === field;
     const rawValue = field === "baseUrl" ? this.savedBaseUrl : this.savedApiKey;
     const cursor = field === "baseUrl" ? this.baseUrlCursor : this.apiKeyCursor;
-    const placeholder =
-      field === "baseUrl" ? DEFAULT_BASE_URL : "Paste saved fallback API key here";
+    const placeholder = field === "baseUrl" ? DEFAULT_BASE_URL : "Paste saved API key here";
     const innerWidth = Math.max(12, width - 2);
     const open = this.theme.fg(focused ? "accent" : "border", "[");
     const close = this.theme.fg(focused ? "accent" : "border", "]");
@@ -518,9 +529,10 @@ export class GatewayConfigPanelComponent implements Focusable {
       this.focusIndex = (this.focusIndex + 1) % this.focusOrder.length;
       return true;
     }
-    if (data.length === 1 && data.charCodeAt(0) >= 32) {
-      value = value.slice(0, cursor) + data + value.slice(cursor);
-      cursor += 1;
+    const pastedText = normalizePastedTextFieldInput(data);
+    if (pastedText) {
+      value = value.slice(0, cursor) + pastedText + value.slice(cursor);
+      cursor += pastedText.length;
       setter(value, cursor);
       this.errorMessage = null;
       return true;
@@ -554,12 +566,12 @@ export class GatewayConfigPanelComponent implements Focusable {
     if (focus === "save-enable") {
       const effective = this.resolveEffectivePreview(normalizedSavedBaseUrl);
       if (!effective.baseUrl) {
-        this.errorMessage = `Built-in default base URL is unavailable; set ${BASE_URL_ENV} or enter a saved base URL fallback before enabling.`;
+        this.errorMessage = `Enter a saved base URL before enabling. ${BASE_URL_ENV} is only an automation fallback.`;
         this.focusIndex = 0;
         return;
       }
       if (!effective.apiKey) {
-        this.errorMessage = `Set ${API_KEY_ENV} or enter a saved API key fallback before enabling.`;
+        this.errorMessage = `Enter a saved API key before enabling, or run /login. ${API_KEY_ENV} is only an automation fallback.`;
         this.focusIndex = 1;
         return;
       }
@@ -636,15 +648,18 @@ export class GatewayConfigPanelComponent implements Focusable {
       this.getSavedExclusiveScopeValue() ??
       this.state.lowerSavedExclusiveScope;
 
-    const baseUrl = envBaseUrl ?? savedBaseUrl ?? DEFAULT_BASE_URL;
+    const baseUrl = savedBaseUrl ?? envBaseUrl ?? DEFAULT_BASE_URL;
     const apiKey =
-      envApiKey ?? this.state.higherSavedApiKey ?? savedApiKey ?? this.state.lowerSavedApiKey;
+      this.state.higherSavedApiKey ?? savedApiKey ?? this.state.lowerSavedApiKey ?? envApiKey;
+    const savedApiKeyPresent = Boolean(
+      this.state.higherSavedApiKey ?? savedApiKey ?? this.state.lowerSavedApiKey,
+    );
 
     return {
       baseUrl,
-      baseUrlSource: envBaseUrl ? "env" : savedBaseUrl ? "saved" : "default",
+      baseUrlSource: savedBaseUrl ? "saved" : envBaseUrl ? "env" : "default",
       apiKey,
-      apiKeySource: envApiKey ? "env" : apiKey ? "saved" : "missing",
+      apiKeySource: savedApiKeyPresent ? "saved" : envApiKey ? "env" : "missing",
       exclusiveScope: savedExclusiveScope ?? false,
       exclusiveScopeSource: savedExclusiveScope !== undefined ? "saved" : "default",
     };

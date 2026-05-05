@@ -389,9 +389,8 @@ function buildLeftColumn(
       `${costColor(formatCost(data.monthlyCost))} ${MUTED("/")} ${MUTED(formatBudget(budget))}${sourceHint}`,
     ),
   );
-  // Lifetime usage — prefers the gateway's per-key counter, falls back to a
-  // local session-file estimate for bring-your-own-keys users. Always
-  // rendered so BYO-keys users still see cumulative context.
+  // Lifetime usage is a local all-session estimate. Gateway `/key/info.spend`
+  // is current-key spend and resets on key rotation, so it is not suitable here.
   const lifetimeHint =
     data.lifetimeUsageSource === "sessions" ? ` ${MUTED("(local estimate)")}` : "";
   lines.push(

@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /** Read-only gateway preflight diagnostics for `/sf-llm-gateway-internal doctor`. */
 import {
-  API_KEY_ENV,
   describeApiKey,
   describeConfigValue,
   getGatewayConfig,
@@ -36,8 +35,11 @@ export type GatewayDoctorReport = {
 
 export function interpretGatewayHttpResult(status: number, bodyPreview: string): string {
   if (status >= 200 && status < 300) return "OK";
+  if (status === 401 && /key is blocked/i.test(bodyPreview)) {
+    return "Authentication failed because the active gateway key is blocked. Run /login and paste a new gateway API key; saved pi config now takes precedence over stale env or Keychain exports.";
+  }
   if (status === 401 || /no api key|authentication|unauthorized/i.test(bodyPreview)) {
-    return `Authentication failed. Check ${API_KEY_ENV} or the saved gateway API key.`;
+    return "Authentication failed. Run /login to paste a gateway API key, or use env vars only for automation when no saved key exists.";
   }
   if (
     status === 302 ||
@@ -82,7 +84,9 @@ export async function fetchGatewayDoctorReport(cwd: string): Promise<GatewayDoct
     recommendations.push(`Run /sf-llm-gateway-internal setup and enter the gateway base URL.`);
   }
   if (!config.apiKey) {
-    recommendations.push(`Set ${API_KEY_ENV} or run /login and paste the gateway API key.`);
+    recommendations.push(
+      "Run /login and paste the gateway API key. Env vars are only an automation fallback when no saved key exists.",
+    );
   }
   for (const check of checks) {
     if (!check.ok) recommendations.push(`${check.name}: ${check.interpretation}`);

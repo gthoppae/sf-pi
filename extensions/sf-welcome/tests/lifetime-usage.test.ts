@@ -3,8 +3,8 @@
  * Covers resolveLifetimeUsage() — the splash's new "Lifetime Usage" line.
  *
  * Contract:
- *   - If the gateway has populated keyInfo.spend, use it (source = gateway).
- *   - Otherwise return a local session-file estimate (source = sessions).
+ *   - Always return a local session-file estimate (source = sessions).
+ *   - Gateway keyInfo.spend is per-key, not all-time, and resets after key rotation.
  */
 import { afterEach, describe, expect, it, vi } from "vitest";
 import {
@@ -20,12 +20,12 @@ describe("resolveLifetimeUsage", () => {
     vi.restoreAllMocks();
   });
 
-  it("prefers the gateway's per-key lifetime spend when available", () => {
+  it("uses the local session-file estimate even when gateway keyInfo is present", () => {
     setMonthlyUsageState({
       monthlyUsage: null,
       monthlyUsageError: null,
       keyInfo: {
-        spend: 987.65,
+        spend: 0.29,
         keyName: "sk-...abcd",
         fetchedAt: new Date().toISOString(),
       },
@@ -33,17 +33,14 @@ describe("resolveLifetimeUsage", () => {
       health: null,
       healthError: null,
     });
-    const estimateSpy = vi.spyOn(sessionData, "estimateLifetimeCost");
+    vi.spyOn(sessionData, "estimateLifetimeCost").mockReturnValue(8123.45);
 
     const result = resolveLifetimeUsage();
 
-    expect(result).toEqual({ lifetimeCost: 987.65, lifetimeUsageSource: "gateway" });
-    // Gateway wins — we should not waste a filesystem scan.
-    expect(estimateSpy).not.toHaveBeenCalled();
+    expect(result).toEqual({ lifetimeCost: 8123.45, lifetimeUsageSource: "sessions" });
   });
 
-  it("falls back to a local session-file estimate when keyInfo is missing", () => {
-    // BYO-keys users: no gateway response, no keyInfo → scan local sessions.
+  it("uses a local session-file estimate when keyInfo is missing", () => {
     vi.spyOn(sessionData, "estimateLifetimeCost").mockReturnValue(123.45);
 
     const result = resolveLifetimeUsage();

@@ -28,9 +28,9 @@ describe("gateway URL normalization", () => {
     );
   });
 
-  it("keeps OpenAI deployment routes for OpenAI-compatible routes", () => {
+  it("strips OpenAI deployment routes before building OpenAI-compatible routes", () => {
     expect(toGatewayOpenAiBaseUrl("https://gateway.example.com/bedrock")).toBe(
-      "https://gateway.example.com/bedrock/v1",
+      "https://gateway.example.com/v1",
     );
   });
 
@@ -40,9 +40,12 @@ describe("gateway URL normalization", () => {
     );
   });
 
-  it("strips /v1 and OpenAI deployment routes together for Anthropic/admin root routes", () => {
+  it("strips /v1 and OpenAI deployment routes together for every route family", () => {
     expect(toGatewayRootBaseUrl("https://gateway.example.com/bedrock/v1")).toBe(
       "https://gateway.example.com",
+    );
+    expect(toGatewayOpenAiBaseUrl("https://gateway.example.com/bedrock/v1")).toBe(
+      "https://gateway.example.com/v1",
     );
   });
 });

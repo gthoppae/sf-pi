@@ -9,6 +9,7 @@
 import { chmodSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import { globalAgentPath, projectConfigPath } from "../../../lib/common/pi-paths.ts";
+import { toGatewayRootBaseUrl } from "./gateway-url.ts";
 
 // -------------------------------------------------------------------------------------------------
 // Public constants
@@ -42,7 +43,8 @@ export const LEGACY_ENABLED_MODEL_PATTERN_ANTHROPIC = `${LEGACY_PROVIDER_NAME_AN
 export const BASE_URL_ENV = "SF_LLM_GATEWAY_INTERNAL_BASE_URL";
 export const API_KEY_ENV = "SF_LLM_GATEWAY_INTERNAL_API_KEY";
 // The gateway endpoint is a Salesforce-internal URL and is intentionally not
-// hardcoded here. Users must configure it via the setup wizard or env var.
+// hardcoded here. Users should configure it via `/sf-llm-gateway-internal setup`.
+// Env vars are still accepted as an automation fallback when no saved config exists.
 export const DEFAULT_BASE_URL = "";
 
 export const DEFAULT_MODEL_ID = "claude-opus-4-7";
@@ -123,15 +125,15 @@ export function getGatewayConfig(cwd: string): GatewayConfig {
   const envApiKey = process.env[API_KEY_ENV]?.trim() || undefined;
   const savedApiKey = saved.apiKey?.trim() || undefined;
   const savedExclusiveScope = asOptionalBoolean(saved.exclusiveScope);
-  const baseUrl = envBaseUrl ?? savedBaseUrl ?? DEFAULT_BASE_URL;
+  const baseUrl = savedBaseUrl ?? envBaseUrl ?? DEFAULT_BASE_URL;
 
   return {
     enabled: saved.enabled !== false,
     baseUrl,
-    apiKey: envApiKey ?? savedApiKey,
+    apiKey: savedApiKey ?? envApiKey,
     exclusiveScope: savedExclusiveScope ?? false,
-    baseUrlSource: envBaseUrl ? "env" : savedBaseUrl ? "saved" : "default",
-    apiKeySource: envApiKey ? "env" : savedApiKey ? "saved" : "missing",
+    baseUrlSource: savedBaseUrl ? "saved" : envBaseUrl ? "env" : "default",
+    apiKeySource: savedApiKey ? "saved" : envApiKey ? "env" : "missing",
     exclusiveScopeSource: savedExclusiveScope !== undefined ? "saved" : "default",
     previousDefaultProvider: saved.previousDefaultProvider,
     previousDefaultModel: saved.previousDefaultModel,
@@ -152,15 +154,15 @@ export function getGlobalOnlyGatewayConfig(): GatewayConfig {
   const envApiKey = process.env[API_KEY_ENV]?.trim() || undefined;
   const savedApiKey = saved.apiKey?.trim() || undefined;
   const savedExclusiveScope = asOptionalBoolean(saved.exclusiveScope);
-  const baseUrl = envBaseUrl ?? savedBaseUrl ?? DEFAULT_BASE_URL;
+  const baseUrl = savedBaseUrl ?? envBaseUrl ?? DEFAULT_BASE_URL;
 
   return {
     enabled: saved.enabled !== false,
     baseUrl,
-    apiKey: envApiKey ?? savedApiKey,
+    apiKey: savedApiKey ?? envApiKey,
     exclusiveScope: savedExclusiveScope ?? false,
-    baseUrlSource: envBaseUrl ? "env" : savedBaseUrl ? "saved" : "default",
-    apiKeySource: envApiKey ? "env" : savedApiKey ? "saved" : "missing",
+    baseUrlSource: savedBaseUrl ? "saved" : envBaseUrl ? "env" : "default",
+    apiKeySource: savedApiKey ? "saved" : envApiKey ? "env" : "missing",
     exclusiveScopeSource: savedExclusiveScope !== undefined ? "saved" : "default",
     previousDefaultProvider: saved.previousDefaultProvider,
     previousDefaultModel: saved.previousDefaultModel,
@@ -246,7 +248,7 @@ export function readGatewaySavedConfig(filePath: string): SavedGatewayConfig {
     const record = parsed as Record<string, unknown>;
     return {
       enabled: asOptionalBoolean(record.enabled),
-      baseUrl: asOptionalString(record.baseUrl),
+      baseUrl: normalizeBaseUrl(asOptionalString(record.baseUrl)),
       apiKey: asOptionalString(record.apiKey),
       exclusiveScope: asOptionalBoolean(record.exclusiveScope),
       previousEnabledModels: asOptionalStringArrayOrNull(record.previousEnabledModels),
@@ -287,7 +289,7 @@ export function normalizeBaseUrl(rawValue: string | undefined): string | undefin
     if (url.protocol !== "http:" && url.protocol !== "https:") {
       return undefined;
     }
-    return url.toString().replace(/\/$/, "");
+    return toGatewayRootBaseUrl(url.toString().replace(/\/$/, ""));
   } catch {
     return undefined;
   }

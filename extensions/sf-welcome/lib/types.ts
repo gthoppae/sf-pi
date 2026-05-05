@@ -83,12 +83,10 @@ export interface SplashData {
   monthlyBudget: number | null;
   /** Origin of the monthly cost value — used for subtle display hints. */
   monthlyUsageSource?: "gateway" | "sessions";
-  /** All-time cumulative spend in USD. Prefers the gateway's per-key lifetime
-   * counter (`/key/info.spend`), falls back to a local session-file sum when
-   * no gateway data is available (e.g. bring-your-own-keys users). */
+  /** All-time cumulative spend in USD from local session files. */
   lifetimeCost: number;
-  /** Origin of the lifetime cost value. 'gateway' = live per-key counter,
-   * 'sessions' = local best-effort estimate clearly labeled as such. */
+  /** Origin of the lifetime cost value. 'sessions' = local best-effort estimate.
+   * 'gateway' is retained for backward-compatible payloads. */
   lifetimeUsageSource?: "gateway" | "sessions";
   /** Install status for recommended external pi packages. Replaces the
    * legacy Salesforce AI block when any recommendations are defined. */

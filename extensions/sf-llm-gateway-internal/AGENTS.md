@@ -104,8 +104,9 @@ When adding a subcommand:
 
 ## Non-goals
 
-- No default base URL in source. Base URL ships empty; users must provide
-  one via `SF_LLM_GATEWAY_INTERNAL_BASE_URL` or the setup wizard.
+- No default base URL in source. Base URL ships empty; users should provide
+  one via the setup wizard. `SF_LLM_GATEWAY_INTERNAL_BASE_URL` remains an
+  automation fallback when saved config is blank.
 - No secret materials in source, config, or tests.
 - No OpenAI-compat path for Claude — it has known truncation issues,
   documented in the README's "Key Architecture" section.
