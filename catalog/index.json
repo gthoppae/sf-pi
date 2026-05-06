@@ -21,7 +21,7 @@
     "entry": "extensions/sf-agentscript-assist/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 1423
+    "srcLoc": 1420
   },
   {
     "id": "sf-brain",
@@ -71,7 +71,7 @@
     "entry": "extensions/sf-devbar/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 1512
+    "srcLoc": 1509
   },
   {
     "id": "sf-feedback",
@@ -105,7 +105,7 @@
     "entry": "extensions/sf-feedback/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 919
+    "srcLoc": 916
   },
   {
     "id": "sf-guardrail",
@@ -130,7 +130,7 @@
     "entry": "extensions/sf-guardrail/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 2015
+    "srcLoc": 2014
   },
   {
     "id": "sf-llm-gateway-internal",
@@ -158,7 +158,7 @@
     "entry": "extensions/sf-llm-gateway-internal/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 8112
+    "srcLoc": 8122
   },
   {
     "id": "sf-lsp",
@@ -255,7 +255,7 @@
     "entry": "extensions/sf-skills-hud/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 730
+    "srcLoc": 729
   },
   {
     "id": "sf-slack",
@@ -291,7 +291,7 @@
     "entry": "extensions/sf-slack/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 10318
+    "srcLoc": 10324
   },
   {
     "id": "sf-welcome",

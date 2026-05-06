@@ -522,18 +522,15 @@ export default function sfDevBar(pi: ExtensionAPI) {
 
   async function handleDevbarPanel(ctx: ExtensionCommandContext): Promise<void> {
     const panelState: CommandPanelState<DevbarAction> = {};
-    for (;;) {
-      const action = await openCommandPanel(ctx, {
-        title: "📊 SF DevBar — status & controls",
-        subtitle: "Manage the top status bar and Salesforce environment context.",
-        statusLines: buildDevbarPanelStatus(ctx),
-        actions: DEVBAR_ACTIONS,
-        closeValue: "close",
-        state: panelState,
-      });
-      if (!action || action === "close") return;
-      await handleDevbarCommand(ctx, action, true);
-    }
+    await openCommandPanel(ctx, {
+      title: "📊 SF DevBar — status & controls",
+      subtitle: "Manage the top status bar and Salesforce environment context.",
+      statusLines: () => buildDevbarPanelStatus(ctx),
+      actions: DEVBAR_ACTIONS,
+      closeValue: "close",
+      state: panelState,
+      onAction: (action) => handleDevbarCommand(ctx, action, true),
+    });
   }
 
   async function handleDevbarCommand(

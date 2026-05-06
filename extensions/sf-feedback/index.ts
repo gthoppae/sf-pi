@@ -123,22 +123,19 @@ async function handleFeedbackPanel(
   exec: ExecFn,
 ): Promise<void> {
   const panelState: CommandPanelState<FeedbackAction> = {};
-  for (;;) {
-    const action = await openCommandPanel(ctx, {
-      title: "💬 SF Feedback — status & controls",
-      subtitle: "Create public-safe feedback issues with sanitized diagnostics.",
-      statusLines: [
-        "✓ Privacy       diagnostics are sanitized before preview/submission",
-        "✓ Confirmation  GitHub issue creation requires final approval",
-        "• Headless      emits draft + URL only; never submits",
-      ],
-      actions: FEEDBACK_ACTIONS,
-      closeValue: "close",
-      state: panelState,
-    });
-    if (!action || action === "close") return;
-    await handleCommand(pi, ctx, exec, action);
-  }
+  await openCommandPanel(ctx, {
+    title: "💬 SF Feedback — status & controls",
+    subtitle: "Create public-safe feedback issues with sanitized diagnostics.",
+    statusLines: [
+      "✓ Privacy       diagnostics are sanitized before preview/submission",
+      "✓ Confirmation  GitHub issue creation requires final approval",
+      "• Headless      emits draft + URL only; never submits",
+    ],
+    actions: FEEDBACK_ACTIONS,
+    closeValue: "close",
+    state: panelState,
+    onAction: (action) => handleCommand(pi, ctx, exec, action),
+  });
 }
 
 async function handleCommand(

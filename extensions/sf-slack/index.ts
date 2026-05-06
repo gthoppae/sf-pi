@@ -509,18 +509,15 @@ export default function sfSlack(pi: ExtensionAPI) {
 
   async function handleSlackPanel(ctx: ExtensionCommandContext): Promise<void> {
     const panelState: CommandPanelState<SlackCommandAction> = {};
-    for (;;) {
-      const action = await openCommandPanel(ctx, {
-        title: "💬 SF Slack — status & controls",
-        subtitle: "Inspect auth, refresh granted scopes, and tune Slack result rendering.",
-        statusLines: buildSlackPanelStatus(),
-        actions: SLACK_COMMAND_ACTIONS,
-        closeValue: "close",
-        state: panelState,
-      });
-      if (!action || action === "close") return;
-      await handleSlackCommand(action, ctx, true);
-    }
+    await openCommandPanel(ctx, {
+      title: "💬 SF Slack — status & controls",
+      subtitle: "Inspect auth, refresh granted scopes, and tune Slack result rendering.",
+      statusLines: () => buildSlackPanelStatus(),
+      actions: SLACK_COMMAND_ACTIONS,
+      closeValue: "close",
+      state: panelState,
+      onAction: (action) => handleSlackCommand(action, ctx, true),
+    });
   }
 
   async function handleSlackCommand(

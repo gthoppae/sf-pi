@@ -148,24 +148,20 @@ async function handleAgentScriptPanel(
   state: AgentScriptAssistState,
 ): Promise<void> {
   const panelState: CommandPanelState<AgentScriptAction> = {};
-  for (;;) {
-    const doctor = await probeDoctor(ctx.cwd);
-    const action = await openCommandPanel(ctx, {
-      title: "🧭 SF Agent Script Assist — status & controls",
-      subtitle: "Inspect the Agent Script SDK bridge and run targeted checks.",
-      statusLines: [
-        `${doctor.sdkLoaded ? "✓" : "✗"} SDK           ${doctor.sdkLoaded ? "loaded" : "unavailable"}`,
-        `• Vendored path ${doctor.vendoredSdkPath}`,
-        `• Session files ${state.lastStatusByFile.size} tracked file(s)`,
-      ],
-      actions: AGENTSCRIPT_ACTIONS,
-      closeValue: "close",
-      state: panelState,
-    });
-
-    if (!action || action === "close") return;
-    await handleAgentScriptCommand(ctx, state, action, [], true);
-  }
+  const doctor = await probeDoctor(ctx.cwd);
+  await openCommandPanel(ctx, {
+    title: "🧭 SF Agent Script Assist — status & controls",
+    subtitle: "Inspect the Agent Script SDK bridge and run targeted checks.",
+    statusLines: () => [
+      `${doctor.sdkLoaded ? "✓" : "✗"} SDK           ${doctor.sdkLoaded ? "loaded" : "unavailable"}`,
+      `• Vendored path ${doctor.vendoredSdkPath}`,
+      `• Session files ${state.lastStatusByFile.size} tracked file(s)`,
+    ],
+    actions: AGENTSCRIPT_ACTIONS,
+    closeValue: "close",
+    state: panelState,
+    onAction: (action) => handleAgentScriptCommand(ctx, state, action, [], true),
+  });
 }
 
 async function handleAgentScriptCommand(

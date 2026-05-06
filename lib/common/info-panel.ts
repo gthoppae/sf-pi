@@ -8,6 +8,7 @@
  */
 import type { ExtensionCommandContext, Theme } from "@mariozechner/pi-coding-agent";
 import { matchesKey, truncateToWidth, visibleWidth, wrapTextWithAnsi } from "@mariozechner/pi-tui";
+import { iconForSeverity, resolveUiGlyphs, type UiGlyphs } from "./ui-glyphs.ts";
 
 export type InfoPanelSeverity = "info" | "warning" | "error" | "success";
 
@@ -24,6 +25,7 @@ export async function openInfoPanel(
 ): Promise<void> {
   const severity = options.severity ?? "info";
   const body = options.body.trim() || options.title;
+  const glyphs = resolveUiGlyphs(ctx.cwd);
 
   if (!ctx.hasUI) {
     ctx.ui.notify(body, severity === "success" ? "info" : severity);
@@ -32,7 +34,7 @@ export async function openInfoPanel(
 
   await ctx.ui.custom<void>(
     (_tui, theme, _keybindings, done) => {
-      const panel = new InfoPanelComponent(theme, { ...options, body, severity }, done);
+      const panel = new InfoPanelComponent(theme, glyphs, { ...options, body, severity }, done);
       return {
         render: (width: number) => panel.render(width),
         invalidate: () => panel.invalidate(),
@@ -42,9 +44,9 @@ export async function openInfoPanel(
     {
       overlay: true,
       overlayOptions: {
-        width: "72%",
-        minWidth: 56,
-        maxHeight: "80%",
+        width: "62%",
+        minWidth: 64,
+        maxHeight: "75%",
         anchor: "center",
         margin: 2,
       },
@@ -55,6 +57,7 @@ export async function openInfoPanel(
 class InfoPanelComponent {
   constructor(
     private readonly theme: Theme,
+    private readonly glyphs: UiGlyphs,
     private readonly options: Required<Pick<InfoPanelOptions, "title" | "body" | "severity">> &
       Pick<InfoPanelOptions, "footer">,
     private readonly done: () => void,
@@ -74,44 +77,122 @@ class InfoPanelComponent {
   render(width: number): string[] {
     const innerWidth = Math.max(20, width - 4);
     const lines: string[] = [];
-    const border = this.theme.fg("borderAccent", "─".repeat(Math.max(0, width - 2)));
-    const title = this.severityIcon() + " " + this.options.title;
+    const borderChars = this.borderChars();
+    const title = `${iconForSeverity(this.options.severity, this.glyphs)} ${this.options.title}`;
 
-    lines.push(this.theme.fg("borderAccent", `┌${border}┐`));
-    lines.push(this.pad(` ${this.theme.fg("accent", this.theme.bold(title))}`, width));
-    lines.push(this.theme.fg("borderMuted", `├${"─".repeat(Math.max(0, width - 2))}┤`));
+    lines.push(
+      this.borderLine(borderChars.topLeft, borderChars.horizontal, borderChars.topRight, width),
+    );
+    lines.push(this.contentLine(` ${this.colorBorder(this.theme.bold(title))}`, width));
+    lines.push(
+      this.borderLine(
+        borderChars.leftJoin,
+        borderChars.horizontalMuted,
+        borderChars.rightJoin,
+        width,
+      ),
+    );
 
     for (const rawLine of this.options.body.split(/\r?\n/)) {
       if (!rawLine.trim()) {
-        lines.push(this.pad("", width));
+        lines.push(this.contentLine("", width));
         continue;
       }
       for (const wrapped of wrapTextWithAnsi(rawLine, innerWidth)) {
-        lines.push(this.pad(`  ${wrapped}`, width));
+        lines.push(this.contentLine(`  ${this.theme.fg("text", wrapped)}`, width));
       }
     }
 
-    lines.push(this.theme.fg("borderMuted", `├${"─".repeat(Math.max(0, width - 2))}┤`));
     lines.push(
-      this.pad(
+      this.borderLine(
+        borderChars.leftJoin,
+        borderChars.horizontalMuted,
+        borderChars.rightJoin,
+        width,
+      ),
+    );
+    lines.push(
+      this.contentLine(
         ` ${this.theme.fg("dim", this.options.footer ?? "Enter/Esc return to the previous panel")}`,
         width,
       ),
     );
-    lines.push(this.theme.fg("borderAccent", `└${border}┘`));
+    lines.push(
+      this.borderLine(
+        borderChars.bottomLeft,
+        borderChars.horizontal,
+        borderChars.bottomRight,
+        width,
+      ),
+    );
     return lines.map((line) => truncateToWidth(line, width, ""));
   }
 
   invalidate(): void {}
 
-  private severityIcon(): string {
-    if (this.options.severity === "success") return this.theme.fg("success", "✓");
-    if (this.options.severity === "warning") return this.theme.fg("warning", "⚠");
-    if (this.options.severity === "error") return this.theme.fg("error", "✗");
-    return this.theme.fg("accent", "ⓘ");
+  private borderChars(): {
+    topLeft: string;
+    topRight: string;
+    bottomLeft: string;
+    bottomRight: string;
+    leftJoin: string;
+    rightJoin: string;
+    horizontal: string;
+    horizontalMuted: string;
+    vertical: string;
+  } {
+    if (this.glyphs.mode === "ascii") {
+      return {
+        topLeft: "+",
+        topRight: "+",
+        bottomLeft: "+",
+        bottomRight: "+",
+        leftJoin: "+",
+        rightJoin: "+",
+        horizontal: "-",
+        horizontalMuted: "-",
+        vertical: "|",
+      };
+    }
+    return {
+      topLeft: "╭",
+      topRight: "╮",
+      bottomLeft: "╰",
+      bottomRight: "╯",
+      leftJoin: "├",
+      rightJoin: "┤",
+      horizontal: "─",
+      horizontalMuted: "─",
+      vertical: "│",
+    };
+  }
+
+  private borderLine(left: string, fill: string, right: string, width: number): string {
+    const content = `${this.colorBorder(left)}${this.colorBorder(fill.repeat(Math.max(0, width - 2)))}${this.colorBorder(right)}`;
+    return this.bg(content);
+  }
+
+  private contentLine(content: string, width: number): string {
+    const chars = this.borderChars();
+    const innerWidth = Math.max(0, width - 2);
+    const padded = this.pad(truncateToWidth(content, innerWidth, ""), innerWidth);
+    return this.bg(
+      `${this.colorBorder(chars.vertical)}${padded}${this.colorBorder(chars.vertical)}`,
+    );
   }
 
   private pad(content: string, width: number): string {
     return `${content}${" ".repeat(Math.max(0, width - visibleWidth(content)))}`;
+  }
+
+  private bg(content: string): string {
+    return this.theme.bg("customMessageBg", content);
+  }
+
+  private colorBorder(content: string): string {
+    if (this.options.severity === "success") return this.theme.fg("success", content);
+    if (this.options.severity === "warning") return this.theme.fg("warning", content);
+    if (this.options.severity === "error") return this.theme.fg("error", content);
+    return this.theme.fg("borderAccent", content);
   }
 }

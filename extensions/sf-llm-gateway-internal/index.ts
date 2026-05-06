@@ -506,25 +506,20 @@ async function handlePanelCommand(pi: ExtensionAPI, ctx: ExtensionCommandContext
   let scope: "global" | "project" = "global";
   const panelState: CommandPanelState<GatewayPanelAction> = {};
 
-  for (;;) {
-    const action = await openGatewayPanel(ctx, {
-      providerRegistered: getLastDiscovery()?.source !== "disabled",
-      runtimeState: getRuntimeStatusState(),
-      scope,
-      state: panelState,
-    });
-
-    if (!action || action === "close") {
-      return;
-    }
-
-    if (action === "switch-scope") {
-      scope = scope === "global" ? "project" : "global";
-      continue;
-    }
-
-    await handlePanelAction(pi, ctx, action, scope);
-  }
+  await openGatewayPanel(ctx, {
+    providerRegistered: getLastDiscovery()?.source !== "disabled",
+    runtimeState: getRuntimeStatusState(),
+    scope: () => scope,
+    state: panelState,
+    onAction: async (action) => {
+      if (action === "switch-scope") {
+        scope = scope === "global" ? "project" : "global";
+        return;
+      }
+      if (action === "close") return;
+      await handlePanelAction(pi, ctx, action, scope);
+    },
+  });
 }
 
 async function handlePanelAction(

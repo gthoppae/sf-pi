@@ -25,8 +25,9 @@ import { GATEWAY_COMMAND_SURFACE, type GatewayPanelAction } from "./command-surf
 export interface GatewayPanelOptions {
   providerRegistered: boolean;
   runtimeState: GatewayRuntimeStatusState;
-  scope: "global" | "project";
+  scope: "global" | "project" | (() => "global" | "project");
   state?: CommandPanelState<GatewayPanelAction>;
+  onAction?: (action: GatewayPanelAction) => Promise<void> | void;
 }
 
 export async function openGatewayPanel(
@@ -36,11 +37,21 @@ export async function openGatewayPanel(
   return openCommandPanel(ctx, {
     title: "⚡ SF LLM Gateway Internal — status & controls",
     subtitle: "Configure provider scope, discover models, and inspect gateway health.",
-    statusLines: buildGatewayPanelStatusLines(ctx, options, ctx.ui.theme),
-    actions: buildGatewayGroupedActionItems(options.scope),
+    statusLines: () =>
+      buildGatewayPanelStatusLines(
+        ctx,
+        { ...options, scope: currentGatewayPanelScope(options) },
+        ctx.ui.theme,
+      ),
+    actions: () => buildGatewayGroupedActionItems(currentGatewayPanelScope(options)),
     closeValue: "close",
     state: options.state,
+    onAction: options.onAction,
   });
+}
+
+function currentGatewayPanelScope(options: GatewayPanelOptions): "global" | "project" {
+  return typeof options.scope === "function" ? options.scope() : options.scope;
 }
 
 export function buildGatewayPanelStatusLines(
@@ -52,6 +63,8 @@ export function buildGatewayPanelStatusLines(
   const savedScope = getSavedExclusiveScopeStatus(ctx.cwd);
   const activeModel = ctx.model ? `${ctx.model.provider}/${ctx.model.id}` : "none";
   const contextUsage = ctx.getContextUsage();
+
+  const scope = currentGatewayPanelScope(options);
 
   return [
     renderStatusLine(
@@ -108,7 +121,7 @@ export function buildGatewayPanelStatusLines(
       theme,
       "info",
       "Panel scope",
-      `${options.scope} · scoped model mode ${config.exclusiveScope ? "exclusive" : "additive"} · saved fallback effective=${savedScope.effective}`,
+      `${scope} · scoped model mode ${config.exclusiveScope ? "exclusive" : "additive"} · saved fallback effective=${savedScope.effective}`,
     ),
   ];
 }
@@ -160,5 +173,6 @@ export function renderStatusLine(
           ? theme.fg("error", "✗")
           : theme.fg("dim", "•");
   const paddedLabel = label.padEnd(14, " ");
-  return `${marker} ${theme.fg("text", paddedLabel)} ${theme.fg(state === "bad" ? "warning" : "dim", detail)}`;
+  const detailColor = state === "bad" ? "warning" : state === "warn" ? "muted" : "text";
+  return `${marker} ${theme.fg("text", paddedLabel)} ${theme.fg(detailColor, detail)}`;
 }

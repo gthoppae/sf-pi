@@ -229,24 +229,23 @@ export default function sfSkillsHud(pi: ExtensionAPI) {
 
   async function handleSkillsPanel(ctx: ExtensionCommandContext): Promise<void> {
     const panelState: CommandPanelState<SkillsAction> = {};
-    for (;;) {
-      refreshHud(ctx);
-      const action = await openCommandPanel(ctx, {
-        title: "🎯 SF Skills HUD — status & controls",
-        subtitle: "Review skill activity surfaced in the floating HUD.",
-        statusLines: [
+    await openCommandPanel(ctx, {
+      title: "🎯 SF Skills HUD — status & controls",
+      subtitle: "Review skill activity surfaced in the floating HUD.",
+      statusLines: () => {
+        refreshHud(ctx);
+        return [
           `${hudState.hasAny ? "✓" : "○"} Usage detected ${hudState.hasAny ? "yes" : "no"}`,
           `• Live skills    ${hudState.live.length}`,
           `• Earlier skills ${hudState.earlier.length}`,
           `• Discovered     ${hudState.discoveredCount}`,
-        ],
-        actions: SKILLS_ACTIONS,
-        closeValue: "close",
-        state: panelState,
-      });
-      if (!action || action === "close") return;
-      await handleSkillsCommand(ctx, action, true);
-    }
+        ];
+      },
+      actions: SKILLS_ACTIONS,
+      closeValue: "close",
+      state: panelState,
+      onAction: (action) => handleSkillsCommand(ctx, action, true),
+    });
   }
 
   async function handleSkillsCommand(

@@ -4,9 +4,9 @@
  *
  * Pi's stock SelectList is intentionally flat: label + description rows with
  * no non-selectable group headers. SF Pi command surfaces need the same native
- * `ctx.ui.custom()` feel, but with stronger visual hierarchy, grouped actions,
- * preserved selection/filter state, and a full-width selected-action detail pane
- * so long help text does not clip.
+ * `ctx.ui.custom()` feel, but with stronger visual hierarchy, semantic icons,
+ * preserved selection/filter state, in-place action execution, and a full-width
+ * selected-action detail pane so long help text does not clip.
  */
 import type { Component } from "@mariozechner/pi-tui";
 import type { ExtensionCommandContext, Theme } from "@mariozechner/pi-coding-agent";
@@ -21,6 +21,7 @@ import {
   visibleWidth,
   wrapTextWithAnsi,
 } from "@mariozechner/pi-tui";
+import { iconForCommandGroup, resolveUiGlyphs, type UiGlyphs } from "./ui-glyphs.ts";
 
 export interface CommandPanelAction<T extends string = string> {
   value: T;
@@ -37,13 +38,19 @@ export interface CommandPanelState<T extends string = string> {
 export interface CommandPanelOptions<T extends string = string> {
   title: string;
   subtitle?: string;
-  statusLines?: string[];
-  actions: CommandPanelAction<T>[];
+  statusLines?: string[] | (() => string[]);
+  actions: CommandPanelAction<T>[] | (() => CommandPanelAction<T>[]);
   closeValue: T;
   statusHeading?: string;
   actionsHeading?: string;
   helpText?: string;
   state?: CommandPanelState<T>;
+  /**
+   * When set, Enter runs this action without closing the panel. This is the
+   * preferred mode for interactive command menus: action results can open an
+   * overlay and return to the same selected row without the close/reopen flicker.
+   */
+  onAction?: (action: T) => Promise<void> | void;
 }
 
 export async function openCommandPanel<T extends string>(
@@ -51,31 +58,36 @@ export async function openCommandPanel<T extends string>(
   options: CommandPanelOptions<T>,
 ): Promise<T | null> {
   const state = options.state;
+  const glyphs = resolveUiGlyphs(ctx.cwd);
   const result = await ctx.ui.custom<T | null>((tui, theme, keybindings, done) => {
     const container = new Container();
     container.addChild(new DynamicBorder((s: string) => theme.fg("borderAccent", s)));
     container.addChild(new Text(theme.fg("accent", theme.bold(options.title)), 1, 0));
     if (options.subtitle) {
-      container.addChild(new Text(theme.fg("dim", options.subtitle), 1, 0));
+      container.addChild(new Text(theme.fg("muted", options.subtitle), 1, 0));
     }
 
-    if (options.statusLines && options.statusLines.length > 0) {
+    if (options.statusLines) {
       container.addChild(new Spacer(1));
-      container.addChild(new SectionHeading(theme, options.statusHeading ?? "Status"));
-      for (const line of options.statusLines) {
-        container.addChild(new Text(`  ${line}`, 1, 0));
-      }
+      container.addChild(
+        new StatusBlock(theme, glyphs, options.statusHeading ?? "Status", options.statusLines),
+      );
     }
 
     container.addChild(new Spacer(1));
-    container.addChild(new SectionHeading(theme, options.actionsHeading ?? "Actions"));
+    container.addChild(
+      new SectionHeading(theme, glyphs.actions, options.actionsHeading ?? "Actions"),
+    );
     const list = new GroupedActionList(
       theme,
       keybindings,
+      glyphs,
       options.actions,
       options.closeValue,
       done,
+      () => tui.requestRender(),
       state,
+      options.onAction,
     );
     container.addChild(list);
 
@@ -109,14 +121,18 @@ export async function openCommandPanel<T extends string>(
 class GroupedActionList<T extends string> implements Component {
   private filter = "";
   private selectedIndex = 0;
+  private actionInFlight = false;
 
   constructor(
     private readonly theme: Theme,
     private readonly keybindings: KeybindingsManager,
-    private readonly items: CommandPanelAction<T>[],
+    private readonly glyphs: UiGlyphs,
+    private readonly actionSource: CommandPanelAction<T>[] | (() => CommandPanelAction<T>[]),
     private readonly closeValue: T,
     private readonly done: (result: T | null) => void,
+    private readonly requestRender: () => void,
     private readonly state?: CommandPanelState<T>,
+    private readonly onAction?: (action: T) => Promise<void> | void,
   ) {
     this.filter = state?.filter ?? "";
     this.selectedIndex = this.indexForSelectedValue(state?.selectedValue);
@@ -130,7 +146,7 @@ class GroupedActionList<T extends string> implements Component {
     if (this.filter) {
       lines.push(
         truncateToWidth(
-          `  ${this.theme.fg("muted", "Filter")} ${this.theme.fg("accent", this.filter)} ${this.theme.fg("dim", `(${filtered.length}/${this.items.length})`)}`,
+          `  ${this.theme.fg("muted", "Filter")} ${this.theme.fg("accent", this.filter)} ${this.theme.fg("dim", `(${filtered.length}/${this.items().length})`)}`,
           width,
           "",
         ),
@@ -163,11 +179,18 @@ class GroupedActionList<T extends string> implements Component {
     if (selected) {
       lines.push("");
       lines.push(this.renderDetailHeader(width));
+      const status = this.actionInFlight
+        ? ` ${this.theme.fg("warning", `${this.glyphs.loading} running`)}`
+        : "";
       lines.push(
-        truncateToWidth(`  ${this.theme.fg("accent", this.theme.bold(selected.label))}`, width, ""),
+        truncateToWidth(
+          `  ${this.theme.fg("accent", this.theme.bold(selected.label))}${status}`,
+          width,
+          "",
+        ),
       );
       for (const wrapped of wrapTextWithAnsi(selected.description, Math.max(20, width - 4))) {
-        lines.push(`  ${this.theme.fg("dim", wrapped)}`);
+        lines.push(`  ${this.theme.fg("text", wrapped)}`);
       }
     }
 
@@ -177,6 +200,8 @@ class GroupedActionList<T extends string> implements Component {
   invalidate(): void {}
 
   handleInput(data: string): void {
+    if (this.actionInFlight) return;
+
     if (this.keybindings.matches(data, "tui.select.up")) {
       this.move(-1);
       return;
@@ -189,7 +214,11 @@ class GroupedActionList<T extends string> implements Component {
       const selected = this.filteredItems()[this.selectedIndex];
       if (selected) {
         if (this.state) this.state.selectedValue = selected.value;
-        this.done(selected.value);
+        if (this.onAction) {
+          this.runAction(selected.value);
+        } else {
+          this.done(selected.value);
+        }
       }
       return;
     }
@@ -210,8 +239,18 @@ class GroupedActionList<T extends string> implements Component {
     }
   }
 
+  private runAction(action: T): void {
+    this.actionInFlight = true;
+    this.requestRender();
+    void Promise.resolve(this.onAction?.(action)).finally(() => {
+      this.actionInFlight = false;
+      this.requestRender();
+    });
+  }
+
   private renderGroupHeading(group: string, width: number): string {
-    const label = `  ${this.theme.fg("accent", this.theme.bold(group.toUpperCase()))}`;
+    const icon = iconForCommandGroup(group, this.glyphs);
+    const label = `  ${this.theme.fg("accent", this.theme.bold(`${icon} ${group.toUpperCase()}`))}`;
     const remaining = Math.max(0, width - visibleWidth(label) - 2);
     return truncateToWidth(
       `${label} ${this.theme.fg("borderMuted", "─".repeat(remaining))}`,
@@ -221,23 +260,17 @@ class GroupedActionList<T extends string> implements Component {
   }
 
   private renderActionLine(item: CommandPanelAction<T>, selected: boolean, width: number): string {
-    const marker = selected ? this.theme.fg("accent", "→") : this.theme.fg("dim", " ");
-    const label = selected ? this.theme.fg("accent", this.theme.bold(item.label)) : item.label;
-    const left = `  ${marker} ${label}`;
-    if (width < 88 || !item.description) return truncateToWidth(left, width, "");
-
-    const leftWidth = visibleWidth(left);
-    const descriptionWidth = Math.max(18, width - leftWidth - 5);
-    const description = truncateToWidth(item.description, descriptionWidth, "…");
-    return truncateToWidth(
-      `${left}${" ".repeat(Math.max(2, width - leftWidth - visibleWidth(description) - 2))}${this.theme.fg("dim", description)}`,
-      width,
-      "",
-    );
+    const marker = selected
+      ? this.theme.fg("accent", this.glyphs.selectedRow)
+      : this.theme.fg("dim", " ");
+    const label = selected
+      ? this.theme.fg("accent", this.theme.bold(item.label))
+      : this.theme.fg("text", item.label);
+    return truncateToWidth(`  ${marker} ${label}`, width, "");
   }
 
   private renderDetailHeader(width: number): string {
-    const label = `  ${this.theme.fg("muted", this.theme.bold("SELECTED"))}`;
+    const label = `  ${this.theme.fg("accent", this.theme.bold(`${this.glyphs.selected} SELECTED`))}`;
     const remaining = Math.max(0, width - visibleWidth(label) - 2);
     return truncateToWidth(
       `${label} ${this.theme.fg("borderMuted", "─".repeat(remaining))}`,
@@ -255,12 +288,17 @@ class GroupedActionList<T extends string> implements Component {
 
   private filteredItems(): CommandPanelAction<T>[] {
     const needle = this.filter.trim().toLowerCase();
-    if (!needle) return this.items;
-    return this.items.filter((item) =>
+    const items = this.items();
+    if (!needle) return items;
+    return items.filter((item) =>
       `${item.group} ${item.label} ${item.description} ${item.value}`
         .toLowerCase()
         .includes(needle),
     );
+  }
+
+  private items(): CommandPanelAction<T>[] {
+    return typeof this.actionSource === "function" ? this.actionSource() : this.actionSource;
   }
 
   private indexForSelectedValue(value: T | undefined): number {
@@ -277,14 +315,38 @@ class GroupedActionList<T extends string> implements Component {
   }
 }
 
+class StatusBlock implements Component {
+  constructor(
+    private readonly theme: Theme,
+    private readonly glyphs: UiGlyphs,
+    private readonly label: string,
+    private readonly statusLines: string[] | (() => string[]),
+  ) {}
+
+  render(width: number): string[] {
+    const lines = [
+      new SectionHeading(this.theme, this.glyphs.status, this.label).render(width)[0] ?? "",
+    ];
+    const statusLines =
+      typeof this.statusLines === "function" ? this.statusLines() : this.statusLines;
+    for (const line of statusLines) {
+      lines.push(truncateToWidth(`  ${line}`, width, ""));
+    }
+    return lines;
+  }
+
+  invalidate(): void {}
+}
+
 class SectionHeading implements Component {
   constructor(
     private readonly theme: Theme,
+    private readonly icon: string,
     private readonly label: string,
   ) {}
 
   render(width: number): string[] {
-    const text = ` ${this.theme.fg("accent", this.theme.bold(this.label.toUpperCase()))}`;
+    const text = ` ${this.theme.fg("accent", this.theme.bold(`${this.icon} ${this.label.toUpperCase()}`))}`;
     const remaining = Math.max(0, width - visibleWidth(text) - 1);
     return [
       truncateToWidth(`${text} ${this.theme.fg("borderMuted", "─".repeat(remaining))}`, width, ""),

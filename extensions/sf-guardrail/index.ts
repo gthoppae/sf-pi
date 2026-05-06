@@ -254,20 +254,18 @@ const GUARDRAIL_ACTIONS: CommandPanelAction<GuardrailAction>[] = [
 
 async function handleGuardrailPanel(ctx: ExtensionCommandContext): Promise<void> {
   const panelState: CommandPanelState<GuardrailAction> = {};
-  for (;;) {
-    const { config, source } = loadConfig();
-    const action = await openCommandPanel(ctx, {
-      title: "🛡 SF Guardrail — status & controls",
-      subtitle: "Inspect safety rules, audit decisions, and session overrides.",
-      statusLines: buildGuardrailPanelStatus(ctx, config, source),
-      actions: GUARDRAIL_ACTIONS,
-      closeValue: "close",
-      state: panelState,
-    });
-
-    if (!action || action === "close") return;
-    await handleGuardrailCommand(ctx, action, true);
-  }
+  await openCommandPanel(ctx, {
+    title: "🛡 SF Guardrail — status & controls",
+    subtitle: "Inspect safety rules, audit decisions, and session overrides.",
+    statusLines: () => {
+      const { config, source } = loadConfig();
+      return buildGuardrailPanelStatus(ctx, config, source);
+    },
+    actions: GUARDRAIL_ACTIONS,
+    closeValue: "close",
+    state: panelState,
+    onAction: (action) => handleGuardrailCommand(ctx, action, true),
+  });
 }
 
 async function handleGuardrailCommand(

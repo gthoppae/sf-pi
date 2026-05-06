@@ -16,6 +16,7 @@
 import { DynamicBorder, getSettingsListTheme } from "@mariozechner/pi-coding-agent";
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import { Container, type SettingItem, SettingsList, Text } from "@mariozechner/pi-tui";
+import { resolveUiGlyphs } from "../../../lib/common/ui-glyphs.ts";
 import type { DefaultFieldsMode, OnOff, SlackPreferences, ThreadBodyMode } from "./preferences.ts";
 
 export interface SettingsPanelOptions {
@@ -31,33 +32,34 @@ export async function openSettingsPanel(
   options: SettingsPanelOptions,
 ): Promise<void> {
   const working: SlackPreferences = { ...current };
+  const glyphs = resolveUiGlyphs(ctx.cwd);
 
   await ctx.ui.custom<void>((tui, theme, _kb, done) => {
     const items: SettingItem[] = [
       {
         id: "defaultFields",
-        label: "Result detail · Default search detail",
+        label: `${glyphs.status} Result detail · Default search detail`,
         description: "Controls default body detail for search and research results.",
         currentValue: working.defaultFields,
         values: ["auto", "summary", "preview", "full"],
       },
       {
         id: "threadBodies",
-        label: "Result detail · Thread/history bodies",
+        label: `${glyphs.status} Result detail · Thread/history bodies`,
         description: "Controls message body detail when reading threads and channel history.",
         currentValue: working.threadBodies,
         values: ["full", "preview"],
       },
       {
         id: "showWidget",
-        label: "UI feedback · Research summary widget",
+        label: `${glyphs.controls} UI feedback · Research summary widget`,
         description: "Shows or hides the lightweight Slack research activity widget.",
         currentValue: working.showWidget,
         values: ["on", "off"],
       },
       {
         id: "compactPermalinks",
-        label: "Links · Compact permalinks (OSC 8)",
+        label: `${glyphs.links} Links · Compact permalinks (OSC 8)`,
         description: "Renders cleaner terminal hyperlinks when the terminal supports OSC 8 links.",
         currentValue: working.compactPermalinks,
         values: ["on", "off"],
@@ -75,7 +77,14 @@ export async function openSettingsPanel(
       ),
     );
     container.addChild(
-      new Text(theme.fg("muted", "Sections: Result detail · UI feedback · Links"), 1, 0),
+      new Text(
+        theme.fg(
+          "muted",
+          `Sections: ${glyphs.status} Result detail · ${glyphs.controls} UI feedback · ${glyphs.links} Links`,
+        ),
+        1,
+        0,
+      ),
     );
 
     const settingsList = new SettingsList(
