@@ -144,9 +144,14 @@ cd sf-pi
 npm install
 ```
 
-The `postinstall` step sets up Husky git hooks (`pre-commit` + `commit-msg`)
-so your commits are auto-formatted and validated against
-[Conventional Commits](https://www.conventionalcommits.org/).
+`npm install` runs the `prepare` script, which installs Husky hooks:
+
+- `pre-commit` runs gitleaks on the staged diff when available, lint-staged
+  formatting/fixes, and catalog regeneration when extension manifests change.
+- `commit-msg` validates
+  [Conventional Commits](https://www.conventionalcommits.org/).
+- `pre-push` blocks force-pushes and deletion of `main`; CI remains the source
+  of truth for full lint/typecheck/test validation.
 
 Optional local install for manual testing:
 

@@ -8,5 +8,5 @@
   "commands": ["/sf-guardrail"],
   "providers": [],
   "tools": [],
-  "events": ["session_start", "session_shutdown", "before_agent_start", "tool_call"]
+  "events": ["session_start", "session_tree", "before_agent_start", "tool_call"]
 }

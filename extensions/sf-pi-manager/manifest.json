@@ -6,12 +6,6 @@
   "defaultEnabled": true,
   "alwaysActive": true,
   "configurable": true,
-  "commands": [
-    "/sf-pi",
-    "/sf-pi recommended",
-    "/sf-pi announcements",
-    "/sf-pi skills",
-    "/sf-pi doctor"
-  ],
+  "commands": ["/sf-pi"],
   "events": ["session_start", "session_shutdown"]
 }

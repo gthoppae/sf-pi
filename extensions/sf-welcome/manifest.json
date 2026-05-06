@@ -5,5 +5,5 @@
   "category": "ui",
   "defaultEnabled": true,
   "commands": ["/sf-welcome", "/sf-setup-fonts"],
-  "events": ["session_start", "agent_start", "tool_call"]
+  "events": ["session_start", "agent_start", "tool_call", "session_shutdown"]
 }

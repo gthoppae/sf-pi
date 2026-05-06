@@ -292,7 +292,7 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ steps.pr.outputs.pr_number }}
         # Why --auto instead of an immediate merge:
-        #   The main branch ruleset requires 9 status checks + PR before
+        #   The main branch ruleset requires status checks + PR before
         #   merge. The job we're in right now is itself one of those
         #   required checks, so an immediate `gh pr merge` deadlocks:
         #   "required check 'CI' has not completed" (it can't complete
@@ -303,9 +303,9 @@ jobs:
         #
         #   --auto has GitHub queue the merge and execute it as soon as
         #   every required check reports success, with no bypass
-        #   required. For the release PR that typically means: CI + OSV
-        #   + License + Workflow lint + gitleaks + npm audit all
-        #   conclude, then GitHub merges the PR and deletes the branch.
+        #   required. For the release PR that typically means: CI,
+        #   License, Workflow lint, gitleaks, and npm audit all conclude,
+        #   then GitHub merges the PR and deletes the branch.
         run: |
           set -euo pipefail
           gh pr merge "$PR" \

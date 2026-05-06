@@ -84,6 +84,10 @@ Restart pi or run `/reload`. Every extension ships enabled by default
 — see the **Default** column in the [Bundled Extensions](#bundled-extensions)
 table for exact per-extension defaults.
 
+External users without access to the Salesforce-internal LLM gateway can disable
+that provider with `/sf-pi disable sf-llm-gateway-internal`; all other bundled
+extensions continue to work independently.
+
 ### Step 4 — Set up the terminal font (one-time)
 
 The splash and status bars use
@@ -182,10 +186,6 @@ Every slash command exposed by a bundled extension. See each extension README fo
 | `/sf-guardrail`            | [SF Guardrail](./extensions/sf-guardrail/)                       | core     |
 | `/sf-lsp`                  | [SF LSP](./extensions/sf-lsp/)                                   | core     |
 | `/sf-pi`                   | [SF Pi Manager](./extensions/sf-pi-manager/)                     | core     |
-| `/sf-pi recommended`       | [SF Pi Manager](./extensions/sf-pi-manager/)                     | core     |
-| `/sf-pi announcements`     | [SF Pi Manager](./extensions/sf-pi-manager/)                     | core     |
-| `/sf-pi skills`            | [SF Pi Manager](./extensions/sf-pi-manager/)                     | core     |
-| `/sf-pi doctor`            | [SF Pi Manager](./extensions/sf-pi-manager/)                     | core     |
 | `/sf-slack`                | [SF Slack](./extensions/sf-slack/)                               | core     |
 | `/sf-llm-gateway-internal` | [SF LLM Gateway Internal](./extensions/sf-llm-gateway-internal/) | provider |
 | `/sf-devbar`               | [SF DevBar](./extensions/sf-devbar/)                             | ui       |
@@ -607,7 +607,7 @@ Jump to an extension's Troubleshooting section to see the full fix. This index i
 - HUD never appears even though I know a skill was used
 - A skill moved from Live to Earlier mid-session
 - HUD doesn't update after switching branches with `/tree`
-- I want the HUD off or a richer view
+- I want the HUD off or more controls
 
 **[SF Welcome](./extensions/sf-welcome/#troubleshooting)**
 

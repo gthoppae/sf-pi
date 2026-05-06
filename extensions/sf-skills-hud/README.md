@@ -29,7 +29,8 @@ Extension loads
   ├─ session_compact
   │   └─ re-scan after compaction changes what is still live
   ├─ /sf-skills
-  │   └─ show text summary for the current state
+  │   ├─ UI available → open status & controls panel
+  │   └─ no UI        → show text summary for the current state
   └─ session_shutdown
       └─ dismiss overlay and clear references
 ```
@@ -70,16 +71,19 @@ its usage is still present in the active context. Older skill usage moves to the
 
 ## Behavior Matrix
 
-| Event/Trigger      | Condition                                   | Result                                            |
-| ------------------ | ------------------------------------------- | ------------------------------------------------- |
-| `session_start`    | UI available                                | Mount passive top-right overlay and rebuild state |
-| `session_start`    | no UI                                       | Stay silent                                       |
-| `message_end`      | skill block or `read(SKILL.md)` now visible | Refresh HUD contents                              |
-| `message_end`      | no skill usage detected                     | Keep overlay hidden                               |
-| `session_tree`     | branch changed                              | Recompute live vs earlier skills                  |
-| `session_compact`  | compaction completed                        | Recompute live vs earlier skills                  |
-| `/sf-skills`       | any time                                    | Show textual summary via notification             |
-| `session_shutdown` | —                                           | Dismiss overlay                                   |
+| Event/Trigger        | Condition                                   | Result                                            |
+| -------------------- | ------------------------------------------- | ------------------------------------------------- |
+| `session_start`      | UI available                                | Mount passive top-right overlay and rebuild state |
+| `session_start`      | no UI                                       | Stay silent                                       |
+| `message_end`        | skill block or `read(SKILL.md)` now visible | Refresh HUD contents                              |
+| `message_end`        | no skill usage detected                     | Keep overlay hidden                               |
+| `session_tree`       | branch changed                              | Recompute live vs earlier skills                  |
+| `session_compact`    | compaction completed                        | Recompute live vs earlier skills                  |
+| `/sf-skills`         | UI available                                | Open status & controls panel                      |
+| `/sf-skills`         | no UI                                       | Show textual summary via notification             |
+| `/sf-skills summary` | any time                                    | Show textual summary via notification             |
+| `/sf-skills help`    | any time                                    | Show command help                                 |
+| `session_shutdown`   | —                                           | Dismiss overlay                                   |
 
 ## File Structure
 
@@ -123,14 +127,16 @@ matches intentionally don't trigger the HUD.
 **A skill moved from Live to Earlier mid-session:**
 Expected. After a compaction or significant context growth, the HUD no
 longer claims a skill is "live" unless its usage is still present in
-the active context. Use `/sf-skills` to see the current summary.
+the active context. Use `/sf-skills` to open controls, or
+`/sf-skills summary` to print the current summary.
 
 **HUD doesn't update after switching branches with `/tree`:**
 It should — `session_tree` events trigger a state rebuild. If you see
-stale state, run `/sf-skills` to force a recompute. File an issue with
-a repro; derived-state reconstruction is designed to avoid this class
+stale state, run `/sf-skills summary` to force a recompute. File an issue
+with a repro; derived-state reconstruction is designed to avoid this class
 of bug.
 
-**I want the HUD off or a richer view:**
-Phase 2 will add `/sf-skills show|hide|pin|unpin|panel`. See
+**I want the HUD off or more controls:**
+`/sf-skills` opens the current status & controls panel. Phase 2 will add
+richer visibility controls such as show/hide and pin/unpin. See
 [`ROADMAP.md`](./ROADMAP.md) for the phased plan.

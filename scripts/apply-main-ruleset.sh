@@ -8,8 +8,7 @@
 # pushing directly to main while external contributors go through the
 # PR + review flow.
 #
-# Baseline (matches what salesforce/agentscript runs today, plus a
-# linear-history requirement and squash-only merges):
+# Baseline for sf-pi's solo-maintainer fast path plus PR protection:
 #
 #   - Block deletion of main
 #   - Block non-fast-forward (force) pushes
@@ -18,19 +17,22 @@
 #     squash-only merge method
 #   - Required status checks (strict=false so rebases aren't forced):
 #       Validate, npm audit (production), gitleaks, actionlint,
-#       Require SHA-pinned actions, commitlint, Dependency review,
-#       License scan (production deps), OSV scan (PR diff) / osv-scan.
+#       Require SHA-pinned actions, commitlint,
+#       License scan (production deps).
 #     Not required (intentional):
 #       - CodeQL: workflow is schedule-only (weekly) + workflow_dispatch;
 #         requiring it would stall every PR.
+#       - Dependency review and OSV PR-diff scan: pull_request-only by
+#         design. Release-please PRs are generated with GITHUB_TOKEN, so
+#         their required checks are dispatched explicitly and these two
+#         checks are kept advisory rather than required.
 #       - OSV scan (full): runs only on push/schedule (reports "skipping"
-#         on PRs). The PR-diff job covers pull_request events.
+#         on PRs).
 #       - salesforce-cla: external check owned by the CLA bot; treat as
 #         advisory, not enforced via ruleset.
-#   - Bypass: repo Admins only (actor_id 5). The release-please auto-merge
-#     job can't bypass the PR rule, so release PRs now require a single
-#     manual merge click from an Admin. Same pattern salesforce/agentscript
-#     uses.
+#   - Bypass: repo Admins only (actor_id 5). Release PRs use GitHub's
+#     normal auto-merge path after CI posts all required statuses; no
+#     admin bypass or manual merge click is required.
 #
 # Usage:
 #   gh auth login                              # must be SSO-approved for salesforce
@@ -86,9 +88,7 @@ payload=$(cat <<JSON
           { "context": "actionlint" },
           { "context": "Require SHA-pinned actions" },
           { "context": "commitlint" },
-          { "context": "Dependency review" },
-          { "context": "License scan (production deps)" },
-          { "context": "OSV scan (PR diff) / osv-scan" }
+          { "context": "License scan (production deps)" }
         ]
       }
     }

@@ -59,6 +59,9 @@ Extension loads
        └─ Inject [Slack Workspace] identity anchors (User + Team) only
             (cache sizes and gated counts are intentionally omitted — they drift
              turn-to-turn and would invalidate prompt cache)
+  /sf-slack
+       ├─ UI available + no args → open status & controls panel
+       └─ no UI + no args        → show auth status
   /sf-slack refresh
        ├─ If token resolves now but tools were not registered earlier
        │   (e.g. user ran /login mid-session) → ensureSlackToolsRegistered()
@@ -423,13 +426,14 @@ visible to the LLM.
 
 ## Commands
 
-| Command              | Description                                          |
-| -------------------- | ---------------------------------------------------- |
-| `/sf-slack`          | Show auth status and connection info                 |
-| `/sf-slack refresh`  | Re-detect identity, re-probe scopes, refresh cache   |
-| `/sf-slack settings` | Open preferences (search detail, widget, permalinks) |
-| `/sf-slack sent`     | List `slack_send` activity in the current branch     |
-| `/sf-slack help`     | Show command help                                    |
+| Command              | Description                                                        |
+| -------------------- | ------------------------------------------------------------------ |
+| `/sf-slack`          | Open status & controls panel in UI; show auth status in no-UI mode |
+| `/sf-slack status`   | Show auth status and connection info                               |
+| `/sf-slack refresh`  | Re-detect identity, re-probe scopes, refresh cache                 |
+| `/sf-slack settings` | Open preferences (search detail, widget, permalinks)               |
+| `/sf-slack sent`     | List `slack_send` activity in the current branch                   |
+| `/sf-slack help`     | Show command help                                                  |
 
 ## Display Profile Integration
 
@@ -454,6 +458,8 @@ returns full bodies regardless of the shared display profile.
 | `session_shutdown`   | —                               | Clear footer status                                                            |
 | `before_agent_start` | identity + at least one slack\* | Inject minimal workspace context (User + Team only)                            |
 | `before_agent_start` | no identity / no slack tools    | Skip injection                                                                 |
+| `/sf-slack`          | UI available                    | Open status & controls panel                                                   |
+| `/sf-slack`          | no UI                           | Show auth status                                                               |
 | `/sf-slack refresh`  | token resolves now              | Register tools if needed, re-probe scopes, refresh cache                       |
 | any tool call        | no auth                         | Return setup instructions (defensive; normally unreachable)                    |
 

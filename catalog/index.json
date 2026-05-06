@@ -122,7 +122,7 @@
     "tools": [],
     "events": [
       "session_start",
-      "session_shutdown",
+      "session_tree",
       "before_agent_start",
       "tool_call"
     ],
@@ -214,11 +214,7 @@
     "alwaysActive": true,
     "configurable": true,
     "commands": [
-      "/sf-pi",
-      "/sf-pi recommended",
-      "/sf-pi announcements",
-      "/sf-pi skills",
-      "/sf-pi doctor"
+      "/sf-pi"
     ],
     "providers": [],
     "tools": [],
@@ -230,7 +226,7 @@
     "entry": "extensions/sf-pi-manager/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 3176
+    "srcLoc": 3180
   },
   {
     "id": "sf-skills-hud",
@@ -311,7 +307,8 @@
     "events": [
       "session_start",
       "agent_start",
-      "tool_call"
+      "tool_call",
+      "session_shutdown"
     ],
     "docs": {},
     "entry": "extensions/sf-welcome/index.ts",

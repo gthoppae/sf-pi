@@ -18,13 +18,15 @@ Extension loads
   └─ registerCommand("sf-feedback")
 
 /sf-feedback
-  ├─ collectDiagnostics()
-  │    ├─ package/runtime versions
-  │    ├─ OS, shell, terminal, TTY/CI
-  │    ├─ git state summary
-  │    ├─ SF CLI version/config summary
-  │    ├─ enabled/disabled SF Pi extensions
-  │    └─ GitHub CLI auth status
+  ├─ UI available + no args → open status & controls panel
+  └─ selected action / explicit subcommand
+     ├─ collectDiagnostics()
+     ├─ package/runtime versions
+     ├─ OS, shell, terminal, TTY/CI
+     ├─ git state summary
+     ├─ SF CLI version/config summary
+     ├─ enabled/disabled SF Pi extensions
+     └─ GitHub CLI auth status
   ├─ prompt for issue type/title/details (interactive only)
   ├─ build sanitized Markdown body
   ├─ preview + confirm
@@ -59,13 +61,15 @@ Every diagnostic command may fail on some machines. Failures are summarized as
 
 ## Behavior Matrix
 
-| Event/Trigger              | Condition                              | Result                                          |
-| -------------------------- | -------------------------------------- | ----------------------------------------------- |
-| `/sf-feedback`             | interactive + authenticated `gh`       | Prompt, preview, confirm, create GitHub issue   |
-| `/sf-feedback`             | interactive without authenticated `gh` | Prompt, preview, confirm, open prefilled URL    |
-| `/sf-feedback`             | headless                               | Emit draft body and fallback URL; do not submit |
-| `/sf-feedback diagnostics` | any mode                               | Emit sanitized diagnostics only                 |
-| `/sf-feedback help`        | any mode                               | Show command help                               |
+| Event/Trigger                                | Condition                              | Result                                          |
+| -------------------------------------------- | -------------------------------------- | ----------------------------------------------- |
+| `/sf-feedback`                               | UI available + no args                 | Open status & controls panel                    |
+| `/sf-feedback`                               | no UI + no args                        | Emit generic feedback draft and fallback URL    |
+| `/sf-feedback bug\|feature\|setup\|feedback` | interactive + authenticated `gh`       | Prompt, preview, confirm, create GitHub issue   |
+| `/sf-feedback bug\|feature\|setup\|feedback` | interactive without authenticated `gh` | Prompt, preview, confirm, open prefilled URL    |
+| `/sf-feedback bug\|feature\|setup\|feedback` | headless                               | Emit draft body and fallback URL; do not submit |
+| `/sf-feedback diagnostics`                   | any mode                               | Emit sanitized diagnostics only                 |
+| `/sf-feedback help`                          | any mode                               | Show command help                               |
 
 ## File Structure
 

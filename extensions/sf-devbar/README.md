@@ -79,7 +79,7 @@ Extension loads
 
 ### Registration
 
-- `pi.registerCommand()` — `/sf-devbar` toggle
+- `pi.registerCommand()` — `/sf-devbar` status/control panel plus text subcommands
 - `pi.registerShortcut()` — Ctrl+Shift+B toggle
 - `pi.registerFlag()` — `--no-devbar` CLI flag
 
@@ -98,13 +98,16 @@ as results arrive:
 
 ## Commands
 
-| Command           | Description                         |
-| ----------------- | ----------------------------------- |
-| `/sf-devbar`      | Toggle bars on/off                  |
-| `/sf-devbar help` | Show help                           |
-| `/sf-org`         | Show detected Salesforce org status |
-| `Ctrl+Shift+B`    | Keyboard toggle                     |
-| `pi --no-devbar`  | Launch without status bars          |
+| Command              | Description                                                   |
+| -------------------- | ------------------------------------------------------------- |
+| `/sf-devbar`         | Open status & controls panel in UI; toggle bars in no-UI mode |
+| `/sf-devbar status`  | Show current org/environment details                          |
+| `/sf-devbar toggle`  | Toggle bars on/off                                            |
+| `/sf-devbar refresh` | Force Salesforce environment re-detection                     |
+| `/sf-devbar help`    | Show help                                                     |
+| `/sf-org`            | Show detected Salesforce org status                           |
+| `Ctrl+Shift+B`       | Keyboard toggle                                               |
+| `pi --no-devbar`     | Launch without status bars                                    |
 
 ## Behavior Matrix
 
@@ -116,7 +119,10 @@ as results arrive:
 | thinking_level_select | thinking changes | Repaint rainbow thinking badge         |
 | turn_end / agent_end  | —                | Refresh context, footer, and git state |
 | session_shutdown      | —                | Clear custom widget/footer             |
-| `/sf-devbar`          | —                | Toggle enabled state                   |
+| `/sf-devbar`          | UI available     | Open status & controls panel           |
+| `/sf-devbar`          | no UI            | Toggle enabled state                   |
+| `/sf-devbar toggle`   | —                | Toggle enabled state                   |
+| `/sf-devbar refresh`  | —                | Force environment re-detection         |
 | `/sf-org`             | —                | Show Salesforce environment summary    |
 
 ## File Structure
@@ -167,7 +173,7 @@ All renderers and helpers are pure and testable:
 **Bars don't appear at all:**
 Confirm you have a TTY — sf-devbar skips rendering in `pi -p` / JSON /
 print mode via `ctx.hasUI`. If you're in a real terminal, try
-`/sf-devbar` to toggle. The `--no-devbar` CLI flag suppresses rendering
+`/sf-devbar` to open controls or `/sf-devbar toggle` to toggle. The `--no-devbar` CLI flag suppresses rendering
 for the session if you've launched with it.
 
 **Org segment shows `…` or takes a long time:**

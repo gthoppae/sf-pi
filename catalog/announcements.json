@@ -14,13 +14,13 @@
       "body": "ui: improve command panel interactions — ui: refine panels and popup contrast"
     },
     {
-      "id": "pi-0.72-required",
+      "id": "pi-0.73-required",
       "kind": "note",
       "severity": "info",
-      "title": "sf-pi requires pi 0.72 or newer",
+      "title": "sf-pi requires pi 0.73 or newer",
       "publishedAt": "2026-05-03T00:00:00Z",
       "minVersion": "0.33.0",
-      "body": "Current sf-pi builds use pi 0.72 APIs for model thinking maps and per-model gateway routing. Run `pi update` before upgrading sf-pi; PI_CODING_AGENT_SESSION_DIR remains supported for relocating session storage."
+      "body": "Current sf-pi builds require pi 0.73 or newer. Run `pi update` before upgrading sf-pi; PI_CODING_AGENT_SESSION_DIR remains supported for relocating session storage."
     }
   ]
 }

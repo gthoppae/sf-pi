@@ -27,7 +27,7 @@ Extension loads
        ├─ enable-all / disable-all
        ├─ status    → detailed summary
        ├─ display   → show/set compact|balanced|verbose display profile
-       ├─ /sf-pi announcements → list / dismiss / reset maintainer notes + update nudge
+       ├─ announcements → list / dismiss / reset maintainer notes + update nudge
        ├─ skills    → detect & wire Claude Code / Codex / Cursor skill dirs
        ├─ doctor    → diagnose and repair startup / skill-source issues
        └─ help      → command reference

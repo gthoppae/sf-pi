@@ -22,6 +22,10 @@
  * - /sf-pi disable-all        disable all (except the manager)
  * - /sf-pi status             show summary
  * - /sf-pi display [profile]  show or set compact/balanced/verbose display profile
+ * - /sf-pi recommended [...]  manage recommended external extensions
+ * - /sf-pi announcements [...] list/dismiss/reset sf-pi announcements
+ * - /sf-pi skills [...]       wire Claude Code / Codex / Cursor skill dirs
+ * - /sf-pi doctor [fix ...]   diagnose and repair startup/skill setup
  * - /sf-pi help               show available commands
  *
  * Behavior matrix:

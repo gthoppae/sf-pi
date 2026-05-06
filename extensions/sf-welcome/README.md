@@ -43,6 +43,9 @@ Dismissal triggers:
   ├─ agent_start (LLM responds)
   ├─ tool_call (agent working)
   └─ Countdown reaches 0
+
+session_shutdown
+  └─ clear overlay/header state, reset animation flags, and unsubscribe usage-store listeners
 ```
 
 ## Key Architecture Decisions
@@ -117,20 +120,21 @@ Dismissal triggers:
 
 ## Behavior Matrix
 
-| Event/Trigger   | Condition                     | Result                                      |
-| --------------- | ----------------------------- | ------------------------------------------- |
-| session_start   | reason="startup", quiet=false | Show overlay with countdown                 |
-| session_start   | reason="startup", quiet=true  | Show persistent header with countdown       |
-| session_start   | reason≠"startup"              | Skip (resume, reload, fork)                 |
-| session_start   | first-ever launch             | Persist current pi version, omit What's New |
-| agent_start     | overlay/header visible        | Dismiss + persist seen pi version           |
-| tool_call       | overlay/header visible        | Dismiss + persist seen pi version           |
-| any keypress    | overlay visible               | Dismiss + persist seen pi version           |
-| Escape          | header visible                | Dismiss + persist seen pi version           |
-| countdown=0     | overlay/header visible        | Auto-dismiss + persist seen pi version      |
-| /sf-welcome     | always                        | Show text summary                           |
-| /sf-setup-fonts | always                        | Install bundled Nerd Font + refresh cache   |
-| session_start   | ascii + no font + never asked | Ask once, persist answer, never re-ask      |
+| Event/Trigger    | Condition                     | Result                                      |
+| ---------------- | ----------------------------- | ------------------------------------------- |
+| session_start    | reason="startup", quiet=false | Show overlay with countdown                 |
+| session_start    | reason="startup", quiet=true  | Show persistent header with countdown       |
+| session_start    | reason≠"startup"              | Skip (resume, reload, fork)                 |
+| session_start    | first-ever launch             | Persist current pi version, omit What's New |
+| agent_start      | overlay/header visible        | Dismiss + persist seen pi version           |
+| tool_call        | overlay/header visible        | Dismiss + persist seen pi version           |
+| any keypress     | overlay visible               | Dismiss + persist seen pi version           |
+| Escape           | header visible                | Dismiss + persist seen pi version           |
+| countdown=0      | overlay/header visible        | Auto-dismiss + persist seen pi version      |
+| session_shutdown | —                             | Clear overlay/header state and listeners    |
+| /sf-welcome      | always                        | Show text summary                           |
+| /sf-setup-fonts  | always                        | Install bundled Nerd Font + refresh cache   |
+| session_start    | ascii + no font + never asked | Ask once, persist answer, never re-ask      |
 
 ## File Structure
 

@@ -9,16 +9,15 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Breaking Changes
 
-- **Raised pi-coding-agent peerDependency floor to `>=0.72.0`.** sf-pi now
-  depends on pi 0.72+ APIs (model-level `thinkingLevelMap` and per-model
-  `baseUrl` overrides on `pi.registerProvider()`), so running against
-  older pi builds will no longer work. To soften the blow for users who
-  update sf-pi before updating pi, every extension factory now calls a new
-  `requirePiVersion()` gate in `lib/common/pi-compat.ts` at the top of the
-  factory. On pi < 0.72 the gate logs a single actionable warning per
-  extension ("requires pi-coding-agent >= 0.72.0, found <x>. Run
-  `pi update`\...") and short-circuits, so the rest of pi keeps starting
-  instead of crashing with `schema validation failed` or
+- **Raised pi-coding-agent peerDependency floor to `>=0.73.0`.** sf-pi now
+  requires pi 0.73+ while retaining the 0.72-era model thinking maps and
+  per-model `baseUrl` routing integrations, so running against older pi builds
+  will no longer work. To soften the blow for users who update sf-pi before
+  updating pi, every extension factory calls the `requirePiVersion()` gate in
+  `lib/common/pi-compat.ts` at the top of the factory. On pi < 0.73 the gate
+  logs a single actionable warning per extension ("requires pi-coding-agent >=
+  0.73.0, found <x>. Run `pi update`...") and short-circuits, so the rest of
+  pi keeps starting instead of crashing with `schema validation failed` or
   `ctx.ui.<method> is not a function`.
 
 ### Features
@@ -55,7 +54,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   max_tokens shim and the SSE early-error retry wrapper in
   `transport.ts`), but the boilerplate explanation in `discovery.ts`
   shrinks from ~20 lines to ~8.
-- **Drop pi 0.70-era compatibility casts.** Now that the floor is 0.72,
+- **Drop pi 0.70-era compatibility casts.** Now that the floor is 0.73,
   the `ProviderConfigWithName` structural cast in
   `sf-llm-gateway-internal/lib/discovery.ts` and the `pi.on as unknown
   as ...` cast around `thinking_level_select` in `sf-devbar/index.ts` are
@@ -89,14 +88,14 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   `sfPi.gatewayUnifyMigrated` sentinel, so the migrator runs at most once
   per settings file. Env-var users (`SF_LLM_GATEWAY_INTERNAL_API_KEY`) and
   existing saved-config users are not affected. Current sf-pi builds require
-  pi `>=0.72.0`; see the breaking-change note above.
+  pi `>=0.73.0`; see the breaking-change note above.
 
 - **sf-devbar: instant thinking-badge repaint on `thinking_level_select`
   (pi ≥ 0.71).** pi emits `thinking_level_select` whenever the user flips
   thinking level via shortcut, settings, or model clamp. Previously the
   devbar only refreshed the rainbow badge on the next turn boundary,
   leaving it visibly stale while idle. Current sf-pi builds require pi
-  `>=0.72.0`; see the breaking-change note above.
+  `>=0.73.0`; see the breaking-change note above.
 
 ### Bug Fixes
 
@@ -117,7 +116,7 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 - **pi 0.71+ session storage note.** pi 0.71 removed built-in Google Gemini
   CLI and Antigravity providers; sf-pi does not use either. The README also
   documents `PI_CODING_AGENT_SESSION_DIR` for users who want to relocate
-  session storage. Current sf-pi builds require pi `>=0.72.0`; see the
+  session storage. Current sf-pi builds require pi `>=0.73.0`; see the
   breaking-change note above.
 
 - **sf-welcome + sf-pi-manager: announcements panel and update nudge.**

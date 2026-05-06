@@ -65,7 +65,7 @@ ones agents and maintainers most often need:
 | `scripts/generate-catalog.mjs`      | Regenerates catalog files, generated docs, and generated README marker blocks.                                     |
 | `scripts/docs-health.mjs`           | Checks factual doc drift contracts and public-safe examples.                                                       |
 | `scripts/docs-changed.mjs`          | Summarizes which docs are implicated by a diff.                                                                    |
-| `scripts/add-spdx-headers.mjs`      | Adds or checks SPDX headers for source scripts. CI and pre-commit use the check path.                              |
+| `scripts/add-spdx-headers.mjs`      | Adds or checks SPDX headers for source scripts. Pre-commit auto-adds missing headers; CI uses the check path.      |
 | `scripts/check-llm-artifacts.sh`    | CI guard for unresolved conflict markers, prompt-template tokens, and LLM TODO markers.                            |
 | `scripts/scaffold.mjs`              | Creates a new extension folder and refreshes generated catalog/docs.                                               |
 | `scripts/sync-agentforce-sdk.mjs`   | Refreshes the vendored Agentforce SDK snapshot used by `sf-agentscript-assist`.                                    |
@@ -375,6 +375,6 @@ npm run check
 # Run tests
 npm test
 
-# Full validation (generate + format + check + test)
+# Full validation (generate + SPDX + docs health + format + check + test)
 npm run validate
 ```

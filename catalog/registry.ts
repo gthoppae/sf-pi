@@ -53,7 +53,7 @@ export const SF_PI_REGISTRY: readonly SfPiExtension[] = [
     category: "core",
     defaultEnabled: true,
     commands: ["/sf-guardrail"],
-    events: ["session_start","session_shutdown","before_agent_start","tool_call"],
+    events: ["session_start","session_tree","before_agent_start","tool_call"],
     configurable: true,
     getConfigPanel: async () => {
       const mod = await import("../extensions/sf-guardrail/lib/config-panel.ts");
@@ -102,7 +102,7 @@ export const SF_PI_REGISTRY: readonly SfPiExtension[] = [
     file: "extensions/sf-pi-manager/index.ts",
     category: "core",
     defaultEnabled: true,
-    commands: ["/sf-pi","/sf-pi recommended","/sf-pi announcements","/sf-pi skills","/sf-pi doctor"],
+    commands: ["/sf-pi"],
     events: ["session_start","session_shutdown"],
     alwaysActive: true,
     configurable: true,
@@ -146,6 +146,6 @@ export const SF_PI_REGISTRY: readonly SfPiExtension[] = [
     category: "ui",
     defaultEnabled: true,
     commands: ["/sf-welcome","/sf-setup-fonts"],
-    events: ["session_start","agent_start","tool_call"],
+    events: ["session_start","agent_start","tool_call","session_shutdown"],
   },
 ];

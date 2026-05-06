@@ -213,6 +213,35 @@ function checkExtensionReadmes() {
   }
 }
 
+function checkManifestEventsMatchCode() {
+  for (const dir of extensionDirs()) {
+    const base = `extensions/${dir}`;
+    const manifestPath = `${base}/manifest.json`;
+    const indexPath = `${base}/index.ts`;
+    if (!existsSync(path.join(ROOT, manifestPath)) || !existsSync(path.join(ROOT, indexPath))) {
+      continue;
+    }
+
+    const manifest = readJson(manifestPath);
+    const manifestEvents = new Set(manifest.events ?? []);
+    const code = readText(indexPath);
+    const codeEvents = new Set(
+      [...code.matchAll(/\bpi\.on\(\s*["'`]([^"'`]+)["'`]/g)].map((match) => match[1]),
+    );
+
+    for (const event of codeEvents) {
+      if (!manifestEvents.has(event)) {
+        fail(manifestPath, `Missing event from manifest: ${event}`);
+      }
+    }
+    for (const event of manifestEvents) {
+      if (!codeEvents.has(event)) {
+        fail(manifestPath, `Manifest lists event not registered in index.ts: ${event}`);
+      }
+    }
+  }
+}
+
 function checkChangelog() {
   const changelog = readText("CHANGELOG.md");
   const unreleasedMatch = changelog.match(/^## Unreleased\s*\n([\s\S]*?)(?=^## \[|$)/m);
@@ -265,6 +294,7 @@ function run() {
   checkRecommendationTable();
   checkGeneratedFilesExist();
   checkExtensionReadmes();
+  checkManifestEventsMatchCode();
   checkChangelog();
   checkPublicSafety();
   checkDocOwnership();

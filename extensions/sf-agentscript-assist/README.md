@@ -93,11 +93,12 @@ read them without mental conversion.
 
 ## Commands
 
-| Command                               | Description                                           |
-| ------------------------------------- | ----------------------------------------------------- |
-| `/sf-agentscript-assist`              | Same as `doctor`                                      |
-| `/sf-agentscript-assist doctor`       | Show SDK load status, vendored path, resolved dialect |
-| `/sf-agentscript-assist check <file>` | Manually diagnose a single `.agent` file              |
+| Command                               | Description                                                    |
+| ------------------------------------- | -------------------------------------------------------------- |
+| `/sf-agentscript-assist`              | Open status & controls panel in UI; run `doctor` in no-UI mode |
+| `/sf-agentscript-assist doctor`       | Show SDK load status, vendored path, resolved dialect          |
+| `/sf-agentscript-assist check <file>` | Manually diagnose a single `.agent` file                       |
+| `/sf-agentscript-assist help`         | Show command help                                              |
 
 We deliberately ship a minimal command surface. Most of the value flows
 through the automatic `tool_result` hook. Commands exist only for the
@@ -124,8 +125,11 @@ assumptions.
 | tool_result                           | `.agent` write/edit completed | Compile source, append diagnostics/fixes |
 | tool_result                           | file is not `.agent`          | Stay silent                              |
 | tool_result                           | SDK unavailable               | Emit one setup note, then stay quiet     |
-| `/sf-agentscript-assist`              | no args or `doctor`           | Show SDK load status and vendored path   |
+| `/sf-agentscript-assist`              | UI available                  | Open status & controls panel             |
+| `/sf-agentscript-assist`              | no UI                         | Show SDK load status and vendored path   |
+| `/sf-agentscript-assist doctor`       | any mode                      | Show SDK load status and vendored path   |
 | `/sf-agentscript-assist check <file>` | `.agent` file exists          | Run one manual diagnostic pass           |
+| `/sf-agentscript-assist help`         | any mode                      | Show command help                        |
 
 ## File Structure
 

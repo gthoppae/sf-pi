@@ -76,7 +76,7 @@ roadmap — see `ROADMAP.md`.
 
 ## Commands
 
-- `/sf-guardrail` → status summary + last 5 decisions
+- `/sf-guardrail` → open status & controls panel in UI; status summary in no-UI mode
 - `/sf-guardrail list` → full dump of active rules
 - `/sf-guardrail audit` → up to 50 recent decisions from the session
 - `/sf-guardrail forget` → clear session allow-memory (entries remain
@@ -143,6 +143,8 @@ current turn so hostile agent loops can't bypass a prior confirmation.
 | tool_call          | interactive confirmation                | `ctx.ui.select`, audit per choice      |
 | tool_call          | headless + env opt-in                   | Pass through, audit as headless_pass   |
 | tool_call          | headless + no env opt-in                | `{ block }`, audit as headless_block   |
+| /sf-guardrail      | UI available                            | Open status & controls panel           |
+| /sf-guardrail      | no UI                                   | Show status summary                    |
 
 ## File Structure
 
