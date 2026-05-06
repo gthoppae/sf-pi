@@ -217,7 +217,7 @@ describe("slack_send source-level safety invariants", () => {
     const pattern = eval(match![1]) as RegExp;
     expect(pattern.test("hello <!subteam^S123ABCDEFG|@some-group> world")).toBe(true);
     expect(pattern.test("hello <!channel>")).toBe(true);
-    expect(pattern.test("hello <@U02EK4AHJMU>")).toBe(false);
+    expect(pattern.test("hello <@U012ABCDEF>")).toBe(false);
     expect(pattern.test("hello @channelish")).toBe(false);
   });
 
@@ -253,17 +253,16 @@ describe("slack_send source-level safety invariants", () => {
     expect(sendSource).toMatch(/signal,\s*timeout:\s*CONFIRM_TIMEOUT_SECONDS/);
   });
 
-  it("delegates fuzzy recipient confirmation to the HITL helper", () => {
-    // The old code had inline pickCandidateChannel / pickCandidateUser
-    // helpers and an AUTO_SELECT_THRESHOLD constant. The new code routes
-    // every channel + user resolution through requireConfirmedChannel /
-    // requireConfirmedUser, which is where the select-or-type dialog lives.
-    expect(sendSource).toMatch(/requireConfirmedChannel\s*\(/);
-    expect(sendSource).toMatch(/requireConfirmedUser\s*\(/);
-    // The inline helpers (and their local threshold) are gone — belt-and-
-    // braces check so nobody silently reintroduces them.
-    expect(sendSource).not.toMatch(/function pickCandidateChannel/);
-    expect(sendSource).not.toMatch(/function pickCandidateUser/);
+  it("folds recipient review into the final send confirmation", () => {
+    // slack_send should not show the shared recipient-confirm select dialog
+    // and then a separate final send dialog. It resolves candidates itself
+    // and includes recipient confidence/alternates in the one final confirm.
+    expect(sendSource).not.toMatch(/requireConfirmedChannel\s*\(/);
+    expect(sendSource).not.toMatch(/requireConfirmedUser\s*\(/);
+    expect(sendSource).toMatch(/recipientReview/);
+    expect(sendSource).toMatch(/formatRecipientReview/);
+    expect(sendSource).toMatch(/Other possible matches/);
+    expect(sendSource).not.toMatch(/Cancelled\. What next/);
   });
 });
 
@@ -279,18 +278,13 @@ describe("/sf-slack sent command", () => {
 describe("routeRecipient — channel label resolution", () => {
   // Live repro (v0.14.1): `slack_send action=channel to=C09MFCX4A2H`
   // rendered a bare ID instead of `#jag-fde-ai-sharelab`. Fix shipped a
-  // raw-ID async fallback in routeRecipient. The HITL-helper migration
-  // moved that concern up one layer: requireConfirmedChannel always
-  // goes through the fuzzy/ID resolvers in resolve.ts which hit
-  // conversations.info for raw IDs, so a cold cache no longer produces
-  // a bare-ID confirm dialog.
+  // raw-ID async fallback in routeRecipient. The unified-confirm flow keeps
+  // verification in resolveChannel, but still offers an explicit raw-ID path
+  // for user-supplied IDs that Slack cannot verify with the available scopes.
 
-  it("no longer short-circuits on isSlackChannelId for channel sends", () => {
-    // The old routeRecipient had an `if (isSlackChannelId(ref))` fast
-    // path that skipped verification. That path is gone; raw IDs flow
-    // through requireConfirmedChannel like every other ref.
-    expect(sendSource).not.toMatch(/if \(isSlackChannelId\(ref\)\)/);
-    // The channel route path calls the HITL helper regardless of ref shape.
-    expect(sendSource).toMatch(/requireConfirmedChannel\(ctx, token, ref/);
+  it("routes raw channel IDs through resolve first and only falls back with a warning", () => {
+    expect(sendSource).toMatch(/resolveChannel\(token, ref/);
+    expect(sendSource).toMatch(/user_unverified/);
+    expect(sendSource).toMatch(/could not verify this raw channel\/DM ID/);
   });
 });

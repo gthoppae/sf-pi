@@ -76,9 +76,12 @@ Tools and their supporting modules follow a **one-file-per-concern** split:
 
 ## Human-in-the-loop recipient resolution (P-HITL)
 
-Every tool that turns a fuzzy channel or user reference into an ID must
+Every read-style tool that turns a fuzzy channel or user reference into an ID must
 route through `requireConfirmedChannel` / `requireConfirmedUser` in
-`lib/recipient-confirm.ts`. This is the single source of truth for:
+`lib/recipient-confirm.ts`. `slack_send` is the exception: it resolves candidates
+itself and folds recipient confidence/alternates into the final send confirmation
+so normal sends do not show two separate dialogs. The shared helper remains the
+single source of truth for:
 
 - the 0.85 auto-confirm threshold (unified across reads and writes),
 - the interactive select-or-type dialog for low-confidence refs,
@@ -86,7 +89,8 @@ route through `requireConfirmedChannel` / `requireConfirmedUser` in
 - headless-mode loud-failure with the candidate list in the error.
 
 Do not reintroduce ad-hoc `resolveChannelParam` / `resolveUserParam`
-helpers in new tool files; delegate to the shared helper. The
-`resolveChannel` / `resolveUser` primitives in `lib/resolve.ts` are
-intentionally one layer below — they perform the lookups, the helper
-adds the HITL dialog.
+helpers in new read tool files; delegate to the shared helper. For
+`slack_send`, keep recipient review inside the single final confirmation rather
+than adding a separate select dialog. The `resolveChannel` / `resolveUser`
+primitives in `lib/resolve.ts` are intentionally one layer below — they perform
+the lookups, while the caller adds the appropriate HITL surface.

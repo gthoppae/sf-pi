@@ -15,7 +15,7 @@
  * Safety rails:
  *   - Token-type gate (user tokens only; bot/app rejected upfront)
  *   - Scope gate (chat:write OR chat:write.public must be granted)
- *   - Low-confidence recipient gate (<0.85 forces a select-first step)
+ *   - Unified recipient + message confirmation (low-confidence matches are shown inline)
  *   - Mention re-confirm (@channel/@here/@everyone flips the default to Cancel)
  *   - Headless refusal unless SLACK_ALLOW_HEADLESS_SEND=1
  *   - Dry-run via SLACK_SEND_DRY_RUN=1 — confirm UX runs but no API call
@@ -33,6 +33,9 @@ import {
   type ChatGetPermalinkResponse,
   type ConversationsOpenResponse,
   type JsonCompatibleParams,
+  type ResolveResult,
+  type ResolvedChannel,
+  type ResolvedUser,
   type SlackSearchMatch,
   type SlackSendAuditEntry,
 } from "./types.ts";
@@ -46,12 +49,7 @@ import {
   hasScope,
   detectTokenType,
 } from "./api.ts";
-import { isSlackUserId } from "./resolve.ts";
-import {
-  requireConfirmedChannel,
-  requireConfirmedUser,
-  type ConfirmResult as RecipientConfirmResult,
-} from "./recipient-confirm.ts";
+import { isSlackChannelId, isSlackUserId, resolveChannel, resolveUser } from "./resolve.ts";
 import { buildSlackTextResult, SLACK_OUTPUT_DESCRIPTION_SUFFIX } from "./truncation.ts";
 
 // ─── Tunables ──────────────────────────────────────────────────────────────────
@@ -73,6 +71,7 @@ const MENTION_PATTERN =
   /<!channel\b|<!here\b|<!everyone\b|<!subteam\b|@channel\b|@here\b|@everyone\b/i;
 
 const MAX_MESSAGE_LENGTH = 40_000;
+const RECIPIENT_AUTO_CONFIRM_THRESHOLD = 0.85;
 
 // ─── Render helpers ────────────────────────────────────────────────────────────
 
@@ -129,13 +128,13 @@ export function registerSendTool(pi: ExtensionAPI): void {
       "Post a message to Slack as the authenticated user. " +
       "Actions: channel — post to a channel/MPIM/known D... DM ID. dm — post to a 1:1 DM by user reference. thread — reply in a thread. " +
       "Every send requires explicit user confirmation via a dialog; non-interactive sessions refuse unless SLACK_ALLOW_HEADLESS_SEND=1 is set. " +
-      "Use this ONLY when the user has explicitly asked you to send a message in the current turn. Draft the text with the user first; the confirm dialog is a safety net, not a replacement for drafting together." +
+      "Use this ONLY when the user has explicitly asked you to send a message in the current turn. Draft text first only when exact wording is missing; the confirm dialog is the approval step, not a surprise." +
       SLACK_OUTPUT_DESCRIPTION_SUFFIX,
     promptSnippet:
       "Post a Slack message to a channel, DM, or thread with explicit user confirmation",
     promptGuidelines: [
       "Call slack_send ONLY after the user has explicitly asked, in the current turn, to send a message.",
-      "Draft the message with the user in chat first. Do NOT surprise the user with a dialog; they should already know what you are about to send.",
+      "If the user did not supply exact wording, draft the message in chat first. If they did, do not ask for another chat-level confirmation; the slack_send dialog is the approval step. Do NOT surprise the user with a dialog; they should already know what you are about to send.",
       'Never add your own signatures, footers, or "via pi"-style markers to the message text. Send the text verbatim.',
       "Pass the text in Slack mrkdwn (*bold*, _italic_, <url|label>) if formatting is requested. Otherwise plain text is fine.",
       "For DMs to people, use action=dm with a user reference (email, @handle, or display name). If the token lacks im:write, the tool can reuse an existing DM found by Slack search; use action=channel with a D... ID only when the user explicitly provides that existing DM channel ID.",
@@ -277,6 +276,7 @@ export function registerSendTool(pi: ExtensionAPI): void {
           action,
           channelId: routed.channelId,
           channelLabel: routed.channelLabel,
+          recipientReview: routed.recipientReview,
           text,
           threadTs: params.thread_ts,
         },
@@ -426,6 +426,16 @@ export function preflightSend(
 interface RoutedRecipient {
   channelId: string;
   channelLabel?: string;
+  recipientReview?: RecipientReview;
+}
+
+interface RecipientReview {
+  input: string;
+  selected: string;
+  confidence?: number;
+  source?: string;
+  alternates?: string[];
+  warning?: string;
 }
 
 interface RouteFailure {
@@ -456,18 +466,89 @@ async function routeRecipient(
     return routeDm(token, ref, signal, ctx);
   }
 
-  // channel + thread share the same channel-resolution path. The HITL
-  // helper takes care of raw-ID verification, fuzzy fallback, the
-  // interactive select-or-type loop, and headless loud-failure — we no
-  // longer short-circuit on isSlackChannelId() because that path used to
-  // accept syntactically-valid-but-unverified IDs (live repro: a bogus
-  // `C09ZZZZZZZZ` survived resolution and reached chat.postMessage).
-  const confirmed = await requireConfirmedChannel(ctx, token, ref, signal);
-  if (confirmed.ok && confirmed.recipient.type === "channel") {
-    const { channel } = confirmed.recipient;
-    return { channelId: channel.id, channelLabel: channel.name };
+  // channel + thread share the same channel-resolution path. For sends we do
+  // not call the shared recipient-confirm helper, because that helper opens a
+  // separate select dialog and then slack_send opens its final send dialog.
+  // Instead we resolve candidates here and fold the selected recipient + any
+  // ambiguity into the single final confirmation dialog.
+  const resolved = await resolveChannel(token, ref, signal, { limit: 5 });
+  const routed = routeResolvedChannel(action, ref, resolved, ctx.hasUI);
+  if ("result" in routed) return routed;
+  return routed;
+}
+
+function routeResolvedChannel(
+  action: "channel" | "thread",
+  ref: string,
+  resolution: ResolveResult<ResolvedChannel>,
+  hasUI: boolean,
+): RoutedRecipient | RouteFailure {
+  if (resolution.best) {
+    if (!hasUI && resolution.confidence < RECIPIENT_AUTO_CONFIRM_THRESHOLD) {
+      return recipientResolutionFailure(action, "channel", ref, resolution);
+    }
+    const channel = resolution.best;
+    return {
+      channelId: channel.id,
+      channelLabel: channel.name,
+      recipientReview: buildChannelReview(ref, resolution, channel),
+    };
   }
-  return channelConfirmationFailure(action, ref, confirmed);
+
+  if (hasUI && isSlackChannelId(ref)) {
+    return {
+      channelId: ref.trim(),
+      channelLabel: ref.trim(),
+      recipientReview: {
+        input: ref,
+        selected: ref.trim(),
+        confidence: 0,
+        source: "user_unverified",
+        warning: "Slack could not verify this raw channel/DM ID; confirm only if you trust it.",
+      },
+    };
+  }
+
+  return recipientResolutionFailure(action, "channel", ref, resolution);
+}
+
+type SelectedUserForSend = { user: ResolvedUser; review: RecipientReview } | RouteFailure;
+
+function selectUserForSend(
+  ref: string,
+  resolution: ResolveResult<ResolvedUser>,
+  hasUI: boolean,
+): SelectedUserForSend {
+  if (resolution.best) {
+    if (!hasUI && resolution.confidence < RECIPIENT_AUTO_CONFIRM_THRESHOLD) {
+      return recipientResolutionFailure("dm", "user", ref, resolution);
+    }
+    return { user: resolution.best, review: buildUserReview(ref, resolution, resolution.best) };
+  }
+
+  if (hasUI && isSlackUserId(ref)) {
+    const user: ResolvedUser = {
+      id: ref.trim(),
+      handle: ref.trim(),
+      displayName: ref.trim(),
+      realName: ref.trim(),
+      email: "",
+      confidence: 0,
+      source: "user_unverified",
+    };
+    return {
+      user,
+      review: {
+        input: ref,
+        selected: ref.trim(),
+        confidence: 0,
+        source: "user_unverified",
+        warning: "Slack could not verify this raw user ID; confirm only if you trust it.",
+      },
+    };
+  }
+
+  return recipientResolutionFailure("dm", "user", ref, resolution);
 }
 
 async function routeDm(
@@ -476,53 +557,45 @@ async function routeDm(
   signal: AbortSignal | undefined,
   ctx: ExtensionContext,
 ): Promise<RoutedRecipient | RouteFailure> {
-  let userId: string | undefined;
-  let handle: string | undefined;
-  let displayName: string | undefined;
-  let realName: string | undefined;
+  const resolved = await resolveUser(token, ref, signal, { limit: 5 });
+  const selected = selectUserForSend(ref, resolved, ctx.hasUI);
+  if ("result" in selected) return selected;
 
-  if (isSlackUserId(ref)) {
-    // Raw user IDs pass through — the DM-open step verifies the ID exists.
-    // Display name stays undefined here; search fallback will still try the
-    // raw ID if im:write is missing.
-    userId = ref;
-  } else {
-    const confirmed = await requireConfirmedUser(ctx, token, ref, signal);
-    if (!confirmed.ok) return userConfirmationFailure(ref, confirmed);
-    const user = confirmed.recipient.type === "user" ? confirmed.recipient.user : null;
-    if (!user || user.id === "me") {
-      return {
-        result: {
-          content: [
-            {
-              type: "text",
-              text: `action=dm requires a specific other user; got "${ref}". Use an @handle, email, or user ID.`,
-            },
-          ],
-          details: { ok: false, action: "dm", reason: "self_not_allowed" },
-        },
-      };
-    }
-    userId = user.id;
-    handle = user.handle;
-    displayName = user.displayName;
-    realName = user.realName;
+  const { user, review } = selected;
+  if (user.id === "me") {
+    return {
+      result: {
+        content: [
+          {
+            type: "text",
+            text: `action=dm requires a specific other user; got "${ref}". Use an @handle, email, or user ID.`,
+          },
+        ],
+        details: { ok: false, action: "dm", reason: "self_not_allowed" },
+      },
+    };
   }
 
-  const fallbackContext = { ref, userId, handle, displayName, realName };
+  const fallbackContext = {
+    ref,
+    userId: user.id,
+    handle: user.handle,
+    displayName: user.displayName,
+    realName: user.realName,
+  };
 
   if (!hasScope("im:write")) {
     const existing = await findExistingDmChannel(token, fallbackContext, signal);
-    if (existing) return existing;
+    if (existing) return { ...existing, recipientReview: review };
     return missingDmOpenScopeFailure(ref, fallbackContext);
   }
 
-  const opened = await conversationsOpenDM(token, [userId], signal);
+  const opened = await conversationsOpenDM(token, [user.id], signal);
   if (!opened.ok) {
     const error = opened as ApiErr;
     if (error.error === "missing_scope") {
       const existing = await findExistingDmChannel(token, fallbackContext, signal);
-      if (existing) return existing;
+      if (existing) return { ...existing, recipientReview: review };
       return missingDmOpenScopeFailure(ref, fallbackContext, error.needed, error.provided);
     }
     return {
@@ -543,7 +616,97 @@ async function routeDm(
       },
     };
   }
-  return { channelId: im, channelLabel: dmLabel(fallbackContext) };
+  return { channelId: im, channelLabel: dmLabel(fallbackContext), recipientReview: review };
+}
+
+function buildChannelReview(
+  ref: string,
+  resolution: ResolveResult<ResolvedChannel>,
+  selected: ResolvedChannel,
+): RecipientReview {
+  return {
+    input: ref,
+    selected: `#${selected.name} (${selected.id})`,
+    confidence: selected.confidence,
+    source: selected.source,
+    alternates: formatAlternates(resolution.candidates, selected.id),
+    warning: lowConfidenceWarning(resolution.confidence),
+  };
+}
+
+function buildUserReview(
+  ref: string,
+  resolution: ResolveResult<ResolvedUser>,
+  selected: ResolvedUser,
+): RecipientReview {
+  return {
+    input: ref,
+    selected: `${displayUser(selected)} (${selected.id})`,
+    confidence: selected.confidence,
+    source: selected.source,
+    alternates: formatAlternates(resolution.candidates, selected.id),
+    warning: lowConfidenceWarning(resolution.confidence),
+  };
+}
+
+function lowConfidenceWarning(confidence: number): string | undefined {
+  if (confidence >= RECIPIENT_AUTO_CONFIRM_THRESHOLD) return undefined;
+  return `Recipient match is below ${Math.round(RECIPIENT_AUTO_CONFIRM_THRESHOLD * 100)}% confidence; review before sending.`;
+}
+
+function formatAlternates(
+  candidates: Array<ResolvedChannel | ResolvedUser>,
+  selectedId: string,
+): string[] {
+  return candidates
+    .filter((candidate) => candidate.id !== selectedId)
+    .slice(0, 4)
+    .map((candidate) => {
+      if ("name" in candidate) {
+        return `#${candidate.name} (${candidate.id}, ${confidencePercent(candidate.confidence)}%)`;
+      }
+      return `${displayUser(candidate)} (${candidate.id}, ${confidencePercent(candidate.confidence)}%)`;
+    });
+}
+
+function displayUser(user: ResolvedUser): string {
+  return user.displayName || user.realName || user.handle || user.id;
+}
+
+function confidencePercent(confidence: number): number {
+  return Math.round(Math.max(0, Math.min(1, confidence)) * 100);
+}
+
+function recipientResolutionFailure(
+  action: string,
+  type: "channel" | "user",
+  ref: string,
+  resolution: ResolveResult<ResolvedChannel | ResolvedUser>,
+): RouteFailure {
+  const candidates = resolution.candidates.map((candidate) => {
+    if ("name" in candidate) {
+      return `#${candidate.name} (${candidate.id}, ${confidencePercent(candidate.confidence)}%)`;
+    }
+    return `${displayUser(candidate)} (${candidate.id}, ${confidencePercent(candidate.confidence)}%)`;
+  });
+  const suffix = candidates.length ? ` Candidates: ${candidates.join("; ")}` : "";
+  return {
+    result: {
+      content: [
+        {
+          type: "text",
+          text: `Slack ${type} "${ref}" could not be safely resolved. Re-run with an exact name or ID.${suffix}`,
+        },
+      ],
+      details: {
+        ok: false,
+        action,
+        reason: resolution.ok ? "headless_unverified" : "not_found",
+        ref,
+        candidates,
+      },
+    },
+  };
 }
 
 interface DmFallbackContext {
@@ -662,81 +825,13 @@ function quoteSearchPhrase(value: string): string {
   return `"${value.replace(/"/g, "").trim()}"`;
 }
 
-// Translate the HITL helper's ConfirmResult into a RouteFailure shaped like
-// the rest of slack_send's error contract. Reasons flow through verbatim
-// (cancelled, ambiguous_headless, not_found, headless_unverified) so the
-// LLM's observation matches what the human experienced.
-// The repo runs tsc with `strict: false`, which does not narrow
-// discriminated unions on simple `if (x.ok) { ... }` guards. Use an
-// Extract cast on the failure branch so we can read the failure fields
-// without TS noise; the runtime `confirmed.ok` check above still
-// guarantees correctness.
-type RecipientFailure = Extract<RecipientConfirmResult, { ok: false }>;
-
-function channelConfirmationFailure(
-  action: string,
-  ref: string,
-  confirmed: RecipientConfirmResult,
-): RouteFailure {
-  if (confirmed.ok) {
-    // Type-level guard: this branch shouldn't fire in practice because
-    // callers only enter the failure path when confirmed.ok is false.
-    return {
-      result: {
-        content: [
-          { type: "text", text: `Unable to route channel "${ref}" — unexpected success state.` },
-        ],
-        details: { ok: false, action, reason: "channel_resolution_required", ref },
-      },
-    };
-  }
-  const failure = confirmed as RecipientFailure;
-  return {
-    result: {
-      content: [{ type: "text", text: failure.message }],
-      details: {
-        ok: false,
-        action,
-        reason: failure.reason,
-        ref,
-        candidates: failure.candidates,
-      },
-    },
-  };
-}
-
-function userConfirmationFailure(ref: string, confirmed: RecipientConfirmResult): RouteFailure {
-  if (confirmed.ok) {
-    return {
-      result: {
-        content: [
-          { type: "text", text: `Unable to route user "${ref}" — unexpected success state.` },
-        ],
-        details: { ok: false, action: "dm", reason: "user_resolution_required", ref },
-      },
-    };
-  }
-  const failure = confirmed as RecipientFailure;
-  return {
-    result: {
-      content: [{ type: "text", text: failure.message }],
-      details: {
-        ok: false,
-        action: "dm",
-        reason: failure.reason,
-        ref,
-        candidates: failure.candidates,
-      },
-    },
-  };
-}
-
 // ─── Confirmation dialog ──────────────────────────────────────────────────────
 
 interface ConfirmContext {
   action: "channel" | "dm" | "thread";
   channelId: string;
   channelLabel?: string;
+  recipientReview?: RecipientReview;
   text: string;
   threadTs?: string;
 }
@@ -784,46 +879,25 @@ async function confirmSend(
     return { ok: true, text: initial.text };
   }
 
-  let currentText = initial.text;
-  // Edit loop: user can repeatedly edit, then confirm or cancel.
-  for (;;) {
-    const preview = buildConfirmMessage({ ...initial, text: currentText });
-    const confirmed = await ctx.ui.confirm("Send Slack message?", preview, {
-      signal,
-      timeout: CONFIRM_TIMEOUT_SECONDS * 1000,
-    });
-    if (!confirmed) {
-      // Offer one edit pass before giving up, but only if the text contains
-      // no mentions (mentions get their own re-confirm below).
-      const choice = await ctx.ui.select("Cancelled. What next?", [
-        "Cancel (do not send)",
-        "Edit text and retry",
-      ]);
-      if (choice !== "Edit text and retry") {
-        return cancelledResult(initial.action);
-      }
-      const edited = await ctx.ui.input("Edit message text", currentText);
-      if (edited === undefined || !edited.trim()) {
-        return cancelledResult(initial.action);
-      }
-      currentText = edited.trim();
-      continue;
-    }
+  const preview = buildConfirmMessage(initial);
+  const confirmed = await ctx.ui.confirm("Send Slack message?", preview, {
+    signal,
+    timeout: CONFIRM_TIMEOUT_SECONDS * 1000,
+  });
+  if (!confirmed) return cancelledResult(initial.action);
 
-    // Mention re-confirm (Recommendation #4 in the proposal).
-    if (MENTION_PATTERN.test(currentText)) {
-      const mentionOk = await ctx.ui.confirm(
-        "⚠ This message contains @channel / @here / @everyone. Send anyway?",
-        buildMentionWarning({ ...initial, text: currentText }),
-        { signal, timeout: CONFIRM_TIMEOUT_SECONDS * 1000 },
-      );
-      if (!mentionOk) {
-        return cancelledResult(initial.action);
-      }
-    }
-
-    return { ok: true, text: currentText };
+  // Mention re-confirm is intentionally the only second dialog, and only for
+  // messages with broadcast-scoped mentions.
+  if (MENTION_PATTERN.test(initial.text)) {
+    const mentionOk = await ctx.ui.confirm(
+      "⚠ This message contains @channel / @here / @everyone. Send anyway?",
+      buildMentionWarning(initial),
+      { signal, timeout: CONFIRM_TIMEOUT_SECONDS * 1000 },
+    );
+    if (!mentionOk) return cancelledResult(initial.action);
   }
+
+  return { ok: true, text: initial.text };
 }
 
 function buildConfirmMessage(ctx: ConfirmContext): string {
@@ -836,6 +910,7 @@ function buildConfirmMessage(ctx: ConfirmContext): string {
   const body = ctx.text.length > 600 ? ctx.text.slice(0, 600) + "…" : ctx.text;
   return [
     `To: ${dest}`,
+    ...formatRecipientReview(ctx.recipientReview),
     `Length: ${ctx.text.length} char${ctx.text.length === 1 ? "" : "s"}`,
     "",
     "--- Preview ---",
@@ -844,6 +919,21 @@ function buildConfirmMessage(ctx: ConfirmContext): string {
     "",
     "Press Enter to send, Esc to cancel.",
   ].join("\n");
+}
+
+function formatRecipientReview(review: RecipientReview | undefined): string[] {
+  if (!review) return [];
+  const lines = [
+    `Resolved from: ${review.input}`,
+    `Recipient: ${review.selected}${review.confidence === undefined ? "" : ` (${confidencePercent(review.confidence)}% via ${review.source || "resolve"})`}`,
+  ];
+  if (review.warning) lines.push(`Warning: ${review.warning}`);
+  if (review.alternates?.length) {
+    lines.push("Other possible matches:");
+    for (const alternate of review.alternates) lines.push(`  - ${alternate}`);
+  }
+  lines.push("");
+  return lines;
 }
 
 function buildMentionWarning(ctx: ConfirmContext): string {

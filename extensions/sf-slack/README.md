@@ -368,10 +368,11 @@ Safety rails (enforced in `lib/send-tool.ts`):
 - **Scope gate** — requires `chat:write` or `chat:write.public`. `action=dm`
   uses `im:write` to open a DM when available; without it, the tool searches
   for an already-open `D...` DM channel and posts there after confirmation.
-- **Recipient HITL** — every fuzzy `to` goes through the shared
-  `requireConfirmedChannel` / `requireConfirmedUser` helper in
-  `lib/recipient-confirm.ts`. Below-threshold matches pop a select-or-type
-  dialog; headless mode fails loudly with the full candidate list.
+- **Unified recipient + send HITL** — `slack_send` resolves fuzzy `to` values
+  before the final confirmation dialog and shows the selected recipient,
+  confidence, and alternates inline with the message preview. It does not open
+  a separate recipient-selection dialog for normal sends; headless mode still
+  fails loudly when the match is below threshold.
 - **Broadcast re-confirm** — `@channel`, `@here`, `@everyone`, and
   `<!subteam ...>` user-group pings flip the confirm dialog's default to
   Cancel.
@@ -590,10 +591,12 @@ DM, ask a workspace admin to approve `im:write`, or send to a user-provided
 existing `D...` channel ID with `action=channel`.
 
 **A Slack user or channel reference resolves to the wrong target:**
-Below a 0.85 confidence threshold, resolution pops a select-or-type
-dialog in interactive mode; in headless mode it fails loudly with the
-candidate list in the error. If you hit low-confidence results a lot,
-pass fully-qualified IDs (`C01...`, `U01...`) or email addresses via
+For `slack_send`, the final send dialog includes the selected recipient,
+confidence, and alternate matches; cancel and retry with an exact ID/email if it
+picked the wrong target. Other Slack tools use the shared select-or-type dialog
+below a 0.85 confidence threshold, while headless mode fails loudly with the
+candidate list in the error. If you hit low-confidence results a lot, pass
+fully-qualified IDs (`C01...`, `U01...`) or email addresses via
 `slack_user action=email`.
 
 **`slack_canvas read` says "canvas not found":**
