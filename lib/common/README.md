@@ -15,6 +15,8 @@ code lives in `extensions/<id>/lib/`.
 | Module                                      | Owners (what uses it)                                                       | What it provides                                                                 |
 | ------------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
 | `command-panel.ts`                          | command-bearing extensions                                                  | Shared grouped status/actions panel built on Pi's native `ctx.ui.custom()`       |
+| `info-panel.ts`                             | command-bearing extensions                                                  | In-TUI info popup for command panels with headless `ctx.ui.notify()` fallback    |
+| `ui-glyphs.ts`                              | command-bearing extensions                                                  | Semantic UI glyphs for panels/popups with ASCII fallback (rides `glyph-policy`)  |
 | `pi-compat.ts`                              | all extensions                                                              | Feature-detecting shims for pi APIs that may not exist on older pi runtimes      |
 | `pi-paths.ts`                               | all extensions that touch settings                                          | Global + project `settings.json` paths, pi home dir resolution                   |
 | `exec-adapter.ts`                           | `sf-environment` consumers                                                  | Adapter from `pi.exec()` to the `ExecFn` type used by `sf-environment/detect.ts` |
@@ -22,8 +24,14 @@ code lives in `extensions/<id>/lib/`.
 | `display/types.ts`                          | `sf-pi-manager`, `sf-lsp`, `sf-agentscript-…`                               | `SfPiDisplayProfile` union + shared display types                                |
 | `display/settings.ts`                       | `sf-pi-manager`                                                             | Read/write the shared `sfPi.display.profile` setting (project > global)          |
 | `display/diagnostics.ts`                    | `sf-lsp`, `sf-agentscript-assist`                                           | `details.sfPiDiagnostics` contract for LSP-style tool results                    |
+| `doctor/diagnostics.ts`                     | `sf-pi-manager`, `sf-welcome`                                               | Read-only diagnostics powering `/sf-pi doctor` (side-effect free)                |
+| `doctor/fixes.ts`                           | `sf-pi-manager`                                                             | Safe-repair operations for `/sf-pi doctor fix startup`/`skills` (gated by HITL)  |
+| `doctor/types.ts`                           | `sf-pi-manager`, `sf-welcome`                                               | Shared diagnostic + fix-target shapes                                            |
 | `monthly-usage/store.ts`                    | `sf-llm-gateway-internal` (producer); `sf-welcome`, `sf-devbar` (consumers) | Decoupled monthly-usage state store with refresher registration                  |
 | `slack-status/store.ts`                     | `sf-slack` (producer); `sf-welcome`, `sf-devbar` (consumers)                | Decoupled Slack auth/readiness status store                                      |
+| `sf-lsp-health/index.ts`                    | `sf-lsp` (producer); `sf-devbar` (consumer)                                 | In-process LSP availability + last-error registry; powers the devbar LSP segment |
+| `sf-lsp-health/types.ts`                    | `sf-lsp`, `sf-devbar`                                                       | Availability/severity union + payload shape for the registry                     |
+| `skill-sources/skill-sources.ts`            | `sf-pi-manager`, `sf-welcome`                                               | Detects + wires Claude Code / Codex / Cursor skill roots for `/sf-pi skills`     |
 | `sf-pi-extension-state.ts`                  | `sf-welcome`, `sf-devbar`, diagnostics                                      | Shared bundled-extension enablement checks from Pi package filters               |
 | `catalog-state/announcements-manifest.ts`   | `sf-welcome`, `sf-pi-manager`                                               | Load + validate `catalog/announcements.json`                                     |
 | `catalog-state/announcements-state.ts`      | `sf-welcome`, `sf-pi-manager`                                               | Per-user announcements dismissal/ack state file                                  |

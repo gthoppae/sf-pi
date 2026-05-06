@@ -22,7 +22,7 @@ design proposal and — ideally — a PR.
 - [x] Scope probing + dynamic tool gating for `sf-slack`
 - [x] Unified one-provider gateway design with OpenAI-compat + native
       Anthropic transport routing in `sf-llm-gateway-internal`
-- [x] pi `>=0.72.0` runtime floor with per-model thinking/baseUrl support
+- [x] pi `>=0.73.0` runtime floor with per-model thinking/baseUrl support
 - [x] Auto-generated catalog, command reference, troubleshooting index, and
       folder layout (drift-proof docs via `npm run generate-catalog`)
 - [x] First-boot auto-install for Apex + LWC language servers

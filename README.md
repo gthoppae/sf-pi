@@ -185,6 +185,7 @@ Every slash command exposed by a bundled extension. See each extension README fo
 | `/sf-pi recommended`       | [SF Pi Manager](./extensions/sf-pi-manager/)                     | core     |
 | `/sf-pi announcements`     | [SF Pi Manager](./extensions/sf-pi-manager/)                     | core     |
 | `/sf-pi skills`            | [SF Pi Manager](./extensions/sf-pi-manager/)                     | core     |
+| `/sf-pi doctor`            | [SF Pi Manager](./extensions/sf-pi-manager/)                     | core     |
 | `/sf-slack`                | [SF Slack](./extensions/sf-slack/)                               | core     |
 | `/sf-llm-gateway-internal` | [SF LLM Gateway Internal](./extensions/sf-llm-gateway-internal/) | provider |
 | `/sf-devbar`               | [SF DevBar](./extensions/sf-devbar/)                             | ui       |
@@ -359,18 +360,37 @@ For the canonical machine-readable bundle list, see [`catalog/index.json`](./cat
 The normal setup path is inside pi. Run the built-in setup wizard and paste your
 organization's gateway root URL plus API key:
 
+Run `/sf-llm-gateway-internal` with no args for the grouped Pi-native panel.
+For headless or copy-paste use, the canonical subcommands are:
+
 ```text
-/sf-llm-gateway-internal setup              # Single overlay setup form
-/login                                      # Rotate only the saved API key
-/sf-llm-gateway-internal on                 # Enable provider + set default model
-/sf-llm-gateway-internal off                # Disable provider + restore previous default
-/sf-llm-gateway-internal refresh            # Re-discover models + refresh budget
-/sf-llm-gateway-internal set-default        # Set the scoped default model
-/sf-llm-gateway-internal models             # List discovered gateway models
+# Setup
+/sf-llm-gateway-internal setup               # Single overlay setup form
+/login                                       # Rotate only the saved API key
+/sf-llm-gateway-internal on                  # Enable provider + set default model
+/sf-llm-gateway-internal off                 # Disable provider + restore previous default
+/sf-llm-gateway-internal set-default         # Set the scoped default model
+
+# Discovery & diagnostics
+/sf-llm-gateway-internal refresh             # Re-discover models + refresh budget
+/sf-llm-gateway-internal models              # List discovered gateway models
+/sf-llm-gateway-internal doctor              # Diagnose gateway connectivity + scope drift
+/sf-llm-gateway-internal usage-probe         # Force a read-only key/user spend probe
 /sf-llm-gateway-internal debug <model>       # Inspect transformed upstream payload
-/sf-llm-gateway-internal beta               # Show beta header state
+
+# Utilities
+/sf-llm-gateway-internal tokens              # Count prompt tokens + zero-cost note for current model
+/sf-llm-gateway-internal onboard             # Print SSO onboarding link / paste-token instructions
+/sf-llm-gateway-internal beta                # Show beta header state
 /sf-llm-gateway-internal beta context-1m off # Toggle a beta header
+
+# Reference
+/sf-llm-gateway-internal status              # Full text status report
+/sf-llm-gateway-internal help                # Command reference
 ```
+
+See the extension's [Command Surface](./extensions/sf-llm-gateway-internal/#command-surface)
+section for the canonical grouping with descriptions.
 
 The extension stores setup in pi's saved config. Env vars are still supported as
 an automation fallback when saved config is blank, but they are no longer the

@@ -18,7 +18,7 @@ Claude vs non-Claude traffic to the transport each family was designed for.
 Supports dynamic model discovery, monthly budget tracking, runtime beta
 header toggling, additive vs exclusive scoped-model behavior, a TUI setup
 wizard, a read-only usage probe, and an in-app "paste your token" flow under
-`/login` (pi ≥ 0.72).
+`/login`.
 
 ## Key Architecture: One Provider, Two Transports
 
@@ -26,7 +26,7 @@ Since R1·Unify the extension registers a single Pi provider (`sf-llm-gateway-
 internal`) with a friendly display label `SF LLM Gateway (Salesforce Internal)`.
 Every model is registered under the provider-level `openai-completions` API so
 pi always invokes the provider's custom `streamSimple` dispatcher. Claude models
-also carry a per-model `baseUrl` pinned to the gateway root (pi ≥ 0.72), so the
+also carry a per-model `baseUrl` pinned to the gateway root, so the
 dispatcher only has to switch the request model to `api: "anthropic-messages"`
 and forward to the matching shim:
 

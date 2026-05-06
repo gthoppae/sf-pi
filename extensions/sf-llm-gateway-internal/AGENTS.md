@@ -16,26 +16,30 @@ Repo-level rules still apply; see root `AGENTS.md`.
 
 ## File map (what lives where)
 
-| Responsibility                                 | File                        |
-| ---------------------------------------------- | --------------------------- |
-| Extension entry, lifecycle, command dispatch   | `index.ts`                  |
-| Env vars, constants, saved-config I/O          | `lib/config.ts`             |
-| Gateway URL normalization                      | `lib/gateway-url.ts`        |
-| Model presets + family inference + betas       | `lib/models.ts`             |
-| Anthropic beta header runtime controls         | `lib/beta-controls.ts`      |
-| Provider registration + model discovery        | `lib/discovery.ts`          |
-| HTTP transport (OpenAI-compat + Anthropic)     | `lib/transport.ts`          |
-| Monthly usage / key info / health fetcher      | `lib/monthly-usage.ts`      |
-| Pi settings mutation (defaults, enabledModels) | `lib/pi-settings.ts`        |
-| Footer + status report formatting              | `lib/status.ts`             |
-| Standard command metadata + completions        | `lib/command-surface.ts`    |
-| No-args grouped status & controls panel        | `lib/panel.ts`              |
-| TUI setup wizard component                     | `lib/setup-overlay.ts`      |
-| Config panel (advanced form)                   | `lib/config-panel.ts`       |
-| Transform debug probe                          | `lib/debug.ts`              |
-| Provider-telemetry (429/5xx footer badge)      | `lib/provider-telemetry.ts` |
-| Transparent inner-stream retry telemetry       | `lib/retry-telemetry.ts`    |
-| Wire-level request/response tracing            | `lib/wire-trace.ts`         |
+| Responsibility                                 | File                            |
+| ---------------------------------------------- | ------------------------------- |
+| Extension entry, lifecycle, command dispatch   | `index.ts`                      |
+| Env vars, constants, saved-config I/O          | `lib/config.ts`                 |
+| Gateway URL normalization                      | `lib/gateway-url.ts`            |
+| Model presets + family inference + betas       | `lib/models.ts`                 |
+| Anthropic beta header runtime controls         | `lib/beta-controls.ts`          |
+| Provider registration + model discovery        | `lib/discovery.ts`              |
+| HTTP transport (OpenAI-compat + Anthropic)     | `lib/transport.ts`              |
+| Monthly usage / key info / health fetcher      | `lib/monthly-usage.ts`          |
+| Pi settings mutation (defaults, enabledModels) | `lib/pi-settings.ts`            |
+| Legacy provider-id settings migration          | `lib/migrate-unify-provider.ts` |
+| Footer + status report formatting              | `lib/status.ts`                 |
+| Standard command metadata + completions        | `lib/command-surface.ts`        |
+| No-args grouped status & controls panel        | `lib/panel.ts`                  |
+| TUI setup wizard component                     | `lib/setup-overlay.ts`          |
+| Config panel (advanced form)                   | `lib/config-panel.ts`           |
+| Transform debug probe                          | `lib/debug.ts`                  |
+| `/sf-llm-gateway-internal doctor` diagnostics  | `lib/doctor.ts`                 |
+| `/sf-llm-gateway-internal tokens` counter      | `lib/token-counter.ts`          |
+| `/sf-llm-gateway-internal onboard` SSO link    | `lib/onboarding.ts`             |
+| Provider-telemetry (429/5xx footer badge)      | `lib/provider-telemetry.ts`     |
+| Transparent inner-stream retry telemetry       | `lib/retry-telemetry.ts`        |
+| Wire-level request/response tracing            | `lib/wire-trace.ts`             |
 
 ## Cross-extension contracts
 
