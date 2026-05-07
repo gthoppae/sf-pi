@@ -588,6 +588,7 @@ Jump to an extension's Troubleshooting section to see the full fix. This index i
 - I set `/thinking` to a different level but subsequent model switches reset it to `xhigh`
 - Beta headers aren't taking effect
 - Monthly-usage footer is stale or missing
+- Old and new gateway keys are confusing status or tests
 
 **[SF DevBar](./extensions/sf-devbar/#troubleshooting)**
 

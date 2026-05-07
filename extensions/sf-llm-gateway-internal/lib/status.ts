@@ -7,6 +7,7 @@
  */
 import type { ExtensionContext } from "@mariozechner/pi-coding-agent";
 import {
+  API_KEY_ENV,
   BETAS_ENV,
   DEFAULT_MODEL_ID,
   DEFAULT_THINKING_LEVEL,
@@ -14,6 +15,7 @@ import {
   describeApiKey,
   describeConfigValue,
   getGatewayConfig,
+  getMergedSavedGatewayConfig,
   getSavedExclusiveScopeStatus,
   globalGatewayConfigPath,
   projectGatewayConfigPath,
@@ -106,6 +108,7 @@ export function buildStatusReport(
     `Gateway health: ${formatHealthReportLine(state.health, state.healthError)}`,
     `Last 7d: ${formatDailyActivityReportLine(state.dailyActivity, state.dailyActivityError)}`,
     `Keys on account: ${formatKeyListReportLine(state.keyList, state.keyListError, state.keyInfo?.keyName)}`,
+    ...formatApiKeyGuidanceReportLines(ctx.cwd, state),
     "",
     `Model discovery: ${discovery?.source ?? "not run"}${discovery?.error ? ` ⚠ ${discovery.error}` : ""}`,
     `Discovered models: ${discovery?.modelIds.length ?? 0}`,
@@ -287,7 +290,58 @@ export function formatKeyListReportLine(
   if (!keyList) return keyListError ?? "not loaded yet";
   const activeHint = activeKeyName ? `, active: ${activeKeyName}` : "";
   if (keyList.count <= 1) return `${keyList.count}${activeHint}`;
-  return `${keyList.count} (consider pruning unused ones in /ui/${activeHint})`;
+  return `${keyList.count} (multiple keys exist; confirm the active key before pruning old keys in the gateway UI${activeHint})`;
+}
+
+/**
+ * Build key-rotation/source guidance for status surfaces. The extension can
+ * reliably detect source conflicts (saved key vs env var), auth rejection, and
+ * multiple keys on the account; it cannot infer key creation dates, so the
+ * guidance tells users where to update or prune instead of guessing age.
+ */
+export function getApiKeyGuidanceLines(cwd: string, state: GatewayRuntimeStatusState): string[] {
+  const config = getGatewayConfig(cwd);
+  const savedKey = getMergedSavedGatewayConfig(cwd).apiKey?.trim();
+  const envKey = process.env[API_KEY_ENV]?.trim();
+  const lines: string[] = [];
+
+  if (state.connectionStatus?.kind === "auth-failed") {
+    lines.push(
+      "Active gateway key was rejected. Run /login to paste a new key, then rerun /sf-llm-gateway-internal doctor.",
+    );
+  }
+
+  if (savedKey && envKey && savedKey !== envKey) {
+    lines.push(
+      `${API_KEY_ENV} is also set but ignored because a saved key wins. If the env key is newer, run /login or /sf-llm-gateway-internal setup to save it; otherwise remove the stale env var from your shell or Keychain setup.`,
+    );
+  } else if (config.apiKeySource === "env") {
+    lines.push(
+      `Using ${API_KEY_ENV} as an automation fallback. For interactive use, run /login or /sf-llm-gateway-internal setup so pi keeps using the intended key across shells.`,
+    );
+  }
+
+  if (state.keyList && state.keyList.count > 1) {
+    const active = state.keyInfo?.keyName ? ` Active key: ${state.keyInfo.keyName}.` : "";
+    lines.push(
+      `Gateway reports ${state.keyList.count} keys on this account.${active} After confirming pi works with the current key, prune older unused keys in the gateway UI.`,
+    );
+  }
+
+  return lines;
+}
+
+export function summarizeApiKeyGuidance(
+  cwd: string,
+  state: GatewayRuntimeStatusState,
+): string | undefined {
+  return getApiKeyGuidanceLines(cwd, state)[0];
+}
+
+function formatApiKeyGuidanceReportLines(cwd: string, state: GatewayRuntimeStatusState): string[] {
+  const guidance = getApiKeyGuidanceLines(cwd, state);
+  if (guidance.length === 0) return [];
+  return ["", "API key guidance:", ...guidance.map((line) => `- ${line}`)];
 }
 
 /**

@@ -288,6 +288,15 @@ function resolveConnectionStatus(
     };
   }
 
+  if (healthResult.status === "fulfilled") {
+    return {
+      kind: "degraded",
+      detail: formatProbeFailureSummary(usageResult, keyResult),
+      checkedAt,
+      source: "health",
+    };
+  }
+
   const unreachable = failures.find((error) => !(error instanceof GatewayRequestError));
   if (unreachable) {
     return { kind: "unreachable", detail: formatError(unreachable), checkedAt };
@@ -310,6 +319,19 @@ function formatSettledError(result: PromiseSettledResult<unknown>): string | und
   return result.status === "rejected" ? formatError(result.reason) : undefined;
 }
 
+function formatProbeFailureSummary(
+  usageResult: PromiseSettledResult<GatewayMonthlyUsage>,
+  keyResult: PromiseSettledResult<GatewayKeyInfo>,
+): string {
+  const failures = [
+    usageResult.status === "rejected" ? formatError(usageResult.reason) : null,
+    keyResult.status === "rejected" ? formatError(keyResult.reason) : null,
+  ].filter((value): value is string => Boolean(value));
+  return failures.length > 0
+    ? `Auth-gated usage probes failed while health succeeded: ${failures.join("; ")}`
+    : "Auth-gated usage probes failed while health succeeded.";
+}
+
 function formatError(error: unknown): string {
   return error instanceof Error ? error.message : String(error);
 }
@@ -325,8 +347,11 @@ async function gatewayRequestError(
   } catch {
     bodyPreview = "";
   }
+  const blockedKeyHint = /key is blocked/i.test(bodyPreview)
+    ? " Active gateway key is blocked; run /login to paste a new key."
+    : "";
   return new GatewayRequestError(
-    `${label} request failed (${response.status}).`,
+    `${label} request failed (${response.status}).${blockedKeyHint}`,
     source,
     response.status,
     bodyPreview,

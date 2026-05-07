@@ -444,3 +444,12 @@ Usage is cached for 60 seconds and refreshes automatically on every
 fetch immediately. If you're using sf-welcome or sf-devbar as
 consumers, they read from the shared store in `lib/common/monthly-usage/`
 — the gateway must be registered and have succeeded at least once.
+
+**Old and new gateway keys are confusing status or tests:**
+Saved pi config wins over `SF_LLM_GATEWAY_INTERNAL_API_KEY`. If both are set
+and differ, `/sf-llm-gateway-internal status` and `doctor` warn that the env
+var is ignored. If the env key is newer, run `/login` or
+`/sf-llm-gateway-internal setup` to save it; otherwise remove the stale env var
+from your shell or Keychain setup. If the gateway reports multiple keys on the
+account, confirm the active masked key in status, verify pi works with the
+current key, then prune older unused keys in the gateway UI.

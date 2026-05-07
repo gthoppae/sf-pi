@@ -1,9 +1,11 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /** Read-only gateway preflight diagnostics for `/sf-llm-gateway-internal doctor`. */
 import {
+  API_KEY_ENV,
   describeApiKey,
   describeConfigValue,
   getGatewayConfig,
+  getMergedSavedGatewayConfig,
   type ConfigSource,
 } from "./config.ts";
 import { toGatewayOpenAiBaseUrl, toGatewayRootBaseUrl } from "./gateway-url.ts";
@@ -108,6 +110,7 @@ export async function fetchGatewayDoctorReport(cwd: string): Promise<GatewayDoct
   for (const check of checks) {
     if (!check.ok) recommendations.push(`${check.name}: ${check.interpretation}`);
   }
+  recommendations.push(...buildDoctorKeySourceRecommendations(cwd));
   if (recommendations.length === 0) {
     recommendations.push("Gateway preflight passed.");
   }
@@ -123,6 +126,26 @@ export async function fetchGatewayDoctorReport(cwd: string): Promise<GatewayDoct
     checks,
     recommendations,
   };
+}
+
+function buildDoctorKeySourceRecommendations(cwd: string): string[] {
+  const config = getGatewayConfig(cwd);
+  const savedKey = getMergedSavedGatewayConfig(cwd).apiKey?.trim();
+  const envKey = process.env[API_KEY_ENV]?.trim();
+
+  if (savedKey && envKey && savedKey !== envKey) {
+    return [
+      `${API_KEY_ENV} is set but ignored because a saved key wins. If the env key is newer, run /login or /sf-llm-gateway-internal setup to save it; otherwise remove the stale env var from your shell or Keychain setup.`,
+    ];
+  }
+
+  if (config.apiKeySource === "env") {
+    return [
+      `Using ${API_KEY_ENV} as an automation fallback. For interactive use, run /login or /sf-llm-gateway-internal setup so pi keeps using the intended key across shells.`,
+    ];
+  }
+
+  return [];
 }
 
 /**

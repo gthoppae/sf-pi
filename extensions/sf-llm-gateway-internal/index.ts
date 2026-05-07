@@ -603,14 +603,31 @@ async function handleModelsCommand(pi: ExtensionAPI, ctx: ExtensionCommandContex
 }
 
 async function handleDoctorCommand(pi: ExtensionAPI, ctx: ExtensionCommandContext): Promise<void> {
-  const report = await fetchGatewayDoctorReport(ctx.cwd);
-  await emitCommandOutput(
-    pi,
-    ctx,
-    "SF LLM Gateway Internal doctor.",
-    formatGatewayDoctorReport(report),
-    report.checks.some((check) => !check.ok) ? "warning" : "info",
-  );
+  try {
+    const report = await fetchGatewayDoctorReport(ctx.cwd);
+    await emitCommandOutput(
+      pi,
+      ctx,
+      "SF LLM Gateway Internal doctor.",
+      formatGatewayDoctorReport(report),
+      report.checks.some((check) => !check.ok) ? "warning" : "info",
+    );
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error);
+    await emitCommandOutput(
+      pi,
+      ctx,
+      "SF LLM Gateway Internal doctor failed.",
+      [
+        "SF LLM Gateway Doctor failed before completing checks.",
+        "",
+        detail,
+        "",
+        "Try /sf-llm-gateway-internal status. If authentication is failing, run /login and paste a new gateway API key.",
+      ].join("\n"),
+      "error",
+    );
+  }
 }
 
 async function handleUsageProbeCommand(

@@ -86,6 +86,56 @@ describe("gateway monthly usage refresh", () => {
     }
   });
 
+  it("reports degraded, not unreachable, when health succeeds but usage probes fail", async () => {
+    process.env[BASE_URL_ENV] = "https://gateway.example.test";
+    process.env[API_KEY_ENV] = "test-key";
+    mockGatewayFetch({ userStatus: 500, keyStatus: 500, healthStatus: 200 });
+    const unregister = registerGatewayMonthlyUsageRefresher();
+    const cwd = createProjectConfig({
+      baseUrl: "https://gateway.example.test",
+      apiKey: "test-key",
+    });
+
+    try {
+      await getMonthlyUsageStateRefresh(true, cwd);
+
+      expect(getMonthlyUsageState().connectionStatus).toMatchObject({
+        kind: "degraded",
+        source: "health",
+      });
+      expect(getMonthlyUsageState().connectionStatus?.detail).toContain("health succeeded");
+    } finally {
+      unregister();
+    }
+  });
+
+  it("adds blocked-key guidance to auth failure details", async () => {
+    process.env[BASE_URL_ENV] = "https://gateway.example.test";
+    process.env[API_KEY_ENV] = "blocked-key";
+    mockGatewayFetch({
+      userStatus: 401,
+      keyStatus: 401,
+      healthStatus: 200,
+      authBody: { error: { message: "Authentication Error, Key is blocked." } },
+    });
+    const unregister = registerGatewayMonthlyUsageRefresher();
+    const cwd = createProjectConfig({
+      baseUrl: "https://gateway.example.test",
+      apiKey: "blocked-key",
+    });
+
+    try {
+      await getMonthlyUsageStateRefresh(true, cwd);
+
+      expect(getMonthlyUsageState().connectionStatus).toMatchObject({
+        kind: "auth-failed",
+      });
+      expect(getMonthlyUsageState().connectionStatus?.detail).toContain("/login");
+    } finally {
+      unregister();
+    }
+  });
+
   it("publishes daily activity alongside the other probes", async () => {
     process.env[BASE_URL_ENV] = "https://gateway.example.test";
     process.env[API_KEY_ENV] = "test-key";
@@ -268,23 +318,34 @@ function mockGatewayFetch(options: {
   healthStatus: number;
   dailyStatus?: number;
   keyListStatus?: number;
+  authBody?: unknown;
 }): void {
   globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
     const url = String(input);
     if (url.endsWith("/user/info")) {
-      return jsonResponse(options.userStatus, {
-        user_info: {
-          max_budget: 3000,
-          spend: 42,
-          budget_reset_at: "2026-06-01",
-          budget_duration: "1mo",
-        },
-      });
+      return jsonResponse(
+        options.userStatus,
+        options.userStatus === 401 && options.authBody
+          ? options.authBody
+          : {
+              user_info: {
+                max_budget: 3000,
+                spend: 42,
+                budget_reset_at: "2026-06-01",
+                budget_duration: "1mo",
+              },
+            },
+      );
     }
     if (url.endsWith("/key/info")) {
-      return jsonResponse(options.keyStatus, {
-        info: { spend: 7, key_name: "sk-...test", rpm_limit: 100, tpm_limit: 1000 },
-      });
+      return jsonResponse(
+        options.keyStatus,
+        options.keyStatus === 401 && options.authBody
+          ? options.authBody
+          : {
+              info: { spend: 7, key_name: "sk-...test", rpm_limit: 100, tpm_limit: 1000 },
+            },
+      );
     }
     if (url.endsWith("/health/readiness")) {
       return jsonResponse(options.healthStatus, { status: "connected" });

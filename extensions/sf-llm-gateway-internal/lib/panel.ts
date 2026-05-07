@@ -18,7 +18,7 @@ import {
   getSavedExclusiveScopeStatus,
   PROVIDER_NAME,
 } from "./config.ts";
-import type { GatewayRuntimeStatusState } from "./status.ts";
+import { summarizeApiKeyGuidance, type GatewayRuntimeStatusState } from "./status.ts";
 import { formatTokens, formatUsd } from "./models.ts";
 import { GATEWAY_COMMAND_SURFACE, type GatewayPanelAction } from "./command-surface.ts";
 
@@ -65,6 +65,7 @@ export function buildGatewayPanelStatusLines(
   const contextUsage = ctx.getContextUsage();
 
   const scope = currentGatewayPanelScope(options);
+  const keyGuidance = summarizeApiKeyGuidance(ctx.cwd, options.runtimeState);
 
   return [
     renderStatusLine(
@@ -84,6 +85,13 @@ export function buildGatewayPanelStatusLines(
       config.apiKey ? "ok" : "warn",
       "API key",
       describeApiKey(config.apiKey, config.apiKeySource),
+    ),
+    ...(keyGuidance ? [renderStatusLine(theme, "warn", "Key guidance", keyGuidance)] : []),
+    renderStatusLine(
+      theme,
+      connectionStatusLineState(options.runtimeState.connectionStatus),
+      "Connection",
+      formatConnectionStatus(options.runtimeState.connectionStatus),
     ),
     renderStatusLine(
       theme,
@@ -156,6 +164,23 @@ export function buildGatewayGroupedActionItems(
   });
 
   return items;
+}
+
+function formatConnectionStatus(status: GatewayRuntimeStatusState["connectionStatus"]): string {
+  if (!status) return "not checked yet";
+  const parts: string[] = [status.kind];
+  if (status.source) parts.push(`via ${status.source}`);
+  if (status.detail) parts.push(status.detail);
+  return parts.join(" · ");
+}
+
+function connectionStatusLineState(
+  status: GatewayRuntimeStatusState["connectionStatus"],
+): "ok" | "warn" | "bad" | "info" {
+  if (!status || status.kind === "checking" || status.kind === "unknown") return "info";
+  if (status.kind === "connected") return "ok";
+  if (status.kind === "auth-failed") return "bad";
+  return "warn";
 }
 
 export function renderStatusLine(

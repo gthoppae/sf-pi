@@ -3,10 +3,10 @@
  * Targeted tests for gateway status formatting helpers.
  */
 import { afterEach, describe, expect, it } from "vitest";
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import { BETAS_ENV } from "../lib/config.ts";
+import { API_KEY_ENV, BETAS_ENV, SAVED_CONFIG_FILE } from "../lib/config.ts";
 
 const originalHomeEnv = process.env.HOME;
 const originalAsciiIconsEnv = process.env.SF_PI_ASCII_ICONS;
@@ -16,10 +16,13 @@ import {
   formatDailyActivityReportLine,
   formatKeyListReportLine,
   formatSparkline,
+  getApiKeyGuidanceLines,
+  summarizeApiKeyGuidance,
 } from "../lib/status.ts";
 import { KNOWN_BETAS } from "../lib/models.ts";
 
 const originalBetasEnv = process.env[BETAS_ENV];
+const originalApiKeyEnv = process.env[API_KEY_ENV];
 const tempDirs: string[] = [];
 
 function makeTempDir(prefix: string): string {
@@ -33,6 +36,12 @@ afterEach(() => {
     delete process.env[BETAS_ENV];
   } else {
     process.env[BETAS_ENV] = originalBetasEnv;
+  }
+
+  if (originalApiKeyEnv === undefined) {
+    delete process.env[API_KEY_ENV];
+  } else {
+    process.env[API_KEY_ENV] = originalApiKeyEnv;
   }
 
   if (originalHomeEnv === undefined) {
@@ -232,6 +241,54 @@ describe("formatSparkline", () => {
   });
 });
 
+describe("API key guidance", () => {
+  it("warns when saved and env keys differ", () => {
+    const cwd = makeTempDir("gateway-key-guidance-");
+    const configDir = path.join(cwd, ".pi");
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(
+      path.join(configDir, SAVED_CONFIG_FILE),
+      `${JSON.stringify({ enabled: true, baseUrl: "https://gateway.example.test", apiKey: "saved-key" })}\n`,
+    );
+    process.env[API_KEY_ENV] = "env-key";
+
+    const lines = getApiKeyGuidanceLines(
+      cwd,
+      withDefaults({
+        discovery: null,
+        monthlyUsage: null,
+        monthlyUsageError: null,
+        runtimeBetaOverrides: null,
+        runtimeExtraBetas: new Set(),
+      }),
+    );
+
+    expect(lines.join("\n")).toContain("saved key wins");
+    expect(lines.join("\n")).toContain("/login");
+    expect(lines.join("\n")).not.toContain("saved-key");
+    expect(lines.join("\n")).not.toContain("env-key");
+  });
+
+  it("points rejected keys and multiple-key accounts at rotation/pruning guidance", () => {
+    const cwd = makeTempDir("gateway-key-guidance-");
+    const summary = summarizeApiKeyGuidance(
+      cwd,
+      withDefaults({
+        discovery: null,
+        monthlyUsage: null,
+        monthlyUsageError: null,
+        connectionStatus: { kind: "auth-failed", source: "user-info" },
+        keyInfo: { spend: 1, keyName: "sk-...active", fetchedAt: new Date().toISOString() },
+        keyList: { count: 3, fetchedAt: new Date().toISOString() },
+        runtimeBetaOverrides: null,
+        runtimeExtraBetas: new Set(),
+      }),
+    );
+
+    expect(summary).toContain("/login");
+  });
+});
+
 describe("formatKeyListReportLine", () => {
   const fetchedAt = new Date().toISOString();
 
@@ -250,7 +307,7 @@ describe("formatKeyListReportLine", () => {
   it("warns when multiple keys are on file", () => {
     const line = formatKeyListReportLine({ count: 4, fetchedAt }, null, "sk-...def");
     expect(line).toContain("4");
-    expect(line).toContain("consider pruning");
+    expect(line).toContain("pruning old keys");
     expect(line).toContain("sk-...def");
   });
 });
