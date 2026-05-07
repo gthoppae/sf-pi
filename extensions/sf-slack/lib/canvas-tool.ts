@@ -686,7 +686,7 @@ export function preflightCanvasWrite(tokenType: SlackTokenType): CanvasWriteGate
       reason: "missing_scope",
       message:
         "Canvas create/edit needs the canvases:write scope, which this token does not have. " +
-        "Re-run /login sf-slack to re-consent with canvases:write granted.",
+        "Re-auth after the Slack app/workspace has approved canvases:write.",
     };
   }
   return null;

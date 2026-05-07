@@ -166,9 +166,10 @@ describe("api", () => {
       expect(summarizeSlackError("token_expired")).toMatch(/\/login sf-slack|refresh/);
     });
 
-    it("summarizes missing_scope with a re-consent hint", () => {
+    it("summarizes missing_scope with an approval + re-auth hint", () => {
       const text = summarizeSlackError("missing_scope", "files:read", "search:read");
-      expect(text).toMatch(/re-consent/i);
+      expect(text).toMatch(/Re-auth/i);
+      expect(text).toMatch(/approved/);
       expect(text).toContain("files:read");
     });
 

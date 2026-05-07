@@ -127,17 +127,17 @@ If your organization already provides an approved OAuth helper page, you can use
 that flow and then store the returned token with `/login sf-slack`, macOS
 Keychain, or `SLACK_USER_TOKEN`.
 
-If you need to build or verify the flow yourself, Slack's current user-token
-OAuth path for MCP-style integrations is:
+If you need to build or verify the flow yourself, use Slack OAuth v2 with the
+requested user-token scopes in the `user_scope` parameter:
 
 ```text
-https://slack.com/oauth/v2_user/authorize
+https://slack.com/oauth/v2/authorize
 ```
 
 A minimal authorization URL looks like this:
 
 ```text
-https://slack.com/oauth/v2_user/authorize?client_id=YOUR_CLIENT_ID&scope=search:read.public,search:read.files,users:read,channels:history&redirect_uri=https://YOUR-APP.example.com/slack/callback
+https://slack.com/oauth/v2/authorize?client_id=YOUR_CLIENT_ID&user_scope=search:read.public,search:read.files,users:read,channels:history&redirect_uri=https://YOUR-APP.example.com/slack/callback
 ```
 
 High-level flow:
@@ -146,13 +146,13 @@ High-level flow:
 2. Add the user scopes you need under **OAuth & Permissions**.
 3. Configure an HTTPS redirect URL.
 4. Send the user through the OAuth consent screen.
-5. Exchange the returned `code` using `oauth.v2.user.access`.
+5. Exchange the returned `code` using `oauth.v2.access` and store the returned `authed_user.access_token`.
 6. Store the resulting `xoxp-...` token securely.
 
 Example code exchange:
 
 ```bash
-curl -X POST https://slack.com/api/oauth.v2.user.access \
+curl -X POST https://slack.com/api/oauth.v2.access \
   -H 'Content-Type: application/x-www-form-urlencoded' \
   --data-urlencode 'client_id=YOUR_CLIENT_ID' \
   --data-urlencode 'client_secret=YOUR_CLIENT_SECRET' \
@@ -162,8 +162,8 @@ curl -X POST https://slack.com/api/oauth.v2.user.access \
 
 Notes:
 
-- For user-token-only and MCP-style flows, prefer `v2_user/authorize` +
-  `oauth.v2.user.access`.
+- For user-token-only and MCP-style flows, put scopes in `user_scope` and omit
+  bot-only scopes from that parameter.
 - If your org provides a helper page, that page may perform the code exchange
   for you and simply show the token or a ready-to-copy MCP configuration.
 - Never commit tokens to the repo or paste them into checked-in config files.
@@ -183,17 +183,17 @@ for core features and mark invasive scopes as optional when possible.
 not automatically broken; `/sf-slack` renders the Slack-approved scope grant plus
 a capability summary so users can see what is available and what is degraded.
 
-| Profile               | Scopes                                                             | Notes                                                                     |
-| --------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------- |
-| Public search         | `search:read.public`, `search:read.files`, `search:read.users`     | Search public channels, files, and users                                  |
-| Private and DM search | `search:read.private`, `search:read.im`, `search:read.mpim`        | User-token-only scopes; admins may choose not to grant them               |
-| Message context       | `channels:history`, `groups:history`, `im:history`, `mpim:history` | Needed for `conversations.history` / `conversations.replies`              |
-| Directory metadata    | `channels:read`, `groups:read`, `im:read`, `mpim:read`             | Enables channel info/list/member APIs; search fallbacks exist             |
-| User lookup           | `users:read`, `users:read.email`                                   | Email lookup requires `users:read.email`                                  |
-| File metadata         | `files:read`                                                       | Separate from `search:read.files`; needed for `files.info`                |
-| Canvas sections       | `canvases:read`                                                    | Enables `canvases.sections.lookup` and section ID discovery               |
-| Canvas create/edit    | `canvases:write`                                                   | Needs a user token (`xoxp-`)                                              |
-| Posting messages      | `chat:write`, `im:write`, `mpim:write`                             | `chat:write` posts to known channels/DM IDs; `im:write` opens new 1:1 DMs |
+| Profile               | Scopes                                                             | Notes                                                                                 |
+| --------------------- | ------------------------------------------------------------------ | ------------------------------------------------------------------------------------- |
+| Public search         | `search:read.public`, `search:read.files`, `search:read.users`     | Search public channels, files, and users                                              |
+| Private and DM search | `search:read.private`, `search:read.im`, `search:read.mpim`        | User-token-only scopes; admins may choose not to grant them                           |
+| Message context       | `channels:history`, `groups:history`, `im:history`, `mpim:history` | Needed for `conversations.history` / `conversations.replies`                          |
+| Directory metadata    | `channels:read`, `groups:read`, `im:read`, `mpim:read`             | Enables channel info/list/member APIs; search fallbacks exist                         |
+| User lookup           | `users:read`, `users:read.email`                                   | Email lookup requires `users:read.email`                                              |
+| File metadata         | `files:read`                                                       | Separate from `search:read.files`; needed for `files.info`                            |
+| Canvas sections       | `canvases:read`                                                    | Enables `canvases.sections.lookup` and section ID discovery                           |
+| Canvas create/edit    | `canvases:write`                                                   | Needs a user token (`xoxp-`)                                                          |
+| Posting messages      | `chat:write`, `im:write`, `mpim:write`                             | `chat:write` posts as the user to known channels/DM IDs; `im:write` opens new 1:1 DMs |
 
 ### Capability-oriented profiles
 
@@ -217,11 +217,14 @@ channels:history,groups:history,im:history,mpim:history,
 channels:read,groups:read,im:read,mpim:read,
 users:read,users:read.email,files:read,
 canvases:read,canvases:write,
-chat:write,chat:write.public,im:write,mpim:write
+chat:write,im:write,mpim:write
 ```
 
-Omit the `chat:*` / `im:write` / `mpim:write` scopes if you do not want message
+Omit the `chat:write` / `im:write` / `mpim:write` scopes if you do not want message
 posting. `slack_send` remains gated and confirmed even when those scopes exist.
+`chat:write.public` is intentionally not part of the user-token scope bundle; it
+is a bot/app public-channel posting enhancer and does not replace user-token
+`chat:write` for this extension.
 
 ### Scope caveats
 
@@ -365,7 +368,7 @@ opted in with `SLACK_ALLOW_HEADLESS_SEND=1`.
 Safety rails (enforced in `lib/send-tool.ts`):
 
 - **Token gate** — rejects bot/app tokens upfront; `slack_send` is user-token only.
-- **Scope gate** — requires `chat:write` or `chat:write.public`. `action=dm`
+- **Scope gate** — requires user-token `chat:write`. `action=dm`
   uses `im:write` to open a DM when available; without it, the tool searches
   for an already-open `D...` DM channel and posts there after confirmation.
 - **Unified recipient + send HITL** — `slack_send` resolves fuzzy `to` values
@@ -400,11 +403,11 @@ removed from the active tool set, keeping the LLM system prompt clean.
 | `slack_user`           | `users:read`                                                                     | Some resolver paths can still mine users from search results                                              |
 | `slack_file`           | `files:read`                                                                     | File search may still work through `slack` when `search:read.files` exists                                |
 | `slack_canvas`         | `canvases:read` or `files:read`                                                  | Metadata and section lookup degrade independently by action                                               |
-| `slack_send`           | `chat:write` or `chat:write.public`                                              | DMs can reuse an existing `D...` channel; opening a new DM still needs `im:write`; all sends require HITL |
+| `slack_send`           | user token + `chat:write`                                                        | DMs can reuse an existing `D...` channel; opening a new DM still needs `im:write`; all sends require HITL |
 
 `/sf-slack` renders both the raw granted/requested scope diff and a capability
 summary such as Search, History, Files, Canvases, and Posting. This keeps a
-16-of-23 scope grant understandable instead of making it look like a broken
+partial scope grant understandable instead of making it look like a broken
 login.
 
 ## Agent Context Injection
@@ -488,6 +491,7 @@ extensions/sf-slack/
     api.ts                  ← implementation module
     auth.ts                 ← implementation module
     canvas-tool.ts          ← implementation module
+    capabilities.ts         ← implementation module
     channel-tool.ts         ← implementation module
     config-panel.ts         ← implementation module
     emoji.ts                ← implementation module

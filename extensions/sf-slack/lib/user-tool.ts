@@ -27,6 +27,7 @@ import {
   relativeTime,
   warmUserCacheFromMatches,
   DEFAULT_ASSISTANT_CHANNEL_TYPES,
+  hasScope,
 } from "./api.ts";
 import { formatUserInfo, extractStructuredUser } from "./format.ts";
 import { buildSlackTextResult } from "./truncation.ts";
@@ -259,6 +260,19 @@ export function registerUserTool(pi: ExtensionAPI): void {
           return {
             content: [{ type: "text", text: '"email" requires "email" parameter.' }],
             details: { ok: false, action, reason: "missing_email" },
+          };
+        }
+        if (!hasScope("users:read.email")) {
+          return {
+            content: [
+              {
+                type: "text",
+                text:
+                  "Slack user email lookup needs users:read.email. " +
+                  "Re-auth after the Slack app/workspace has approved that scope, or use slack_user action:'list' / slack_resolve by name.",
+              },
+            ],
+            details: { ok: false, action, reason: "missing_scope" },
           };
         }
 

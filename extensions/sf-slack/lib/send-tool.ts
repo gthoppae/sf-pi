@@ -14,7 +14,7 @@
  *
  * Safety rails:
  *   - Token-type gate (user tokens only; bot/app rejected upfront)
- *   - Scope gate (chat:write OR chat:write.public must be granted)
+ *   - Scope gate (user-token chat:write must be granted)
  *   - Unified recipient + message confirmation (low-confidence matches are shown inline)
  *   - Mention re-confirm (@channel/@here/@everyone flips the default to Cancel)
  *   - Headless refusal unless SLACK_ALLOW_HEADLESS_SEND=1
@@ -377,14 +377,10 @@ interface PreflightFailure {
  *  already-open DM channel found via Slack search and then post with
  *  chat:write.
  *
- *  Why not require chat:write.public for action=channel? Because we don't
- *  yet know whether the resolved channel is one the user is a member of.
- *  chat.postMessage to a channel the user is in only needs chat:write.
- *  chat:write.public is only needed for *public* channels they haven't
- *  joined — and we'd need to hit conversations.info first to tell.
- *  Runtime failure there is still normalized (not_in_channel → clear
- *  re-phrased error), so we let that path handle it instead of
- *  over-gating upfront.
+ *  Why not support chat:write.public here? slack_send posts as the authenticated
+ *  user token. `chat:write.public` is a bot/app public-channel posting enhancer,
+ *  not a replacement for user-token `chat:write`. Runtime failures such as
+ *  not_in_channel are still normalized into friendly guidance.
  */
 export function preflightSend(
   token: string,
@@ -405,14 +401,14 @@ export function preflightSend(
       details: { ok: false, action: action || "send", reason: "wrong_token_type" },
     };
   }
-  if (!hasScope("chat:write") && !hasScope("chat:write.public")) {
+  if (!hasScope("chat:write")) {
     return {
       content: [
         {
           type: "text",
           text:
-            "slack_send needs chat:write (or chat:write.public) which this token does not have. " +
-            "Re-run /login sf-slack to re-consent with chat:write granted.",
+            "slack_send posts as your Slack user token and needs chat:write. " +
+            "Re-auth after the Slack app/workspace has approved chat:write.",
         },
       ],
       details: { ok: false, action: action || "send", reason: "missing_scope" },

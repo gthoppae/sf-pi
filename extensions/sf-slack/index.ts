@@ -75,7 +75,11 @@ import { registerResolveTool } from "./lib/resolve-tool.ts";
 import { registerResearchTool } from "./lib/research-tool.ts";
 import { registerSendTool } from "./lib/send-tool.ts";
 import { registerTimeRangeTool } from "./lib/time-range-tool.ts";
-import { probeAndGateTools } from "./lib/scope-probe.ts";
+import {
+  computeGrantedRequestedScopeCount,
+  deactivateSlackTools,
+  probeAndGateTools,
+} from "./lib/scope-probe.ts";
 import {
   DEFAULT_PREFERENCES,
   PREFS_ENTRY_TYPE,
@@ -327,7 +331,7 @@ export default function sfSlack(pi: ExtensionAPI) {
         break;
       case "connected": {
         // Pill format (surfaced on sf-devbar's right side):
-        //   💬 Slack ✓ Connected @handle [user] 16/23 approved scopes
+        //   💬 Slack ✓ Connected @handle [user] 21/22 approved scopes
         //       └dim    └─success          └accent └─token-type    └─neutral scope grant
         //                                    color depends on
         //                                    token risk:
@@ -401,8 +405,9 @@ export default function sfSlack(pi: ExtensionAPI) {
     const auth = await getSlackToken(ctx);
     if (!isActiveSession(ctx, generation)) return;
     if (!auth.ok) {
-      // No token → no tool registration. System prompt stays Slack-free.
+      // No token → hide any Slack tools left active from an earlier session.
       setDetectedTeamId("");
+      deactivateSlackTools(pi);
       updateStatus(ctx, "disconnected", generation);
       return;
     }
@@ -433,17 +438,19 @@ export default function sfSlack(pi: ExtensionAPI) {
         .filter(Boolean);
       requestedScopeCount = requestedScopes.length;
       const [probeResult] = await Promise.all([
-        probeAndGateTools(pi, token, ctx.signal, requestedScopes),
+        probeAndGateTools(pi, token, ctx.signal, requestedScopes, tokenType),
         prewarmUserCache(token, ctx.signal),
         prewarmChannelCache(token, ctx.signal),
       ]);
       if (!isActiveSession(ctx, generation)) return;
+      const grantedScopes = getGrantedScopes();
       missingGrantedScopeCount = probeResult.missingGrantedScopes.length;
-      grantedScopeCount = getGrantedScopes()?.size ?? 0;
+      grantedScopeCount = computeGrantedRequestedScopeCount(grantedScopes, requestedScopes);
 
       updateStatus(ctx, "connected", generation);
     } catch (error) {
       if (isAbortError(error)) return;
+      deactivateSlackTools(pi);
       updateStatus(ctx, "error", generation);
     }
   });
@@ -454,6 +461,7 @@ export default function sfSlack(pi: ExtensionAPI) {
     if (!wasActive) return;
 
     identity = null;
+    deactivateSlackTools(pi);
     clearSlackStatus();
     setDetectedTeamId("");
     missingGrantedScopeCount = 0;
@@ -540,6 +548,7 @@ export default function sfSlack(pi: ExtensionAPI) {
       if (!isActiveSession(ctx, generation)) return;
 
       if (!auth.ok) {
+        deactivateSlackTools(pi);
         updateStatus(ctx, "disconnected", generation);
         ctx.ui.setStatus(`-command`, undefined);
         await emitSlackOutput(
@@ -572,19 +581,21 @@ export default function sfSlack(pi: ExtensionAPI) {
             .filter(Boolean);
           requestedScopeCount = requestedScopes.length;
           const [probeResult] = await Promise.all([
-            probeAndGateTools(pi, token, ctx.signal, requestedScopes),
+            probeAndGateTools(pi, token, ctx.signal, requestedScopes, tokenType),
             prewarmUserCache(token, ctx.signal),
             prewarmChannelCache(token, ctx.signal),
           ]);
           if (!isActiveSession(ctx, generation)) return;
+          const grantedScopes = getGrantedScopes();
           missingGrantedScopeCount = probeResult.missingGrantedScopes.length;
-          grantedScopeCount = getGrantedScopes()?.size ?? 0;
+          grantedScopeCount = computeGrantedRequestedScopeCount(grantedScopes, requestedScopes);
           updateStatus(ctx, "connected", generation);
           const status = await buildAuthStatus(ctx);
           if (!isActiveSession(ctx, generation)) return;
           ctx.ui.setStatus(`-command`, undefined);
           await emitSlackOutput(ctx, "SF Slack refreshed", status, "success", fromPanel);
         } else {
+          deactivateSlackTools(pi);
           updateStatus(ctx, "error", generation);
           ctx.ui.setStatus(`-command`, undefined);
           await emitSlackOutput(
@@ -597,6 +608,7 @@ export default function sfSlack(pi: ExtensionAPI) {
         }
       } catch (err) {
         if (isAbortError(err)) return;
+        deactivateSlackTools(pi);
         updateStatus(ctx, "error", generation);
         ctx.ui.setStatus(`-command`, undefined);
         await emitSlackOutput(ctx, "Slack detection failed", String(err), "error", fromPanel);

@@ -3,9 +3,8 @@
  * Tests for slack_canvas per-action write preflight (P3).
  *
  * We gate canvas create/edit before hitting the network so we can return a
- * precise, actionable error (\"use a user token\" / \"re-consent with
- * canvases:write\") instead of relaying Slack's raw bot_scopes_not_found or
- * missing_scope.
+ * precise, actionable error (\"use a user token\" / \"scope needs admin approval\")
+ * instead of relaying Slack's raw bot_scopes_not_found or missing_scope.
  */
 import { afterEach, beforeAll, beforeEach, describe, it, expect } from "vitest";
 import { buildCanvasLookupCriteria, preflightCanvasWrite } from "../lib/canvas-tool.ts";
@@ -106,7 +105,7 @@ describe("preflightCanvasWrite", () => {
     expect(gate).not.toBeNull();
     expect(gate!.reason).toBe("missing_scope");
     expect(gate!.message).toMatch(/canvases:write/);
-    expect(gate!.message).toMatch(/\/login sf-slack/);
+    expect(gate!.message).toMatch(/approved canvases:write/);
   });
 
   it("does not block unknown token types when the scope is unknown", () => {

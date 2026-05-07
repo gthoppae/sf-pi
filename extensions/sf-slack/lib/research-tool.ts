@@ -28,6 +28,7 @@ import {
   warmChannelCacheFromMatches,
   getUserCache,
   DEFAULT_ASSISTANT_CHANNEL_TYPES,
+  errorResult,
 } from "./api.ts";
 import {
   formatMessages,
@@ -156,11 +157,13 @@ export function registerResearchTool(pi: ExtensionAPI): void {
       const executedQueries: string[] = [];
       const unique = new Map<string, SlackSearchMatch>();
       const queryCounts: Array<{ query: string; count: number; api: string }> = [];
+      const searchErrors: ApiErr[] = [];
 
       for (const query of candidateQueries) {
         const search = await runSearch(auth.token, query, limit, signal);
         executedQueries.push(query);
         queryCounts.push({ query, count: search.matches.length, api: search.api });
+        if (search.error) searchErrors.push(search.error);
         // Harvest {channel_id → channel_name} from every hit into the shared
         // cache so a follow-up slack action:'history' / 'thread' on any of
         // these IDs short-circuits via cache_by_id and never prompts.
@@ -177,6 +180,16 @@ export function registerResearchTool(pi: ExtensionAPI): void {
           input.strategy !== "broad"
         )
           break;
+      }
+
+      if (unique.size === 0 && searchErrors.length === candidateQueries.length) {
+        const firstError = searchErrors[0];
+        return errorResult(
+          firstError.error,
+          firstError.needed,
+          firstError.provided,
+          firstError.messages,
+        );
       }
 
       const matches = Array.from(unique.values()).slice(0, limit);
@@ -271,7 +284,7 @@ async function runSearch(
   query: string,
   limit: number,
   signal?: AbortSignal,
-): Promise<{ api: string; matches: SlackSearchMatch[] }> {
+): Promise<{ api: string; matches: SlackSearchMatch[]; error?: ApiErr }> {
   const assistantParams: Record<string, string | number> = {
     query,
     count: clampLimit(limit, DEFAULT_SEARCH_LIMIT, 20),
@@ -307,6 +320,7 @@ async function runSearch(
     return {
       api: `error:${error.error}`,
       matches: [],
+      error,
     };
   }
 

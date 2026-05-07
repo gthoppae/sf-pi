@@ -59,11 +59,13 @@ describe("preflightSend", () => {
     expect(preflightSend("xoxp-test")).toBeNull();
   });
 
-  it("passes when a user token has only chat:write.public granted", async () => {
-    // Some workspaces grant the narrower scope instead of the general one.
+  it("rejects a user token that only has chat:write.public", async () => {
     mockFetchWithScopes("chat:write.public, users:read");
     await slackApi("auth.test", "xoxp-test", {});
-    expect(preflightSend("xoxp-test")).toBeNull();
+    const failure = preflightSend("xoxp-test");
+    expect(failure).not.toBeNull();
+    expect(failure!.details.reason).toBe("missing_scope");
+    expect(failure!.content[0].text).toMatch(/needs chat:write/);
   });
 
   it("rejects bot tokens with a user-token hint", () => {
@@ -87,7 +89,7 @@ describe("preflightSend", () => {
     expect(failure).not.toBeNull();
     expect(failure!.details.reason).toBe("missing_scope");
     expect(failure!.content[0].text).toMatch(/chat:write/);
-    expect(failure!.content[0].text).toMatch(/re-consent/i);
+    expect(failure!.content[0].text).toMatch(/Re-auth/i);
   });
 
   describe("action-aware gating", () => {
@@ -145,7 +147,7 @@ describe("existing-DM fallback query planning", () => {
 });
 
 describe("scope-probe gating for slack_send", () => {
-  it("gates slack_send when neither chat:write nor chat:write.public is granted", () => {
+  it("gates slack_send when chat:write is not granted", () => {
     const granted = new Set(["users:read", "search:read.public", "channels:read"]);
     const gated = computeGatedTools(granted, ["slack_send", "slack_user"]);
     expect(gated).toContain("slack_send");
@@ -157,10 +159,16 @@ describe("scope-probe gating for slack_send", () => {
     expect(gated).not.toContain("slack_send");
   });
 
-  it("does not gate slack_send when only chat:write.public is granted", () => {
+  it("gates slack_send when only chat:write.public is granted", () => {
     const granted = new Set(["chat:write.public", "users:read"]);
     const gated = computeGatedTools(granted, ["slack_send", "slack_user"]);
-    expect(gated).not.toContain("slack_send");
+    expect(gated).toContain("slack_send");
+  });
+
+  it("gates slack_send for bot tokens even when chat:write is granted", () => {
+    const granted = new Set(["chat:write", "users:read"]);
+    const gated = computeGatedTools(granted, ["slack_send", "slack_user"], "bot");
+    expect(gated).toContain("slack_send");
   });
 });
 

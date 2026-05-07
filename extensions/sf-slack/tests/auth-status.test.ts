@@ -73,12 +73,13 @@ describe("buildAuthStatus", () => {
 
     expect(status).toMatch(/Status: \u2705 Connected/);
     expect(status).toMatch(/user token \(xoxp-\)/);
-    expect(status).toMatch(/Scope grant: 2 of 3 requested scopes granted by Slack/);
+    expect(status).toMatch(/Scope grant: 1 of 3 requested scopes granted by Slack/);
     expect(status).toMatch(/Granted scopes \(from Slack\)/);
     expect(status).toMatch(/canvases:read/);
+    expect(status).toMatch(/Additional Slack-returned scopes not requested/);
     expect(status).toMatch(/Capabilities:/);
     expect(status).toMatch(/Canvases: section lookup; metadata degraded without files:read/);
-    expect(status).toMatch(/Files: unavailable|Files: search available/);
+    expect(status).toMatch(/Files: not granted|Files: search available/);
     // Partial grants are shown as neutral workspace/app coverage, not auth failure.
     expect(status).toMatch(/Not included in the current workspace\/app grant \(2\)/);
     expect(status).toMatch(/files:read/);

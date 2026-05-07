@@ -66,9 +66,10 @@ export const DEFAULT_SCOPES = [
   "canvases:read",
   "canvases:write",
   // Message sending (slack_send). User-token scopes; never requested unless the
-  // user explicitly re-consents.
+  // user explicitly re-consents. `chat:write.public` is intentionally omitted:
+  // it is a bot/app public-channel posting enhancer, not a standalone user-token
+  // requirement for this extension's confirmed user send flow.
   "chat:write",
-  "chat:write.public",
   "im:write",
   "mpim:write",
 ].join(",");

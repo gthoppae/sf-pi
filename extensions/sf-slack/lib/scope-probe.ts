@@ -22,15 +22,22 @@
  */
 import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
 import type { AuthTestResponse } from "./types.ts";
-import { slackApi, getGrantedScopes } from "./api.ts";
+import { slackApi, getGrantedScopes, type SlackTokenType } from "./api.ts";
+import {
+  ALL_SLACK_TOOL_NAMES,
+  DIRECTORY_SCOPES,
+  HISTORY_SCOPES,
+  SEARCH_SCOPES,
+} from "./capabilities.ts";
 
 /** A tool is enabled if the token has *any* scope in its requirement list. */
 interface ToolScopeRequirement {
   tool: string;
-  anyOf: string[];
+  anyOf: readonly string[];
+  tokenTypes?: readonly SlackTokenType[];
 }
 
-// Keep this table next to the probe so the source of truth for tool \u2194 scope
+// Keep this table next to the probe so the source of truth for tool ↔ scope
 // mapping is co-located. Updates here should match the scopes requested by
 // DEFAULT_SCOPES in types.ts (and any docs in the README scope-planning table).
 //
@@ -40,13 +47,14 @@ interface ToolScopeRequirement {
 //     for `create`/`edit` happens inside the tool itself because it needs
 //     canvases:write.
 //   - slack: the `search` action can use `search:read` (coarse, legacy) OR
-//     any of the granular `search:read.*` scopes (newer workspaces).
+//     any of the granular `search:read.*` scopes (newer workspaces); history
+//     actions can still be useful when only a known channel/DM ID is available.
 //   - slack_research: same search requirements as `slack`.
-//   - slack_time_range / slack_resolve: pure helpers / resolver \u2014 not gated.
+//   - slack_time_range / slack_resolve: pure helpers / resolver — not gated.
 const TOOL_SCOPE_REQUIREMENTS: ToolScopeRequirement[] = [
   {
     tool: "slack_channel",
-    anyOf: ["channels:read", "groups:read", "im:read", "mpim:read"],
+    anyOf: DIRECTORY_SCOPES,
   },
   { tool: "slack_file", anyOf: ["files:read"] },
   { tool: "slack_user", anyOf: ["users:read"] },
@@ -56,36 +64,18 @@ const TOOL_SCOPE_REQUIREMENTS: ToolScopeRequirement[] = [
   },
   {
     tool: "slack",
-    anyOf: [
-      "search:read",
-      "search:read.public",
-      "search:read.private",
-      "search:read.im",
-      "search:read.mpim",
-      "search:read.files",
-      "search:read.users",
-      "channels:history",
-      "groups:history",
-    ],
+    anyOf: [...SEARCH_SCOPES, ...HISTORY_SCOPES],
   },
   {
     tool: "slack_research",
-    anyOf: [
-      "search:read",
-      "search:read.public",
-      "search:read.private",
-      "search:read.im",
-      "search:read.mpim",
-    ],
+    anyOf: SEARCH_SCOPES,
   },
   {
-    // slack_send uses chat.postMessage. `chat:write` covers channels the
-    // user is in; `chat:write.public` additionally covers public channels
-    // the user hasn't joined. Either is enough to register the tool —
-    // per-action preflight inside send-tool.ts enforces the more specific
-    // token-type rule (user tokens only).
+    // slack_send posts as the authenticated user. `chat:write.public` is a
+    // bot/app posting enhancer and is not sufficient for this user-token tool.
     tool: "slack_send",
-    anyOf: ["chat:write", "chat:write.public"],
+    anyOf: ["chat:write"],
+    tokenTypes: ["user"],
   },
 ];
 
@@ -104,13 +94,15 @@ export interface ProbeResult {
 export function computeGatedTools(
   granted: Set<string> | null,
   registeredTools: string[],
+  tokenType: SlackTokenType = "user",
 ): string[] {
   if (!granted) return [];
   const gated: string[] = [];
-  for (const { tool, anyOf } of TOOL_SCOPE_REQUIREMENTS) {
+  for (const { tool, anyOf, tokenTypes } of TOOL_SCOPE_REQUIREMENTS) {
     if (!registeredTools.includes(tool)) continue;
     const hasAny = anyOf.some((scope) => granted.has(scope));
-    if (!hasAny) gated.push(tool);
+    const tokenAllowed = !tokenTypes || tokenTypes.includes(tokenType);
+    if (!hasAny || !tokenAllowed) gated.push(tool);
   }
   return gated;
 }
@@ -124,11 +116,45 @@ export function computeMissingGrantedScopes(
   return requested.filter((scope) => scope && !granted.has(scope));
 }
 
+export function computeGrantedRequestedScopeCount(
+  granted: Set<string> | null,
+  requested: string[],
+): number {
+  if (!granted) return 0;
+  return requested.filter((scope) => scope && granted.has(scope)).length;
+}
+
+/** Hide every Slack-owned tool while preserving non-Slack active tools. */
+export function deactivateSlackTools(pi: ExtensionAPI): void {
+  const activeTools = pi
+    .getActiveTools()
+    .filter(
+      (toolName) =>
+        !ALL_SLACK_TOOL_NAMES.includes(toolName as (typeof ALL_SLACK_TOOL_NAMES)[number]),
+    );
+  pi.setActiveTools(activeTools);
+}
+
+function applyScopeGate(pi: ExtensionAPI, gatedTools: string[]): void {
+  const registeredTools = pi.getAllTools().map((tool) => tool.name);
+  const activeNonSlack = pi
+    .getActiveTools()
+    .filter(
+      (toolName) =>
+        !ALL_SLACK_TOOL_NAMES.includes(toolName as (typeof ALL_SLACK_TOOL_NAMES)[number]),
+    );
+  const activeSlack = ALL_SLACK_TOOL_NAMES.filter(
+    (toolName) => registeredTools.includes(toolName) && !gatedTools.includes(toolName),
+  );
+  pi.setActiveTools([...activeNonSlack, ...activeSlack]);
+}
+
 export async function probeAndGateTools(
   pi: ExtensionAPI,
   token: string,
   signal?: AbortSignal,
   requestedScopes: string[] = [],
+  tokenType: SlackTokenType = "user",
 ): Promise<ProbeResult> {
   // One cheap call whose only purpose is to populate the granted-scope cache
   // via the X-OAuth-Scopes response header (captured inside slackApi).
@@ -137,13 +163,12 @@ export async function probeAndGateTools(
   const granted = getGrantedScopes();
   const registeredTools = pi.getAllTools().map((tool) => tool.name);
 
-  const gatedTools = computeGatedTools(granted, registeredTools);
+  const gatedTools = computeGatedTools(granted, registeredTools, tokenType);
   const missingGrantedScopes = computeMissingGrantedScopes(granted, requestedScopes);
 
-  if (gatedTools.length > 0) {
-    const activeTools = pi.getActiveTools().filter((toolName) => !gatedTools.includes(toolName));
-    pi.setActiveTools(activeTools);
-  }
+  // Recompute the Slack-owned active subset every time. The old one-way filter
+  // hid tools on a limited grant but did not restore them after re-consent.
+  if (granted) applyScopeGate(pi, gatedTools);
 
   return {
     gatedTools,

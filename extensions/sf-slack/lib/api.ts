@@ -731,7 +731,7 @@ export function summarizeSlackError(
     case "missing_scope":
       return (
         `Slack token is missing required scope. Needed: ${needed || "unknown"}. ` +
-        `Provided: ${provided || "unknown"}. Re-run /login sf-slack to re-consent with the needed scopes.`
+        `Provided: ${provided || "unknown"}. Re-auth after the Slack app/workspace has approved the needed scopes.`
       );
     case "not_authed":
     case "invalid_auth":
@@ -767,8 +767,8 @@ export function summarizeSlackError(
       return "Slack is rate-limiting this workspace — the call retried once and was still throttled. Wait a few seconds and try again.";
     case "team_access_not_granted":
       return (
-        "Slack blocked this directory call with team_access_not_granted — typical on Enterprise Grid when the target lives in another workspace. " +
-        "For user/channel lookups, slack_resolve now falls back to assistant.search.context automatically. " +
+        "Slack granted the required scope, but blocked this broad directory call with team_access_not_granted — typical on Enterprise Grid when the target lives in another workspace. " +
+        "For user/channel lookups, slack_resolve falls back to assistant.search.context automatically. " +
         "For direct reads, ask for a specific Slack ID or search messages first (slack action:'search' / slack_research) and pick the author/channel from a hit."
       );
     case "request_timeout":

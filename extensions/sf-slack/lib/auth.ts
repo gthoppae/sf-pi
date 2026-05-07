@@ -223,7 +223,6 @@ export async function loginSlack(callbacks: OAuthLoginCallbacks): Promise<OAuthC
     const state = globalThis.crypto?.randomUUID?.() || `${Date.now()}`;
     const authParams = new URLSearchParams({
       client_id: clientId,
-      scope: oauthScopes(),
       redirect_uri: redirectUri,
       user_scope: oauthScopes(),
       state,

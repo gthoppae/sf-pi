@@ -37,6 +37,7 @@ import {
   detectTokenType,
   type SlackTokenType,
 } from "./api.ts";
+import { buildSlackCapabilities, HISTORY_SCOPES, SEARCH_SCOPES } from "./capabilities.ts";
 
 // ─── Search results (text for LLM consumption) ─────────────────────────────────
 
@@ -252,26 +253,18 @@ export function formatSlackCapabilitySummary(
   tokenType: SlackTokenType = "unknown",
 ): string[] {
   const lines = ["Capabilities:"];
-  if (!granted) {
+  const capabilities = buildSlackCapabilities(granted, tokenType);
+  if (!granted || !capabilities) {
     lines.push("  ? Unknown — run /sf-slack refresh to capture granted scopes from Slack.");
     return lines;
   }
 
   const has = (scope: string) => granted.has(scope);
-  const hasAny = (scopes: string[]) => scopes.some((scope) => granted.has(scope));
-  const mark = (ready: boolean) => (ready ? "✓" : "⚠");
+  const hasAny = (scopes: readonly string[]) => scopes.some((scope) => granted.has(scope));
+  const mark = (ready: boolean) => (ready ? "✓" : "○");
 
-  const searchScopes = [
-    "search:read",
-    "search:read.public",
-    "search:read.private",
-    "search:read.im",
-    "search:read.mpim",
-    "search:read.files",
-    "search:read.users",
-  ];
   lines.push(
-    `  ${mark(hasAny(searchScopes))} Search: ${hasAny(searchScopes) ? "available" : "unavailable — missing search:read.*"}`,
+    `  ${mark(capabilities.search)} Search: ${capabilities.search ? "available" : "not granted — missing search:read.*"}`,
   );
 
   const historyParts = [
@@ -281,44 +274,62 @@ export function formatSlackCapabilitySummary(
     has("mpim:history") ? "MPDMs" : "",
   ].filter(Boolean);
   lines.push(
-    `  ${mark(historyParts.length > 0)} History: ${historyParts.length ? historyParts.join(", ") : "unavailable — missing *:history scopes"}`,
+    `  ${mark(capabilities.history)} History: ${historyParts.length ? historyParts.join(", ") : "not granted — missing *:history scopes"}`,
   );
 
-  const directoryReady = hasAny(["channels:read", "groups:read", "im:read", "mpim:read"]);
-  lines.push(
-    `  ${mark(directoryReady)} Channel directory: ${directoryReady ? "available" : "limited — search/history fallbacks only"}`,
-  );
+  const directoryLabel = capabilities.directory
+    ? capabilities.dmDirectory
+      ? "available"
+      : "available; DM metadata/listing limited without im:read"
+    : hasAny(SEARCH_SCOPES) || hasAny(HISTORY_SCOPES)
+      ? "limited — search/history fallbacks only"
+      : "not granted — missing channel/DM read scopes";
+  lines.push(`  ${mark(capabilities.directory)} Channel directory: ${directoryLabel}`);
 
-  const usersReady = has("users:read");
-  lines.push(
-    `  ${mark(usersReady)} Users: ${usersReady ? (has("users:read.email") ? "lookup + email" : "lookup only") : "unavailable — missing users:read"}`,
-  );
+  const usersLabel = capabilities.users
+    ? capabilities.userEmail
+      ? "lookup + email"
+      : "lookup only; email lookup needs users:read.email"
+    : "not granted — missing users:read";
+  lines.push(`  ${mark(capabilities.users)} Users: ${usersLabel}`);
 
   lines.push(
-    has("files:read")
-      ? "  ✓ Files: metadata/list/download available"
-      : has("search:read.files")
-        ? "  ⚠ Files: search available; metadata/list unavailable without files:read"
-        : "  ⚠ Files: unavailable — missing files:read/search:read.files",
+    capabilities.files
+      ? "  ✓ Files: metadata/list available"
+      : capabilities.fileSearch
+        ? "  ○ Files: search available; metadata/list unavailable without files:read"
+        : "  ○ Files: not granted — missing files:read/search:read.files",
   );
 
   const canvasRead = has("canvases:read");
-  const canvasWrite = has("canvases:write") && tokenType === "user";
+  const canvasWrite = capabilities.canvasWrite;
   lines.push(
-    `  ${mark(canvasRead || canvasWrite)} Canvases: ${formatCanvasCapability(canvasRead, canvasWrite, has("files:read"), tokenType)}`,
+    `  ${mark(capabilities.canvasRead || capabilities.canvasWrite)} Canvases: ${formatCanvasCapability(canvasRead, canvasWrite, has("files:read"), tokenType)}`,
   );
 
-  const postReady = has("chat:write") || has("chat:write.public");
-  const dmOpenReady = postReady && has("im:write");
-  const existingDmReady = postReady && (has("search:read") || has("search:read.im"));
-  const postingLabel = !postReady
-    ? "unavailable — missing chat:write"
-    : dmOpenReady
-      ? "channels + DMs"
-      : existingDmReady
+  const postingLabel = !capabilities.postMessage
+    ? tokenType === "user"
+      ? "not granted — missing chat:write"
+      : "not available — slack_send posts as a user token (xoxp-)"
+    : capabilities.openDm
+      ? capabilities.openMpim
+        ? "channels + DMs + MPDMs"
+        : "channels + DMs; opening MPDMs needs mpim:write"
+      : has("search:read") || has("search:read.im")
         ? "channels + existing DMs; new DMs need im:write"
         : "channels only; DMs need im:write or search:read.im fallback";
-  lines.push(`  ${mark(postReady)} Posting: ${postingLabel}`);
+  lines.push(`  ${mark(capabilities.postMessage)} Posting: ${postingLabel}`);
+
+  if (!has("im:read") && (has("search:read.im") || has("im:history") || has("im:write"))) {
+    lines.push(
+      "  Note: im:read is not granted, so DM metadata/listing is limited; DM search/history/send can still work with the granted DM scopes.",
+    );
+  }
+  if (has("chat:write.public") && !has("chat:write")) {
+    lines.push(
+      "  Note: chat:write.public is not enough for slack_send; this extension needs user-token chat:write.",
+    );
+  }
 
   return lines;
 }
@@ -400,11 +411,17 @@ export async function buildAuthStatus(ctx: ExtensionContext): Promise<string> {
   lines.push("");
   if (granted) {
     const sortedGranted = [...granted].sort();
+    const grantedRequested = requested.filter((scope) => granted.has(scope));
+    const extraGranted = sortedGranted.filter((scope) => !requested.includes(scope));
     lines.push(
-      `Scope grant: ${sortedGranted.length} of ${requested.length} requested scopes granted by Slack.`,
+      `Scope grant: ${grantedRequested.length} of ${requested.length} requested scopes granted by Slack.`,
     );
     lines.push("Granted scopes (from Slack):");
     lines.push(`  ${sortedGranted.join(", ")}`);
+    if (extraGranted.length > 0) {
+      lines.push(`Additional Slack-returned scopes not requested by ${PROVIDER_NAME}:`);
+      lines.push(`  ${extraGranted.join(", ")}`);
+    }
 
     const missingGranted = requested.filter((scope) => !granted.has(scope));
     if (missingGranted.length > 0) {
@@ -416,6 +433,11 @@ export async function buildAuthStatus(ctx: ExtensionContext): Promise<string> {
           "No action is needed unless you need one of the unavailable capabilities below. " +
           "Re-auth will only add scopes if the Slack app/workspace approval changes.",
       );
+      if (missingGranted.includes("im:read")) {
+        lines.push(
+          "  → im:read only affects DM metadata/listing. DM search/history/send can still work when search:read.im, im:history, and im:write are granted.",
+        );
+      }
     }
   } else {
     lines.push(

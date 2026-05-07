@@ -6,10 +6,53 @@
  * helpers (`computeGatedTools`, `computeMissingGrantedScopes`) here.
  * Integration with live Slack is covered by the smoke test.
  */
-import { describe, it, expect } from "vitest";
-import { computeGatedTools, computeMissingGrantedScopes } from "../lib/scope-probe.ts";
+import { afterEach, describe, it, expect } from "vitest";
+import {
+  computeGatedTools,
+  computeGrantedRequestedScopeCount,
+  computeMissingGrantedScopes,
+  deactivateSlackTools,
+  probeAndGateTools,
+} from "../lib/scope-probe.ts";
+import { _resetGrantedScopes } from "../lib/api.ts";
+
+const originalFetch = globalThis.fetch;
+
+class FakePi {
+  private active: string[];
+  constructor(
+    private readonly all: string[],
+    active = all,
+  ) {
+    this.active = [...active];
+  }
+  getAllTools() {
+    return this.all.map((name) => ({ name }));
+  }
+  getActiveTools() {
+    return [...this.active];
+  }
+  setActiveTools(next: string[]) {
+    this.active = [...next];
+  }
+}
+
+function mockAuthTestScopes(scopesHeader: string): void {
+  globalThis.fetch = (async () =>
+    new Response(JSON.stringify({ ok: true }), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "x-oauth-scopes": scopesHeader,
+      },
+    })) as unknown as typeof fetch;
+}
 
 describe("scope-probe", () => {
+  afterEach(() => {
+    globalThis.fetch = originalFetch;
+    _resetGrantedScopes();
+  });
   it("module exports probeAndGateTools function", async () => {
     const mod = await import("../lib/scope-probe.ts");
     expect(typeof mod.probeAndGateTools).toBe("function");
@@ -25,6 +68,7 @@ describe("scope-probe", () => {
       "slack_research",
       "slack_resolve",
       "slack_time_range",
+      "slack_send",
     ];
 
     it("gates nothing when the granted-scope cache is empty (unknown)", () => {
@@ -74,7 +118,7 @@ describe("scope-probe", () => {
         "files:read",
         "canvases:read",
       ]);
-      expect(computeGatedTools(granted, allTools)).toEqual([]);
+      expect(computeGatedTools(granted, allTools)).toEqual(["slack_send"]);
     });
 
     it("gates slack_file when files:read is missing", () => {
@@ -105,10 +149,49 @@ describe("scope-probe", () => {
       expect(computeGatedTools(granted, allTools)).not.toContain("slack_canvas");
     });
 
+    it("keeps the core slack tool active with DM/MPIM history-only grants", () => {
+      expect(computeGatedTools(new Set(["im:history"]), ["slack"])).toEqual([]);
+      expect(computeGatedTools(new Set(["mpim:history"]), ["slack"])).toEqual([]);
+    });
+
     it("does not gate a tool that is not registered in the first place", () => {
       const granted = new Set(["identity"]);
       // slack_file would be gated, but here it isn't even registered.
       expect(computeGatedTools(granted, ["slack", "slack_resolve"])).toEqual(["slack"]);
+    });
+  });
+
+  describe("active tool application", () => {
+    it("hides and restores Slack-owned tools as scopes change", async () => {
+      const pi = new FakePi(["bash", "slack", "slack_file", "slack_send"]);
+
+      mockAuthTestScopes("search:read.public");
+      let result = await probeAndGateTools(
+        pi as never,
+        "xoxp-test",
+        undefined,
+        ["search:read.public", "files:read", "chat:write"],
+        "user",
+      );
+      expect(result.gatedTools.sort()).toEqual(["slack_file", "slack_send"]);
+      expect(pi.getActiveTools()).toEqual(["bash", "slack"]);
+
+      mockAuthTestScopes("search:read.public, files:read, chat:write");
+      result = await probeAndGateTools(
+        pi as never,
+        "xoxp-test",
+        undefined,
+        ["search:read.public", "files:read", "chat:write"],
+        "user",
+      );
+      expect(result.gatedTools).toEqual([]);
+      expect(pi.getActiveTools()).toEqual(["bash", "slack", "slack_file", "slack_send"]);
+    });
+
+    it("deactivates all Slack tools while preserving non-Slack tools", () => {
+      const pi = new FakePi(["bash", "slack", "slack_file"], ["bash", "slack", "slack_file"]);
+      deactivateSlackTools(pi as never);
+      expect(pi.getActiveTools()).toEqual(["bash"]);
     });
   });
 
@@ -139,6 +222,23 @@ describe("scope-probe", () => {
 
     it("tolerates empty requested list", () => {
       expect(computeMissingGrantedScopes(new Set(["a"]), [])).toEqual([]);
+    });
+  });
+
+  describe("computeGrantedRequestedScopeCount", () => {
+    it("counts only requested scopes, not implicit Slack-returned extras", () => {
+      const granted = new Set(["search:read.public", "users:read", "identify"]);
+      expect(
+        computeGrantedRequestedScopeCount(granted, [
+          "search:read.public",
+          "users:read",
+          "files:read",
+        ]),
+      ).toBe(2);
+    });
+
+    it("returns zero when granted scopes are unknown", () => {
+      expect(computeGrantedRequestedScopeCount(null, ["users:read"])).toBe(0);
     });
   });
 });
