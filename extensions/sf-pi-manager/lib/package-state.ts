@@ -12,6 +12,7 @@ import { homedir } from "node:os";
 import path from "node:path";
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
+import { SF_PI_REGISTRY } from "../../../catalog/registry.ts";
 import {
   globalSettingsPath,
   projectSettingsPath,
@@ -132,13 +133,17 @@ export function matchesPackageSource(source: string, settingsDir: string): boole
 export function getDisabledExtensions(settingsPath: string): Set<string> {
   const settings = readJsonFile(settingsPath);
   const entry = findSfPiPackageEntry(settings, path.dirname(settingsPath));
-  if (!entry || !entry.isObject) return new Set();
+  if (!entry || !entry.isObject) return new Set(getDefaultDisabledFiles());
 
   const packages = Array.isArray(settings.packages) ? settings.packages : [];
   const pkg = packages[entry.index] as Record<string, unknown>;
   const extensions = Array.isArray(pkg.extensions) ? pkg.extensions : [];
+  const explicitlyEnabled = getExplicitlyEnabledExtensions(pkg);
 
   const disabled = new Set<string>();
+  for (const file of getDefaultDisabledFiles()) {
+    if (!explicitlyEnabled.has(file)) disabled.add(file);
+  }
   for (const pattern of extensions) {
     if (typeof pattern === "string" && pattern.startsWith("!")) {
       disabled.add(pattern.slice(1));
@@ -177,13 +182,16 @@ export function applyExtensionState(match: PackageEntryMatch, disabledFiles: Set
   const settings = readJsonFile(match.settingsPath);
   const packages = [...(Array.isArray(settings.packages) ? settings.packages : [])];
 
-  if (disabledFiles.size === 0) {
+  const enabledDefaultOff = getDefaultDisabledFiles().filter((file) => !disabledFiles.has(file));
+
+  if (disabledFiles.size === 0 && enabledDefaultOff.length === 0) {
     packages[match.index] = match.source;
   } else {
     const existingObject =
       typeof packages[match.index] === "object" && packages[match.index] !== null
         ? { ...(packages[match.index] as Record<string, unknown>) }
         : {};
+    delete existingObject.enabledExtensions;
 
     packages[match.index] = {
       ...existingObject,
@@ -194,9 +202,21 @@ export function applyExtensionState(match: PackageEntryMatch, disabledFiles: Set
           .sort()
           .map((file) => `!${file}`),
       ],
+      ...(enabledDefaultOff.length > 0 ? { enabledExtensions: enabledDefaultOff.sort() } : {}),
     };
   }
 
   settings.packages = packages;
   writeJsonFile(match.settingsPath, settings);
+}
+
+function getExplicitlyEnabledExtensions(pkg: Record<string, unknown>): Set<string> {
+  const enabledExtensions = Array.isArray(pkg.enabledExtensions) ? pkg.enabledExtensions : [];
+  return new Set(enabledExtensions.filter((entry): entry is string => typeof entry === "string"));
+}
+
+function getDefaultDisabledFiles(): string[] {
+  return SF_PI_REGISTRY.filter((entry) => !entry.defaultEnabled && !entry.alwaysActive).map(
+    (entry) => entry.file,
+  );
 }

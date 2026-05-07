@@ -1,0 +1,276 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/**
+ * Read-only Data 360 readiness probe.
+ *
+ * Data Cloud is not a single switch from an API perspective: one surface can be
+ * enabled while another is gated or empty. This probe samples a curated set of
+ * read-only surfaces and returns a classification instead of relying on one
+ * endpoint.
+ */
+import type { ExtensionAPI, ExtensionContext } from "@mariozechner/pi-coding-agent";
+import { Type } from "typebox";
+
+import { buildExecFn } from "../../../lib/common/exec-adapter.ts";
+import {
+  getCachedSfEnvironment,
+  getSharedSfEnvironment,
+} from "../../../lib/common/sf-environment/shared-runtime.ts";
+import type { SfEnvironment } from "../../../lib/common/sf-environment/types.ts";
+import { buildApiPath } from "./path.ts";
+
+export const D360_PROBE_TOOL_NAME = "d360_probe";
+
+export const D360ProbeParams = Type.Object({
+  target_org: Type.Optional(
+    Type.String({
+      description:
+        "Salesforce org alias or username. Defaults to the active sf-pi target org when available.",
+    }),
+  ),
+  timeout_ms: Type.Optional(
+    Type.Number({ description: "Optional per-probe timeout in milliseconds. Defaults to 45000." }),
+  ),
+});
+
+export interface D360ProbeInput {
+  target_org?: string;
+  timeout_ms?: number;
+}
+
+export type ProbeState =
+  | "enabled_populated"
+  | "enabled_empty"
+  | "ok"
+  | "feature_gated"
+  | "not_found"
+  | "tenant_missing"
+  | "cli_error"
+  | "unknown_error";
+
+export interface ProbeResult {
+  name: string;
+  path: string;
+  state: ProbeState;
+  count?: number;
+  keys?: string[];
+  message?: string;
+  featureCode?: string;
+  exitCode?: number | null;
+}
+
+const PROBES: Array<{ name: string; path: string; requiredForReady?: boolean }> = [
+  { name: "data_spaces", path: "/ssot/data-spaces", requiredForReady: true },
+  { name: "dmo_catalog", path: "/ssot/data-model-objects?limit=1", requiredForReady: true },
+  { name: "dlo_catalog", path: "/ssot/data-lake-objects?limit=1" },
+  { name: "data_streams", path: "/ssot/data-streams?limit=1" },
+  { name: "calculated_insights", path: "/ssot/calculated-insights?limit=1" },
+  { name: "connectors", path: "/ssot/connectors" },
+  { name: "connections_sfdc", path: "/ssot/connections?connectorType=SalesforceDotCom" },
+  { name: "segments", path: "/ssot/segments?limit=1" },
+  { name: "identity_resolution", path: "/ssot/identity-resolutions?limit=1" },
+  { name: "activations", path: "/ssot/activations?limit=1" },
+  { name: "data_transforms", path: "/ssot/data-transforms?limit=1" },
+  { name: "data_actions", path: "/ssot/data-actions?limit=1" },
+  { name: "semantic_models", path: "/ssot/semantic/models?limit=1" },
+  { name: "profile_metadata", path: "/ssot/profile/metadata" },
+  { name: "metadata_entities_dmo", path: "/ssot/metadata-entities?entityType=DataModelObject" },
+];
+
+export function registerD360ProbeTool(pi: ExtensionAPI): void {
+  const exec = buildExecFn(pi);
+
+  pi.registerTool({
+    name: D360_PROBE_TOOL_NAME,
+    label: "Data 360 Probe",
+    description:
+      "Run read-only probes to classify whether Data Cloud/Data 360 surfaces are available in a Salesforce org.",
+    promptSnippet: "Classify Data 360 readiness with read-only REST probes",
+    promptGuidelines: [
+      "Use d360_probe before Data 360 workflows when org readiness is uncertain.",
+      "Treat d360_probe partial results as phase-specific guidance, not as a single global on/off flag.",
+    ],
+    parameters: D360ProbeParams,
+    async execute(_toolCallId, params, signal, _onUpdate, ctx) {
+      const input = params as D360ProbeInput;
+      const env = await resolveEnvironment(exec, ctx);
+      const apiVersion = env.org.apiVersion ?? env.project.sourceApiVersion ?? "66.0";
+      const targetOrg =
+        input.target_org?.trim() || env.config.targetOrg || env.org.alias || env.org.username;
+      if (!targetOrg)
+        throw new Error(
+          "No Salesforce target org is configured. Pass target_org or set sf config target-org.",
+        );
+
+      const probes: ProbeResult[] = [];
+      for (const probe of PROBES) {
+        if (signal?.aborted) throw new Error("Data 360 readiness probe cancelled.");
+        const apiPath = buildApiPath(probe.path, apiVersion);
+        const raw = await pi.exec(
+          "sf",
+          [
+            "api",
+            "request",
+            "rest",
+            apiPath,
+            "--target-org",
+            targetOrg,
+            "--header",
+            "Accept: application/json",
+          ],
+          { signal, timeout: typeof input.timeout_ms === "number" ? input.timeout_ms : 45_000 },
+        );
+        probes.push(classifyProbeResult(probe.name, probe.path, raw.code, raw.stdout, raw.stderr));
+      }
+
+      const summary = summarizeReadiness(probes);
+      const text = JSON.stringify({ targetOrg, apiVersion, ...summary, probes }, null, 2);
+      return {
+        content: [{ type: "text", text }],
+        details: {
+          ok:
+            summary.state === "ready" ||
+            summary.state === "ready_empty" ||
+            summary.state === "partial",
+          targetOrg,
+          apiVersion,
+          ...summary,
+          probes,
+        },
+      };
+    },
+  });
+}
+
+async function resolveEnvironment(
+  exec: ReturnType<typeof buildExecFn>,
+  ctx: ExtensionContext,
+): Promise<SfEnvironment> {
+  return getCachedSfEnvironment(ctx.cwd) ?? (await getSharedSfEnvironment(exec, ctx.cwd));
+}
+
+export function classifyProbeResult(
+  name: string,
+  path: string,
+  exitCode: number | null,
+  stdout: string,
+  stderr: string,
+): ProbeResult {
+  const parsed = parseJson(stdout);
+  const message =
+    extractMessage(parsed) ||
+    stripAnsi(stderr)
+      .split("\n")
+      .find((line) => !line.includes("currently in beta"));
+  const featureCode = message?.match(/\[([A-Za-z0-9]+)\]/)?.[1];
+
+  if (message?.includes("This feature is not currently enabled")) {
+    return { name, path, state: "feature_gated", message, featureCode, exitCode };
+  }
+  if (message?.includes("Couldn't find CDP tenant ID")) {
+    return { name, path, state: "tenant_missing", message, exitCode };
+  }
+  if (exitCode !== 0) {
+    const state = message?.includes("requested resource does not exist")
+      ? "not_found"
+      : "cli_error";
+    return { name, path, state, message, exitCode };
+  }
+  if (!parsed || typeof parsed !== "object") {
+    return { name, path, state: "ok", exitCode };
+  }
+
+  const keys = Object.keys(parsed as Record<string, unknown>);
+  const count = inferCount(parsed);
+  if (typeof count === "number") {
+    return {
+      name,
+      path,
+      state: count > 0 ? "enabled_populated" : "enabled_empty",
+      count,
+      keys,
+      exitCode,
+    };
+  }
+  return { name, path, state: "ok", keys, exitCode };
+}
+
+export function summarizeReadiness(probes: ProbeResult[]): {
+  state: "ready" | "ready_empty" | "partial" | "blocked";
+  guidance: string;
+} {
+  const successes = probes.filter((probe) =>
+    ["enabled_populated", "enabled_empty", "ok"].includes(probe.state),
+  );
+  const populated = successes.some((probe) => probe.state === "enabled_populated");
+  const gated = probes.filter((probe) => probe.state === "feature_gated");
+  const required = new Set(
+    PROBES.filter((probe) => probe.requiredForReady).map((probe) => probe.name),
+  );
+  const requiredSuccess = probes.filter(
+    (probe) =>
+      required.has(probe.name) &&
+      ["enabled_populated", "enabled_empty", "ok"].includes(probe.state),
+  );
+
+  if (requiredSuccess.length === required.size && gated.length === 0) {
+    return {
+      state: populated ? "ready" : "ready_empty",
+      guidance: populated
+        ? "Core Data 360 surfaces are reachable and at least one probed surface has data."
+        : "Core Data 360 surfaces are reachable but the sampled surfaces appear empty.",
+    };
+  }
+  if (successes.length > 0) {
+    return {
+      state: "partial",
+      guidance:
+        "Some Data 360 surfaces are reachable, but one or more phase-specific surfaces are gated or unavailable. Continue only with the reachable phase and review gated feature codes.",
+    };
+  }
+  return {
+    state: "blocked",
+    guidance:
+      "No sampled Data 360 surfaces were reachable. Review Data Cloud provisioning, user permissions, and org readiness before running Data 360 workflows.",
+  };
+}
+
+function parseJson(text: string): unknown {
+  try {
+    return text.trim() ? JSON.parse(text) : null;
+  } catch {
+    return null;
+  }
+}
+
+function extractMessage(parsed: unknown): string | undefined {
+  if (Array.isArray(parsed)) {
+    const first = parsed[0] as { message?: unknown } | undefined;
+    return typeof first?.message === "string" ? first.message : undefined;
+  }
+  if (parsed && typeof parsed === "object") {
+    const obj = parsed as { message?: unknown; error?: { message?: unknown } };
+    if (typeof obj.message === "string") return obj.message;
+    if (typeof obj.error?.message === "string") return obj.error.message;
+  }
+  return undefined;
+}
+
+function inferCount(parsed: unknown): number | undefined {
+  if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) return undefined;
+  const obj = parsed as Record<string, unknown>;
+  if (typeof obj.totalSize === "number") return obj.totalSize;
+  for (const value of Object.values(obj)) {
+    if (Array.isArray(value)) return value.length;
+    if (value && typeof value === "object" && !Array.isArray(value)) {
+      const nested = value as Record<string, unknown>;
+      if (typeof nested.total === "number") return nested.total;
+      if (typeof nested.count === "number") return nested.count;
+      if (Array.isArray(nested.items)) return nested.items.length;
+    }
+  }
+  return undefined;
+}
+
+function stripAnsi(text: string): string {
+  return text.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, "").trim();
+}

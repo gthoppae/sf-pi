@@ -32,9 +32,32 @@ describe("sf-pi extension state", () => {
   it("reads disabled extension filters from project settings", () => {
     const cwd = makeCwd(["extensions/sf-slack/index.ts"]);
 
-    expect(getDisabledExtensionFilesForCwd(cwd)).toEqual(new Set(["extensions/sf-slack/index.ts"]));
+    expect(getDisabledExtensionFilesForCwd(cwd)).toEqual(
+      new Set(["extensions/sf-data360/index.ts", "extensions/sf-slack/index.ts"]),
+    );
     expect(isSfPiExtensionEnabled(cwd, "sf-slack")).toBe(false);
+    expect(isSfPiExtensionEnabled(cwd, "sf-data360")).toBe(false);
     expect(isSfPiExtensionEnabled(cwd, "sf-welcome")).toBe(true);
+  });
+
+  it("detects explicitly enabled default-off extensions", () => {
+    const cwd = mkdtempSync(join(tmpdir(), "sf-pi-extension-state-"));
+    const configDir = join(cwd, ".pi");
+    mkdirSync(configDir, { recursive: true });
+    writeFileSync(
+      join(configDir, "settings.json"),
+      `${JSON.stringify({
+        packages: [
+          {
+            source: "git:github.com/salesforce/sf-pi",
+            extensions: ["extensions/*/index.ts"],
+            enabledExtensions: ["extensions/sf-data360/index.ts"],
+          },
+        ],
+      })}\n`,
+    );
+
+    expect(isSfPiExtensionEnabled(cwd, "sf-data360")).toBe(true);
   });
 
   it("filters footer statuses by owning extension enablement", () => {

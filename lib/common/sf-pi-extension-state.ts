@@ -46,6 +46,9 @@ export function isSfPiExtensionEnabled(cwd: string, extensionId: SfPiExtensionId
   const extension = SF_PI_REGISTRY.find((entry) => entry.id === extensionId);
   if (!extension) return false;
   if (extension.alwaysActive) return true;
+  if (!extension.defaultEnabled) {
+    return getEnabledExtensionFilesForCwd(cwd).has(extension.file);
+  }
   return !getDisabledExtensionFilesForCwd(cwd).has(extension.file);
 }
 
@@ -64,25 +67,64 @@ export function filterEnabledExtensionStatuses(
   return filtered;
 }
 
+function getEnabledExtensionFilesForCwd(cwd: string): Set<string> {
+  const projectPath = projectSettingsPath(cwd);
+  const projectSettings = readJsonFile(projectPath);
+  const projectEntry = findSfPiPackageEntry(projectSettings, path.dirname(projectPath));
+  if (projectEntry) {
+    return getExplicitlyEnabledExtensions(projectSettings, projectEntry.index);
+  }
+
+  const globalPath = globalSettingsPath();
+  const globalSettings = readJsonFile(globalPath);
+  const globalEntry = findSfPiPackageEntry(globalSettings, path.dirname(globalPath));
+  return globalEntry
+    ? getExplicitlyEnabledExtensions(globalSettings, globalEntry.index)
+    : new Set();
+}
+
 function getDisabledExtensions(
   settings: Record<string, unknown>,
   packageIndex: number,
 ): Set<string> {
   const packages = Array.isArray(settings.packages) ? settings.packages : [];
   const pkg = packages[packageIndex];
-  if (!pkg || typeof pkg !== "object") return new Set();
+  if (!pkg || typeof pkg !== "object") return new Set(getDefaultDisabledFiles());
 
   const extensions = Array.isArray((pkg as Record<string, unknown>).extensions)
     ? ((pkg as Record<string, unknown>).extensions as unknown[])
     : [];
+  const explicitlyEnabled = getExplicitlyEnabledExtensions(settings, packageIndex);
 
   const disabled = new Set<string>();
+  for (const file of getDefaultDisabledFiles()) {
+    if (!explicitlyEnabled.has(file)) disabled.add(file);
+  }
   for (const pattern of extensions) {
     if (typeof pattern === "string" && pattern.startsWith("!")) {
       disabled.add(pattern.slice(1));
     }
   }
   return disabled;
+}
+
+function getExplicitlyEnabledExtensions(
+  settings: Record<string, unknown>,
+  packageIndex: number,
+): Set<string> {
+  const packages = Array.isArray(settings.packages) ? settings.packages : [];
+  const pkg = packages[packageIndex];
+  if (!pkg || typeof pkg !== "object") return new Set();
+  const enabledExtensions = Array.isArray((pkg as Record<string, unknown>).enabledExtensions)
+    ? ((pkg as Record<string, unknown>).enabledExtensions as unknown[])
+    : [];
+  return new Set(enabledExtensions.filter((entry): entry is string => typeof entry === "string"));
+}
+
+function getDefaultDisabledFiles(): string[] {
+  return SF_PI_REGISTRY.filter((entry) => !entry.defaultEnabled && !entry.alwaysActive).map(
+    (entry) => entry.file,
+  );
 }
 
 function findSfPiPackageEntry(

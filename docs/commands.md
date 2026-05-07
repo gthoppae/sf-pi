@@ -28,6 +28,14 @@ _High-density Salesforce operator kernel injected once per session — describe-
 - Default: **on**
 - Commands: _none_
 
+### [SF Data 360](../extensions/sf-data360/)
+
+_Data Cloud/Data 360 direct REST helper — one d360_api tool plus extension-owned progressive-disclosure skill references_
+
+- Default: **opt-in**
+- Commands: `/sf-data360`
+- Tools: `d360_api`, `d360_probe`
+
 ### [SF Feedback](../extensions/sf-feedback/)
 
 _Guided feedback and bug-report flow that collects sanitized SF Pi diagnostics and opens a GitHub issue_

@@ -1,0 +1,117 @@
+# SF Data 360 Query Patterns
+
+Use these patterns when inventing Data Cloud SQL, calculated insight SQL, and
+semantic queries. Data Cloud SQL is not CRM SOQL.
+
+## Discovery before query
+
+1. Run `d360_probe` if org readiness is uncertain.
+2. Use DMO/DLO list endpoints to find candidate objects.
+3. Use object metadata endpoints to inspect fields.
+4. Start with `COUNT(*)` or a very small `rowLimit`.
+5. Paginate through query status/rows endpoints only after the first query shape works.
+
+## Preferred SQL endpoint
+
+Use:
+
+```json
+{
+  "method": "POST",
+  "path": "/ssot/query-sql",
+  "body": {
+    "sql": "SELECT COUNT(*) record_count FROM SomeObject__dll",
+    "rowLimit": 1
+  }
+}
+```
+
+Use `GET /ssot/query-sql/{queryId}` for status and
+`GET /ssot/query-sql/{queryId}/rows?offset=0&rowLimit=100` for rows when the
+query returns a query id or requires pagination.
+
+## Table and field naming
+
+- Prefer names discovered from DLO/DMO/metadata endpoints.
+- Do not guess custom field names.
+- Quote table names if needed, but verify both quoted and unquoted forms if the query plane rejects a discovered catalog name.
+- A catalog object can exist while the query plane rejects it because the table is not queryable or external lake access is blocked.
+
+## Safe first query
+
+```sql
+SELECT COUNT(*) record_count FROM MyObject__dll
+```
+
+Then sample rows:
+
+```sql
+SELECT FieldA__c, FieldB__c FROM MyObject__dll LIMIT 10
+```
+
+## Calculated insight SQL rules
+
+Calculated insight SQL has stricter rules than ad hoc query SQL:
+
+- Use fully qualified `table.field` references.
+- `GROUP BY` should use full field references, not select aliases.
+- Prefer `APPROX_COUNT_DISTINCT(...)` instead of `COUNT(DISTINCT ...)`.
+- Avoid subqueries and subquery aliases.
+- Avoid unsupported casts such as `CAST(... AS FLOAT)`; return raw values and compute ratios downstream when needed.
+- Avoid date arithmetic forms that the CI validator rejects; use explicit filters supported by the target org.
+- Let the API derive dimensions/measures from the expression unless current docs say otherwise.
+
+## Segment SQL patterns
+
+Segments often use nested SQL under `includeDbt.models.models[].sql`. Keep the
+SQL focused on the segmented entity id and verify the base entity first.
+
+Pattern:
+
+```sql
+SELECT DISTINCT base.IdField__c
+FROM UnifiedOrBaseEntity__dlm base
+WHERE <conditions>
+```
+
+For readable member details after publishing, prefer SQL joins over opaque
+member-list output when available.
+
+## Semantic query body shape
+
+Semantic queries use `/semantic-engine/gateway`, not `/ssot/query-sql`.
+
+The body shape is:
+
+```json
+{
+  "semanticModelId": "MODEL_ID_OR_API_NAME",
+  "structuredSemanticQuery": {
+    "fields": [
+      {
+        "expression": {
+          "tableField": { "tableName": "DataObjectName", "name": "FieldName" }
+        },
+        "alias": "FieldAlias",
+        "rowGrouping": true
+      },
+      {
+        "expression": { "semanticField": { "name": "CalculatedOrMetricName" } },
+        "alias": "MetricAlias",
+        "semanticAggregationMethod": "SEMANTIC_AGGREGATION_METHOD_SUM"
+      }
+    ],
+    "options": { "limitOptions": { "limit": 10 } }
+  }
+}
+```
+
+Use `tableField` for fields on a semantic data object. Use `semanticField` for
+model-level calculated fields or metrics.
+
+## Recovery from query failures
+
+- `DataModelEntity not found` usually means the table name is wrong or not queryable.
+- `Couldn't find CDP tenant ID` is a query-plane readiness problem, not proof every Data Cloud endpoint is off.
+- External lake access errors can coexist with healthy catalog, stream, and semantic endpoints.
+- Fall back to catalog/metadata probes, choose another known DLO/DMO, and retry with `COUNT(*)`.

@@ -27,6 +27,22 @@ export const SF_PI_REGISTRY: readonly SfPiExtension[] = [
     events: ["before_agent_start"],
   },
   {
+    id: "sf-data360",
+    name: "SF Data 360",
+    description: "Data Cloud/Data 360 direct REST helper — one d360_api tool plus extension-owned progressive-disclosure skill references",
+    file: "extensions/sf-data360/index.ts",
+    category: "core",
+    defaultEnabled: false,
+    commands: ["/sf-data360"],
+    tools: ["d360_api","d360_probe"],
+    events: ["session_start","resources_discover"],
+    configurable: true,
+    getConfigPanel: async () => {
+      const mod = await import("../extensions/sf-data360/lib/config-panel.ts");
+      return mod.createConfigPanel;
+    },
+  },
+  {
     id: "sf-devbar",
     name: "SF DevBar",
     description: "Bespoke Salesforce developer status bar with org context, model info, git, and context window progress",

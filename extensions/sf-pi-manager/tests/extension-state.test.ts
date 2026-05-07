@@ -85,17 +85,17 @@ describe("buildExtensionStates", () => {
 // -------------------------------------------------------------------------------------------------
 
 describe("getDisabledExtensions", () => {
-  it("returns empty set for non-existent settings file", () => {
+  it("returns default-disabled extensions for non-existent settings file", () => {
     const result = getDisabledExtensions("/tmp/does-not-exist-sf-pi-test.json");
-    expect(result).toEqual(new Set());
+    expect(result).toContain("extensions/sf-data360/index.ts");
   });
 
-  it("returns empty set for string-form package entry", () => {
+  it("returns default-disabled extensions for string-form package entry", () => {
     const settingsPath = createTempSettingsFile({
       packages: [TEST_PACKAGE_SOURCE],
     });
 
-    expect(getDisabledExtensions(settingsPath)).toEqual(new Set());
+    expect(getDisabledExtensions(settingsPath)).toContain("extensions/sf-data360/index.ts");
   });
 
   it("reads exclusion patterns from object-form package entry", () => {
@@ -114,6 +114,7 @@ describe("getDisabledExtensions", () => {
 
     expect(getDisabledExtensions(settingsPath)).toEqual(
       new Set([
+        "extensions/sf-data360/index.ts",
         "extensions/sf-ohana-spinner/index.ts",
         "extensions/sf-llm-gateway-internal/index.ts",
       ]),
@@ -135,8 +136,22 @@ describe("getDisabledExtensions", () => {
     });
 
     expect(getDisabledExtensions(settingsPath)).toEqual(
-      new Set(["extensions/sf-ohana-spinner/index.ts"]),
+      new Set(["extensions/sf-data360/index.ts", "extensions/sf-ohana-spinner/index.ts"]),
     );
+  });
+
+  it("does not mark default-disabled extensions disabled when explicitly enabled", () => {
+    const settingsPath = createTempSettingsFile({
+      packages: [
+        {
+          source: TEST_PACKAGE_SOURCE,
+          extensions: ["extensions/*/index.ts"],
+          enabledExtensions: ["extensions/sf-data360/index.ts"],
+        },
+      ],
+    });
+
+    expect(getDisabledExtensions(settingsPath)).not.toContain("extensions/sf-data360/index.ts");
   });
 });
 
@@ -163,7 +178,7 @@ describe("applyExtensionState", () => {
         isObject: true,
         settingsPath,
       },
-      new Set(["extensions/sf-ohana-spinner/index.ts"]),
+      new Set(["extensions/sf-data360/index.ts", "extensions/sf-ohana-spinner/index.ts"]),
     );
 
     const updated = JSON.parse(readFileSync(settingsPath, "utf8")) as {
@@ -174,11 +189,15 @@ describe("applyExtensionState", () => {
       source: TEST_PACKAGE_SOURCE,
       skills: ["skills/*.md"],
       themes: ["themes/*.json"],
-      extensions: ["extensions/*/index.ts", "!extensions/sf-ohana-spinner/index.ts"],
+      extensions: [
+        "extensions/*/index.ts",
+        "!extensions/sf-data360/index.ts",
+        "!extensions/sf-ohana-spinner/index.ts",
+      ],
     });
   });
 
-  it("simplifies back to string-form package entry when all extensions are enabled", () => {
+  it("keeps object form when default-disabled extensions are explicitly enabled", () => {
     const settingsPath = createTempSettingsFile({
       packages: [
         {
@@ -203,7 +222,12 @@ describe("applyExtensionState", () => {
       packages: unknown[];
     };
 
-    expect(updated.packages[0]).toBe(TEST_PACKAGE_SOURCE);
+    expect(updated.packages[0]).toEqual({
+      source: TEST_PACKAGE_SOURCE,
+      extensions: ["extensions/*/index.ts"],
+      enabledExtensions: ["extensions/sf-data360/index.ts"],
+      skills: ["skills/*.md"],
+    });
   });
 
   it("round-trips with getDisabledExtensions", () => {
@@ -212,6 +236,7 @@ describe("applyExtensionState", () => {
     });
 
     const disabled = new Set([
+      "extensions/sf-data360/index.ts",
       "extensions/sf-ohana-spinner/index.ts",
       "extensions/sf-llm-gateway-internal/index.ts",
     ]);
