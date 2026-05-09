@@ -21,6 +21,10 @@ import {
 import { summarizeApiKeyGuidance, type GatewayRuntimeStatusState } from "./status.ts";
 import { formatTokens, formatUsd } from "./models.ts";
 import { GATEWAY_COMMAND_SURFACE, type GatewayPanelAction } from "./command-surface.ts";
+import {
+  buildToggleExtensionAction,
+  LIFECYCLE_GROUP,
+} from "../../sf-pi-manager/lib/extension-toggle.ts";
 
 export interface GatewayPanelOptions {
   providerRegistered: boolean;
@@ -44,7 +48,7 @@ export async function openGatewayPanel(
         { ...options, scope: currentGatewayPanelScope(options) },
         ctx.ui.theme,
       ),
-    actions: () => buildGatewayGroupedActionItems(currentGatewayPanelScope(options)),
+    actions: () => buildGatewayGroupedActionItems(currentGatewayPanelScope(options), ctx.cwd),
     closeValue: "close",
     state: options.state,
     onAction: options.onAction,
@@ -138,6 +142,7 @@ export function buildGatewayPanelStatusLines(
 // Exported for unit tests.
 export function buildGatewayGroupedActionItems(
   scope: "global" | "project",
+  cwd?: string,
 ): CommandPanelAction<GatewayPanelAction>[] {
   const items: CommandPanelAction<GatewayPanelAction>[] = [
     {
@@ -161,8 +166,22 @@ export function buildGatewayGroupedActionItems(
     value: "close",
     label: "Close",
     description: "Dismiss this panel.",
-    group: "Reference",
+    group: LIFECYCLE_GROUP,
   });
+
+  // Append the shared lifecycle toggle when a cwd is available, mirroring
+  // every other gold-standard /sf-* panel (sf-slack, sf-devbar, ...). The
+  // helper returns null for alwaysActive extensions, so this stays a
+  // safe append even though sf-llm-gateway-internal is currently togglable.
+  if (cwd) {
+    const toggle = buildToggleExtensionAction({
+      extensionId: "sf-llm-gateway-internal",
+      cwd,
+    });
+    if (toggle) {
+      items.push({ ...toggle, value: toggle.value as GatewayPanelAction });
+    }
+  }
 
   return items;
 }

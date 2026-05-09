@@ -39,10 +39,23 @@
  */
 import type {
   ExtensionAPI,
+  ExtensionCommandContext,
   ExtensionContext,
   KeybindingsManager,
   Theme,
 } from "@mariozechner/pi-coding-agent";
+import {
+  type CommandPanelAction,
+  type CommandPanelState,
+  openCommandPanel,
+} from "../../lib/common/command-panel.ts";
+import { openInfoPanel, type InfoPanelSeverity } from "../../lib/common/info-panel.ts";
+import {
+  buildToggleExtensionAction,
+  LIFECYCLE_GROUP,
+  performToggleExtension,
+  type LifecycleActionId,
+} from "../sf-pi-manager/lib/extension-toggle.ts";
 import type { SplashData } from "./lib/types.ts";
 import {
   matchesKey,
@@ -535,63 +548,214 @@ export default function sfWelcome(pi: ExtensionAPI) {
 
   // --- /sf-welcome command ---
   pi.registerCommand(COMMAND_NAME, {
-    description: "Show the sf-pi welcome splash screen summary",
-    handler: async (_args, ctx) => {
-      const modelName = ctx.model?.name || ctx.model?.id || "No model";
-      const providerName = ctx.model?.provider || "Unknown provider";
-
-      // Refresh the gateway's monthly-usage cache *before* reading it so the
-      // /sf-welcome summary matches the bottom-bar value even when the user
-      // runs the command mid-session. Without this, the handler would read
-      // stale cache or — if the cache was never populated — fall back to
-      // the local session-file estimate silently.
-      try {
-        await refreshMonthlyUsage(true, ctx.cwd);
-      } catch {
-        // Best-effort — refreshMonthlyUsage already captures the error on
-        // the cache and surfaces it through the "local estimate" suffix.
+    description: "Show the sf-pi welcome splash summary, status, and controls",
+    handler: async (args, ctx) => {
+      const sub = (args ?? "").trim().toLowerCase();
+      if (sub === "" && ctx.hasUI) {
+        await handleWelcomePanel(ctx);
+        return;
       }
-
-      const data = collectSplashData(modelName, providerName, ctx.cwd, MONTHLY_BUDGET_FALLBACK);
-
-      const healthLines = data.extensionHealth.map((ext) => {
-        const statusIcon = ext.status === "active" ? "●" : ext.status === "locked" ? "◆" : "○";
-        return `  ${statusIcon} ${ext.name} — ${ext.status}`;
-      });
-
-      const budgetLabel = data.monthlyBudget === null ? "∞" : `$${data.monthlyBudget}`;
-      const costPercent =
-        typeof data.monthlyBudget === "number" && data.monthlyBudget > 0
-          ? ` (${((data.monthlyCost / data.monthlyBudget) * 100).toFixed(1)}%)`
-          : "";
-      const sourceSuffix = data.monthlyUsageSource === "sessions" ? " (local estimate)" : "";
-      const gatewayStatus = data.gatewayVisible
-        ? (data.gatewayStatus?.kind ?? "not checked")
-        : "hidden";
-      const slackStatus = data.slackVisible ? (data.slackStatus?.kind ?? "not checked") : "hidden";
-
-      const lines = [
-        "sf-pi Welcome Summary",
-        "",
-        `Model: ${data.modelName}`,
-        `Provider: ${data.providerName}`,
-        "",
-        `Monthly cost: $${data.monthlyCost.toFixed(2)} / ${budgetLabel}${costPercent}${sourceSuffix}`,
-        `Gateway: ${gatewayStatus}`,
-        `Slack: ${slackStatus}`,
-        "",
-        "sf-pi Extensions:",
-        ...healthLines,
-        "",
-        `Loaded: ${data.loadedCounts.extensions} extensions, ${data.loadedCounts.skills} skills, ${data.loadedCounts.promptTemplates} prompt templates`,
-        "",
-        "Recent Sessions:",
-        ...data.recentSessions.map((s) => `  • ${s.name} (${s.timeAgo})`),
-      ];
-
-      ctx.ui.notify(lines.join("\n"), "info");
+      // Direct subcommand or headless invocation — emit the summary as plain
+      // text so `pi -p /sf-welcome` keeps printing something useful.
+      const summary = await buildWelcomeSummary(ctx);
+      if (ctx.hasUI) {
+        ctx.ui.notify(summary, "info");
+        return;
+      }
+      console.info(summary);
     },
   });
+
+  // ---------------------------------------------------------------------------
+  // /sf-welcome panel actions and helpers
+  // ---------------------------------------------------------------------------
+
+  type WelcomeAction = "summary" | "fonts" | "help" | "close" | LifecycleActionId;
+
+  const WELCOME_ACTIONS: CommandPanelAction<WelcomeAction>[] = [
+    {
+      value: "summary",
+      label: "Show splash summary",
+      description:
+        "Print the same model, monthly-cost, gateway/slack, extension health, and recent-session lines the splash shows on startup.",
+      group: "Diagnostics",
+    },
+    {
+      value: "fonts",
+      label: "Install bundled Nerd Font",
+      description:
+        "Install the MesloLGM Nerd Font Mono TTFs locally so terminal glyphs render correctly. Idempotent.",
+      group: "Configuration",
+    },
+    {
+      value: "help",
+      label: "Show help",
+      description:
+        "Print /sf-welcome usage, including how to re-run the splash and trigger the font installer.",
+      group: "Reference",
+    },
+    {
+      value: "close",
+      label: "Close",
+      description: "Dismiss this panel.",
+      group: LIFECYCLE_GROUP,
+    },
+  ];
+
+  function buildWelcomeActions(cwd: string): CommandPanelAction<WelcomeAction>[] {
+    const toggle = buildToggleExtensionAction({ extensionId: "sf-welcome", cwd });
+    return toggle ? [...WELCOME_ACTIONS, toggle] : WELCOME_ACTIONS;
+  }
+
+  async function handleWelcomePanel(ctx: ExtensionCommandContext): Promise<void> {
+    const panelState: CommandPanelState<WelcomeAction> = {};
+    await openCommandPanel(ctx, {
+      title: "👋 SF Welcome — status & controls",
+      subtitle:
+        "Re-display the splash summary, install bundled fonts, or toggle the splash itself.",
+      statusLines: () => buildWelcomePanelStatusLines(ctx),
+      actions: () => buildWelcomeActions(ctx.cwd),
+      closeValue: "close",
+      state: panelState,
+      onAction: (action) => handleWelcomeAction(ctx, action),
+    });
+  }
+
+  function buildWelcomePanelStatusLines(ctx: ExtensionCommandContext): string[] {
+    const enabled = isSfPiExtensionEnabled(ctx.cwd, "sf-welcome");
+    // isFontFamilyInstalled takes the platform; we pass nothing so it uses
+    // the current process.platform default. The font name is purely
+    // descriptive on the status line.
+    const fontsInstalled = isFontFamilyInstalled();
+    const decision = readWelcomeState().fontInstallDecision ?? "never asked";
+    return [
+      `${enabled ? "✓" : "✗"} Extension     ${enabled ? "enabled" : "disabled"}`,
+      `• Bundled font  ${fontsInstalled ? "installed" : "not installed"} (${FONT_FAMILY_NAME})`,
+      `• Font prompt   ${decision}`,
+    ];
+  }
+
+  async function handleWelcomeAction(
+    ctx: ExtensionCommandContext,
+    action: WelcomeAction,
+  ): Promise<void> {
+    if (action === "close") return;
+
+    if (action === "lifecycle.toggle") {
+      await performToggleExtension(ctx, "sf-welcome");
+      return;
+    }
+
+    if (action === "summary") {
+      const summary = await buildWelcomeSummary(ctx);
+      await emitWelcomeOutput(ctx, "sf-pi welcome summary", summary, "info");
+      return;
+    }
+
+    if (action === "fonts") {
+      const result = await runFontInstall(exec);
+      // Record that the user explicitly opted in so the one-time startup
+      // splash prompt does not ask again. Mirrors the /sf-setup-fonts
+      // command behavior.
+      writeWelcomeState({
+        fontInstallDecision: "yes",
+        fontInstallPromptedAt: new Date().toISOString(),
+      });
+      await emitWelcomeOutput(
+        ctx,
+        "Nerd Font install",
+        result.summary,
+        result.severity === "warning" ? "warning" : "info",
+      );
+      return;
+    }
+
+    if (action === "help") {
+      await emitWelcomeOutput(
+        ctx,
+        "sf-welcome help",
+        [
+          "sf-welcome — splash summary, font installer, and lifecycle toggle.",
+          "",
+          "Commands:",
+          "  /sf-welcome          Open the status & controls panel.",
+          "  /sf-welcome summary  Print the splash summary as text.",
+          "  /sf-setup-fonts      Install the bundled Nerd Font (alias of the panel action).",
+          "",
+          "Lifecycle:",
+          "  Disable here, or run /sf-pi disable sf-welcome to skip the splash.",
+        ].join("\n"),
+        "info",
+      );
+      return;
+    }
+  }
+
+  // Build the splash summary text used by both the panel "Show summary"
+  // action and the legacy /sf-welcome (no panel) plain-text fallback.
+  // Pulled out of the command handler so both call sites stay in sync.
+  async function buildWelcomeSummary(ctx: ExtensionContext): Promise<string> {
+    const modelName = ctx.model?.name || ctx.model?.id || "No model";
+    const providerName = ctx.model?.provider || "Unknown provider";
+
+    // Refresh the gateway's monthly-usage cache *before* reading it so the
+    // summary matches the bottom-bar value even when the user runs the
+    // command mid-session.
+    try {
+      await refreshMonthlyUsage(true, ctx.cwd);
+    } catch {
+      // Best-effort — refreshMonthlyUsage already captures the error on
+      // the cache and surfaces it through the "local estimate" suffix.
+    }
+
+    const data = collectSplashData(modelName, providerName, ctx.cwd, MONTHLY_BUDGET_FALLBACK);
+    const healthLines = data.extensionHealth.map((ext) => {
+      const statusIcon = ext.status === "active" ? "●" : ext.status === "locked" ? "◆" : "○";
+      return `  ${statusIcon} ${ext.name} — ${ext.status}`;
+    });
+    const budgetLabel = data.monthlyBudget === null ? "∞" : `$${data.monthlyBudget}`;
+    const costPercent =
+      typeof data.monthlyBudget === "number" && data.monthlyBudget > 0
+        ? ` (${((data.monthlyCost / data.monthlyBudget) * 100).toFixed(1)}%)`
+        : "";
+    const sourceSuffix = data.monthlyUsageSource === "sessions" ? " (local estimate)" : "";
+    const gatewayStatus = data.gatewayVisible
+      ? (data.gatewayStatus?.kind ?? "not checked")
+      : "hidden";
+    const slackStatus = data.slackVisible ? (data.slackStatus?.kind ?? "not checked") : "hidden";
+
+    return [
+      "sf-pi Welcome Summary",
+      "",
+      `Model: ${data.modelName}`,
+      `Provider: ${data.providerName}`,
+      "",
+      `Monthly cost: $${data.monthlyCost.toFixed(2)} / ${budgetLabel}${costPercent}${sourceSuffix}`,
+      `Gateway: ${gatewayStatus}`,
+      `Slack: ${slackStatus}`,
+      "",
+      "sf-pi Extensions:",
+      ...healthLines,
+      "",
+      `Loaded: ${data.loadedCounts.extensions} extensions, ${data.loadedCounts.skills} skills, ${data.loadedCounts.promptTemplates} prompt templates`,
+      "",
+      "Recent Sessions:",
+      ...data.recentSessions.map((s) => `  • ${s.name} (${s.timeAgo})`),
+    ].join("\n");
+  }
+
+  async function emitWelcomeOutput(
+    ctx: ExtensionCommandContext,
+    title: string,
+    body: string,
+    severity: InfoPanelSeverity,
+  ): Promise<void> {
+    if (ctx.hasUI) {
+      await openInfoPanel(ctx, { title, body, severity });
+      return;
+    }
+    console.info(body);
+  }
 
   // --- /sf-setup-fonts command ---
   //

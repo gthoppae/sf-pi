@@ -99,6 +99,21 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Features
 
+- **Drift migrations: sf-lsp, sf-llm-gateway-internal, and sf-welcome
+  adopt the standardized panel + popup pattern.**
+  - `/sf-lsp` keeps its rich Doctor + Recent activity panel but its
+    section labels now use the shared `toolTitle` color, every action
+    result (`Refresh doctor`, `Toggle verbose`, `Shut down LSP
+    servers`, ...) routes through `openInfoPanel` instead of dumping a
+    `notify` line, and a `Disable this extension` row joins the
+    actions list under a Lifecycle group.
+  - `/sf-llm-gateway-internal` was already using the shared command
+    panel; the lifecycle toggle row is now appended automatically.
+  - `/sf-welcome` now opens a standardized command panel with `Show
+    splash summary`, `Install bundled Nerd Font`, `Show help`, `Close`,
+    and `Disable this extension` actions. Direct invocations
+    (`/sf-welcome summary`) and headless mode keep their plain-text
+    output for `pi -p` callers and shell scripts.
 - **Lifecycle toggle action: every per-extension settings panel can
   enable/disable the extension without leaving the panel.** A new
   `extensions/sf-pi-manager/lib/extension-toggle.ts` exports

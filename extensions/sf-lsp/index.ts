@@ -28,6 +28,7 @@
 
 import type {
   ExtensionAPI,
+  ExtensionCommandContext,
   ExtensionContext,
   ToolResultEvent,
 } from "@mariozechner/pi-coding-agent";
@@ -64,6 +65,9 @@ import {
   type LspTranscriptDetails,
 } from "./lib/transcript.ts";
 import { openSfLspPanel, type SfLspPanelAction } from "./lib/panel.ts";
+import { openInfoPanel, type InfoPanelSeverity } from "../../lib/common/info-panel.ts";
+import { isSfPiExtensionEnabled } from "../../lib/common/sf-pi-extension-state.ts";
+import { performToggleExtension } from "../sf-pi-manager/lib/extension-toggle.ts";
 import {
   readEffectiveSfLspSettings,
   writeScopedSfLspSettings,
@@ -412,6 +416,10 @@ export default function sfLspExtension(pi: ExtensionAPI) {
             // that no longer mean anything.
             hudEnabled: false,
             verboseEnabled: uiSettings.verbose,
+            lifecycle: {
+              show: true,
+              enabled: isSfPiExtensionEnabled(ctx.cwd, "sf-lsp"),
+            },
           });
 
           await handlePanelAction(action, ctx);
@@ -533,9 +541,26 @@ export default function sfLspExtension(pi: ExtensionAPI) {
     });
   }
 
+  async function emitLspOutput(
+    ctx: ExtensionCommandContext,
+    title: string,
+    body: string,
+    severity: InfoPanelSeverity,
+  ): Promise<void> {
+    // Panel-driven action results route through openInfoPanel so they land
+    // in the same overlay surface used by sf-slack, sf-devbar, etc.
+    // Keeping ctx.ui.notify as a fallback for non-UI callers protects
+    // headless / pi -p flows.
+    if (ctx.hasUI) {
+      await openInfoPanel(ctx, { title, body, severity });
+      return;
+    }
+    console.info(body);
+  }
+
   async function handlePanelAction(
     action: SfLspPanelAction | null,
-    ctx: ExtensionContext,
+    ctx: ExtensionCommandContext,
   ): Promise<void> {
     if (!action || action === "close") return;
 
@@ -543,34 +568,52 @@ export default function sfLspExtension(pi: ExtensionAPI) {
       const statuses = await doctorLsp(ctx.cwd);
       seedFromDoctor(activity, statuses);
       setSfLspHealthFromDoctor(statuses);
-      if (ctx.hasUI) ctx.ui.notify("sf-lsp: doctor refreshed", "info");
+      await emitLspOutput(
+        ctx,
+        "sf-lsp doctor refreshed",
+        renderDoctorReport(statuses),
+        statuses.some((s) => !s.available) ? "warning" : "info",
+      );
       return;
     }
 
     if (action === "toggle-hud") {
       // HUD was retired — redirect to the doctor refresh so the action
       // doesn't silently no-op.
-      if (ctx.hasUI) {
-        ctx.ui.notify("sf-lsp HUD was retired — use the sf-devbar top-bar LSP segment.", "info");
-      }
+      await emitLspOutput(
+        ctx,
+        "sf-lsp HUD retired",
+        "sf-lsp HUD was retired — use the sf-devbar top-bar LSP segment.",
+        "info",
+      );
       return;
     }
 
     if (action === "toggle-verbose") {
       uiSettings = { ...uiSettings, verbose: !uiSettings.verbose };
       writeScopedSfLspSettings(ctx.cwd, "global", { verbose: uiSettings.verbose });
-      if (ctx.hasUI) {
-        ctx.ui.notify(
-          `sf-lsp verbose transcript ${uiSettings.verbose ? "enabled" : "disabled"}`,
-          "info",
-        );
-      }
+      await emitLspOutput(
+        ctx,
+        "sf-lsp verbose transcript",
+        `Verbose transcript rows ${uiSettings.verbose ? "enabled" : "disabled"}.`,
+        "info",
+      );
       return;
     }
 
     if (action === "shutdown-servers") {
       await shutdownLspClients();
-      if (ctx.hasUI) ctx.ui.notify("sf-lsp: LSP servers shut down (will restart lazily)", "info");
+      await emitLspOutput(
+        ctx,
+        "sf-lsp servers shut down",
+        "All LSP child processes have been shut down. They will restart lazily on the next check.",
+        "info",
+      );
+      return;
+    }
+
+    if (action === "lifecycle-toggle") {
+      await performToggleExtension(ctx, "sf-lsp");
       return;
     }
   }

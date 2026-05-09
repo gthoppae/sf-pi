@@ -203,7 +203,7 @@
     "entry": "extensions/sf-llm-gateway-internal/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 8731
+    "srcLoc": 8754
   },
   {
     "id": "sf-lsp",
@@ -227,7 +227,7 @@
     "entry": "extensions/sf-lsp/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 3745
+    "srcLoc": 3811
   },
   {
     "id": "sf-ohana-spinner",
@@ -359,6 +359,6 @@
     "entry": "extensions/sf-welcome/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 4147
+    "srcLoc": 4301
   }
 ]

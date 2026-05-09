@@ -110,6 +110,7 @@ extensions/sf-pi-manager/
     config-panel.ts         ← implementation module
     doctor-command.ts       ← implementation module
     extension-details.ts    ← implementation module
+    extension-toggle.ts     ← implementation module
     overlay.ts              ← implementation module
     package-state.ts        ← implementation module
     recommendations-install.ts← implementation module

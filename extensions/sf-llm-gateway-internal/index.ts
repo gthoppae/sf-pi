@@ -204,6 +204,7 @@ import {
 } from "./lib/command-surface.ts";
 import { type CommandPanelState } from "../../lib/common/command-panel.ts";
 import { openInfoPanel } from "../../lib/common/info-panel.ts";
+import { performToggleExtension } from "../sf-pi-manager/lib/extension-toggle.ts";
 import { openGatewayPanel } from "./lib/panel.ts";
 import {
   getMonthlyUsageState,
@@ -537,6 +538,10 @@ async function handlePanelCommand(pi: ExtensionAPI, ctx: ExtensionCommandContext
         return;
       }
       if (action === "close") return;
+      if (action === "lifecycle.toggle") {
+        await performToggleExtension(ctx, "sf-llm-gateway-internal");
+        return;
+      }
       await handlePanelAction(pi, ctx, action, scope);
     },
   });

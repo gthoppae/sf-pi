@@ -36,13 +36,22 @@ export type SfLspPanelAction =
   | "toggle-hud"
   | "toggle-verbose"
   | "shutdown-servers"
+  | "lifecycle-toggle"
   | "close";
+
+export interface SfLspPanelLifecycleOptions {
+  /** When true, the panel renders a Disable / Enable this extension row. */
+  show: boolean;
+  /** Current enablement state — controls the action label. */
+  enabled: boolean;
+}
 
 export interface SfLspPanelOptions {
   store: LspActivityStore;
   doctorStatuses: LspDoctorStatus[];
   hudEnabled: boolean;
   verboseEnabled: boolean;
+  lifecycle: SfLspPanelLifecycleOptions;
 }
 
 export async function openSfLspPanel(
@@ -58,19 +67,23 @@ export async function openSfLspPanel(
     );
     container.addChild(new Spacer(1));
 
-    container.addChild(new Text(theme.fg("muted", " Doctor"), 1, 0));
+    // Section headings use the shared `toolTitle` token to sit between the
+    // title (accent) and body rows (text). Matches the visual hierarchy
+    // contract in lib/common/command-panel.ts so /sf-lsp does not feel like
+    // an outlier next to /sf-slack, /sf-devbar, etc.
+    container.addChild(new Text(theme.fg("toolTitle", theme.bold(" DOCTOR")), 1, 0));
     for (const line of buildDoctorLines(options.doctorStatuses, theme)) {
       container.addChild(new Text(line, 1, 0));
     }
     container.addChild(new Spacer(1));
 
-    container.addChild(new Text(theme.fg("muted", " Recent activity"), 1, 0));
+    container.addChild(new Text(theme.fg("toolTitle", theme.bold(" RECENT ACTIVITY")), 1, 0));
     for (const line of buildRecentLines(options.store, theme)) {
       container.addChild(new Text(line, 1, 0));
     }
     container.addChild(new Spacer(1));
 
-    container.addChild(new Text(theme.fg("muted", " Actions"), 1, 0));
+    container.addChild(new Text(theme.fg("toolTitle", theme.bold(" ACTIONS")), 1, 0));
     const actionItems: SelectItem[] = [
       {
         value: "refresh-doctor",
@@ -92,6 +105,17 @@ export async function openSfLspPanel(
         label: "Shut down LSP servers",
         description: "Kill all child LSP processes; they restart lazily",
       },
+      ...(options.lifecycle.show
+        ? [
+            {
+              value: "lifecycle-toggle",
+              label: options.lifecycle.enabled ? "Disable this extension" : "Enable this extension",
+              description: options.lifecycle.enabled
+                ? "Add an exclusion for sf-lsp to your sf-pi settings and reload"
+                : "Remove the exclusion for sf-lsp from your sf-pi settings and reload",
+            },
+          ]
+        : []),
       {
         value: "close",
         label: "Close",
@@ -111,7 +135,9 @@ export async function openSfLspPanel(
     container.addChild(list);
 
     container.addChild(new Spacer(1));
-    container.addChild(new Text(theme.fg("dim", "↑↓ navigate • enter select • esc close"), 1, 0));
+    container.addChild(
+      new Text(theme.fg("dim", "↑↓ navigate • enter select • esc / type 'exit' to close"), 1, 0),
+    );
     container.addChild(new DynamicBorder((s: string) => theme.fg("accent", s)));
 
     return {

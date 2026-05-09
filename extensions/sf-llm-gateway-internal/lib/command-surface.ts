@@ -32,7 +32,7 @@ export type GatewayCommandId =
   | "beta"
   | "help";
 
-export type GatewayPanelAction = GatewayCommandId | "switch-scope" | "close";
+export type GatewayPanelAction = GatewayCommandId | "switch-scope" | "close" | "lifecycle.toggle";
 
 export type GatewayCommandSection = "Setup" | "Discovery & diagnostics" | "Utilities" | "Reference";
 
