@@ -56,6 +56,12 @@ import {
 } from "./lib/feedback.ts";
 import { probeDoctor, renderDoctorReport } from "./lib/doctor.ts";
 import {
+  buildToggleExtensionAction,
+  LIFECYCLE_GROUP,
+  performToggleExtension,
+  type LifecycleActionId,
+} from "../sf-pi-manager/lib/extension-toggle.ts";
+import {
   type CommandPanelAction,
   type CommandPanelState,
   openCommandPanel,
@@ -114,7 +120,7 @@ function registerCommand(pi: ExtensionAPI, state: AgentScriptAssistState): void 
   });
 }
 
-type AgentScriptAction = "doctor" | "check" | "help" | "close";
+type AgentScriptAction = "doctor" | "check" | "help" | "close" | LifecycleActionId;
 
 const AGENTSCRIPT_ACTIONS: CommandPanelAction<AgentScriptAction>[] = [
   {
@@ -139,9 +145,16 @@ const AGENTSCRIPT_ACTIONS: CommandPanelAction<AgentScriptAction>[] = [
     value: "close",
     label: "Close",
     description: "Dismiss this panel.",
-    group: "Reference",
+    group: LIFECYCLE_GROUP,
   },
 ];
+
+// Compose the live action list so the lifecycle toggle row reflects the
+// current enablement state on every panel open.
+function buildAgentScriptActions(cwd: string): CommandPanelAction<AgentScriptAction>[] {
+  const toggle = buildToggleExtensionAction({ extensionId: "sf-agentscript-assist", cwd });
+  return toggle ? [...AGENTSCRIPT_ACTIONS, toggle] : AGENTSCRIPT_ACTIONS;
+}
 
 async function handleAgentScriptPanel(
   ctx: ExtensionCommandContext,
@@ -157,7 +170,7 @@ async function handleAgentScriptPanel(
       `• Vendored path ${doctor.vendoredSdkPath}`,
       `• Session files ${state.lastStatusByFile.size} tracked file(s)`,
     ],
-    actions: AGENTSCRIPT_ACTIONS,
+    actions: () => buildAgentScriptActions(ctx.cwd),
     closeValue: "close",
     state: panelState,
     onAction: (action) => handleAgentScriptCommand(ctx, state, action, [], true),
@@ -171,6 +184,10 @@ async function handleAgentScriptCommand(
   args: string[],
   fromPanel = false,
 ): Promise<void> {
+  if (subcommand === "lifecycle.toggle") {
+    await performToggleExtension(ctx, "sf-agentscript-assist");
+    return;
+  }
   if (subcommand === "doctor") {
     const status = await probeDoctor(ctx.cwd);
     await emitAgentScriptOutput(

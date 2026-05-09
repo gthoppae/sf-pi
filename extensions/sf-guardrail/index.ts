@@ -64,6 +64,12 @@ import {
   type CommandPanelState,
   openCommandPanel,
 } from "../../lib/common/command-panel.ts";
+import {
+  buildToggleExtensionAction,
+  LIFECYCLE_GROUP,
+  performToggleExtension,
+  type LifecycleActionId,
+} from "../sf-pi-manager/lib/extension-toggle.ts";
 import { openInfoPanel } from "../../lib/common/info-panel.ts";
 import { requirePiVersion } from "../../lib/common/pi-compat.ts";
 import { record, readRecent } from "./lib/audit.ts";
@@ -204,7 +210,15 @@ export default function sfGuardrail(pi: ExtensionAPI) {
   });
 }
 
-type GuardrailAction = "status" | "list" | "audit" | "forget" | "install-preset" | "help" | "close";
+type GuardrailAction =
+  | "status"
+  | "list"
+  | "audit"
+  | "forget"
+  | "install-preset"
+  | "help"
+  | "close"
+  | LifecycleActionId;
 
 const GUARDRAIL_ACTIONS: CommandPanelAction<GuardrailAction>[] = [
   {
@@ -248,9 +262,16 @@ const GUARDRAIL_ACTIONS: CommandPanelAction<GuardrailAction>[] = [
     value: "close",
     label: "Close",
     description: "Dismiss this panel.",
-    group: "Reference",
+    group: LIFECYCLE_GROUP,
   },
 ];
+
+// Compose the live action list so the lifecycle toggle row reflects the
+// current enablement state on every panel open.
+function buildGuardrailActions(cwd: string): CommandPanelAction<GuardrailAction>[] {
+  const toggle = buildToggleExtensionAction({ extensionId: "sf-guardrail", cwd });
+  return toggle ? [...GUARDRAIL_ACTIONS, toggle] : GUARDRAIL_ACTIONS;
+}
 
 async function handleGuardrailPanel(ctx: ExtensionCommandContext): Promise<void> {
   const panelState: CommandPanelState<GuardrailAction> = {};
@@ -261,7 +282,7 @@ async function handleGuardrailPanel(ctx: ExtensionCommandContext): Promise<void>
       const { config, source } = loadConfig();
       return buildGuardrailPanelStatus(ctx, config, source);
     },
-    actions: GUARDRAIL_ACTIONS,
+    actions: () => buildGuardrailActions(ctx.cwd),
     closeValue: "close",
     state: panelState,
     onAction: (action) => handleGuardrailCommand(ctx, action, true),
@@ -273,6 +294,11 @@ async function handleGuardrailCommand(
   sub: string,
   fromPanel = false,
 ): Promise<void> {
+  if (sub === "lifecycle.toggle") {
+    await performToggleExtension(ctx, "sf-guardrail");
+    return;
+  }
+
   const { config, source } = loadConfig();
 
   if (sub === "status" || sub === "help") {

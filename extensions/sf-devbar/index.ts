@@ -67,6 +67,12 @@ import {
   openCommandPanel,
 } from "../../lib/common/command-panel.ts";
 import { openInfoPanel } from "../../lib/common/info-panel.ts";
+import {
+  buildToggleExtensionAction,
+  LIFECYCLE_GROUP,
+  performToggleExtension,
+  type LifecycleActionId,
+} from "../sf-pi-manager/lib/extension-toggle.ts";
 
 // -------------------------------------------------------------------------------------------------
 // Constants
@@ -484,7 +490,7 @@ export default function sfDevBar(pi: ExtensionAPI) {
     };
   });
 
-  type DevbarAction = "status" | "toggle" | "refresh" | "help" | "close";
+  type DevbarAction = "status" | "toggle" | "refresh" | "help" | "close" | LifecycleActionId;
 
   const DEVBAR_ACTIONS: CommandPanelAction<DevbarAction>[] = [
     {
@@ -516,9 +522,16 @@ export default function sfDevBar(pi: ExtensionAPI) {
       value: "close",
       label: "Close",
       description: "Dismiss this panel.",
-      group: "Reference",
+      group: LIFECYCLE_GROUP,
     },
   ];
+
+  // Compose the live action list so the lifecycle toggle row reflects the
+  // current enablement state on every panel open.
+  function buildDevbarActions(cwd: string): CommandPanelAction<DevbarAction>[] {
+    const toggle = buildToggleExtensionAction({ extensionId: "sf-devbar", cwd });
+    return toggle ? [...DEVBAR_ACTIONS, toggle] : DEVBAR_ACTIONS;
+  }
 
   async function handleDevbarPanel(ctx: ExtensionCommandContext): Promise<void> {
     const panelState: CommandPanelState<DevbarAction> = {};
@@ -526,7 +539,7 @@ export default function sfDevBar(pi: ExtensionAPI) {
       title: "📊 SF DevBar — status & controls",
       subtitle: "Manage the top status bar and Salesforce environment context.",
       statusLines: () => buildDevbarPanelStatus(ctx),
-      actions: DEVBAR_ACTIONS,
+      actions: () => buildDevbarActions(ctx.cwd),
       closeValue: "close",
       state: panelState,
       onAction: (action) => handleDevbarCommand(ctx, action, true),
@@ -538,6 +551,10 @@ export default function sfDevBar(pi: ExtensionAPI) {
     sub: string,
     fromPanel = false,
   ): Promise<void> {
+    if (sub === "lifecycle.toggle") {
+      await performToggleExtension(ctx, "sf-devbar");
+      return;
+    }
     if (sub === "help") {
       await emitDevbarOutput(ctx, "SF DevBar help", renderDevbarHelp(), "info", fromPanel);
       return;

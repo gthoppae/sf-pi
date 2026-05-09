@@ -21,7 +21,7 @@
     "entry": "extensions/sf-agentscript-assist/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 1420
+    "srcLoc": 1436
   },
   {
     "id": "sf-brain",
@@ -85,7 +85,7 @@
     "entry": "extensions/sf-data360/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 1647
+    "srcLoc": 1676
   },
   {
     "id": "sf-devbar",
@@ -115,7 +115,7 @@
     "entry": "extensions/sf-devbar/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 1509
+    "srcLoc": 1525
   },
   {
     "id": "sf-feedback",
@@ -149,7 +149,7 @@
     "entry": "extensions/sf-feedback/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 916
+    "srcLoc": 940
   },
   {
     "id": "sf-guardrail",
@@ -174,7 +174,7 @@
     "entry": "extensions/sf-guardrail/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 2014
+    "srcLoc": 2038
   },
   {
     "id": "sf-llm-gateway-internal",
@@ -271,7 +271,7 @@
     "entry": "extensions/sf-pi-manager/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 3240
+    "srcLoc": 3359
   },
   {
     "id": "sf-skills-hud",
@@ -297,7 +297,7 @@
     "entry": "extensions/sf-skills-hud/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 729
+    "srcLoc": 745
   },
   {
     "id": "sf-slack",
@@ -333,7 +333,7 @@
     "entry": "extensions/sf-slack/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 10649
+    "srcLoc": 10675
   },
   {
     "id": "sf-welcome",

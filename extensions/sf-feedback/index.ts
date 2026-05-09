@@ -34,6 +34,12 @@ import {
 } from "./lib/issue-template.ts";
 import { requirePiVersion } from "../../lib/common/pi-compat.ts";
 import {
+  buildToggleExtensionAction,
+  LIFECYCLE_GROUP,
+  performToggleExtension,
+  type LifecycleActionId,
+} from "../sf-pi-manager/lib/extension-toggle.ts";
+import {
   type CommandPanelAction,
   type CommandPanelState,
   openCommandPanel,
@@ -69,7 +75,15 @@ export default function sfFeedback(pi: ExtensionAPI) {
   });
 }
 
-type FeedbackAction = "bug" | "feature" | "setup" | "feedback" | "diagnostics" | "help" | "close";
+type FeedbackAction =
+  | "bug"
+  | "feature"
+  | "setup"
+  | "feedback"
+  | "diagnostics"
+  | "help"
+  | "close"
+  | LifecycleActionId;
 
 const FEEDBACK_ACTIONS: CommandPanelAction<FeedbackAction>[] = [
   {
@@ -113,9 +127,16 @@ const FEEDBACK_ACTIONS: CommandPanelAction<FeedbackAction>[] = [
     value: "close",
     label: "Close",
     description: "Dismiss this panel.",
-    group: "Reference",
+    group: LIFECYCLE_GROUP,
   },
 ];
+
+// Compose the live action list so the lifecycle toggle row reflects the
+// current enablement state on every panel open.
+function buildFeedbackActions(cwd: string): CommandPanelAction<FeedbackAction>[] {
+  const toggle = buildToggleExtensionAction({ extensionId: "sf-feedback", cwd });
+  return toggle ? [...FEEDBACK_ACTIONS, toggle] : FEEDBACK_ACTIONS;
+}
 
 async function handleFeedbackPanel(
   pi: ExtensionAPI,
@@ -131,7 +152,7 @@ async function handleFeedbackPanel(
       "✓ Confirmation  GitHub issue creation requires final approval",
       "• Headless      emits draft + URL only; never submits",
     ],
-    actions: FEEDBACK_ACTIONS,
+    actions: () => buildFeedbackActions(ctx.cwd),
     closeValue: "close",
     state: panelState,
     onAction: (action) => handleCommand(pi, ctx, exec, action),
@@ -146,6 +167,11 @@ async function handleCommand(
 ): Promise<void> {
   const args = rawArgs.trim().split(/\s+/).filter(Boolean);
   const subcommand = args[0]?.toLowerCase();
+
+  if (subcommand === "lifecycle.toggle") {
+    await performToggleExtension(ctx, "sf-feedback");
+    return;
+  }
 
   if (subcommand === "help") {
     await emitCommandOutput(pi, ctx, "SF Feedback help", renderHelp(), "info");

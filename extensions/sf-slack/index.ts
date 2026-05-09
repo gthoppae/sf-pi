@@ -93,6 +93,12 @@ import { renderStatsLines, resetStats, setStatsListener } from "./lib/stats.ts";
 import { classifySlackStatus, slackStatusLabel } from "./lib/status.ts";
 import { clearSlackStatus, setSlackStatus } from "../../lib/common/slack-status/store.ts";
 import {
+  buildToggleExtensionAction,
+  LIFECYCLE_GROUP,
+  performToggleExtension,
+  type LifecycleActionId,
+} from "../sf-pi-manager/lib/extension-toggle.ts";
+import {
   type CommandPanelAction,
   type CommandPanelState,
   openCommandPanel,
@@ -102,7 +108,14 @@ import { requirePiVersion } from "../../lib/common/pi-compat.ts";
 
 const RESEARCH_WIDGET_KEY = "sf-slack-research";
 
-type SlackCommandAction = "status" | "refresh" | "settings" | "sent" | "help" | "close";
+type SlackCommandAction =
+  | "status"
+  | "refresh"
+  | "settings"
+  | "sent"
+  | "help"
+  | "close"
+  | LifecycleActionId;
 
 const SLACK_COMMAND_ACTIONS: CommandPanelAction<SlackCommandAction>[] = [
   {
@@ -141,9 +154,19 @@ const SLACK_COMMAND_ACTIONS: CommandPanelAction<SlackCommandAction>[] = [
     value: "close",
     label: "Close",
     description: "Dismiss this panel.",
-    group: "Reference",
+    group: LIFECYCLE_GROUP,
   },
 ];
+
+// Compose the live action list at panel-open time. The toggle action's
+// label depends on the current enablement state, so we cannot cache a
+// single static array. `null` from the helper means "alwaysActive — hide
+// the toggle row entirely" (sf-slack itself is not alwaysActive, but
+// sharing the helper with every other panel keeps the pattern uniform).
+function buildSlackActions(cwd: string): CommandPanelAction<SlackCommandAction>[] {
+  const toggle = buildToggleExtensionAction({ extensionId: "sf-slack", cwd });
+  return toggle ? [...SLACK_COMMAND_ACTIONS, toggle] : SLACK_COMMAND_ACTIONS;
+}
 
 // ─── Extension entry point ──────────────────────────────────────────────────────
 
@@ -516,7 +539,7 @@ export default function sfSlack(pi: ExtensionAPI) {
       title: "💬 SF Slack — status & controls",
       subtitle: "Inspect auth, refresh Slack's scope grant, and tune Slack result rendering.",
       statusLines: () => buildSlackPanelStatus(),
-      actions: SLACK_COMMAND_ACTIONS,
+      actions: () => buildSlackActions(ctx.cwd),
       closeValue: "close",
       state: panelState,
       onAction: (action) => handleSlackCommand(action, ctx, true),
@@ -528,6 +551,10 @@ export default function sfSlack(pi: ExtensionAPI) {
     ctx: ExtensionCommandContext,
     fromPanel = false,
   ): Promise<void> {
+    if (sub === "lifecycle.toggle") {
+      await performToggleExtension(ctx, "sf-slack");
+      return;
+    }
     if (sub === "status") {
       await emitSlackOutput(
         ctx,

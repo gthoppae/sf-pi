@@ -99,6 +99,24 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Features
 
+- **Lifecycle toggle action: every per-extension settings panel can
+  enable/disable the extension without leaving the panel.** A new
+  `extensions/sf-pi-manager/lib/extension-toggle.ts` exports
+  `buildToggleExtensionAction` (a `CommandPanelAction` row whose label
+  flips between "Disable this extension" and "Enable this extension"
+  based on current state) and `performToggleExtension` (writes the
+  filter, reloads). Wired into sf-slack, sf-devbar, sf-guardrail,
+  sf-skills-hud, sf-feedback, sf-agentscript-assist, and sf-data360.
+  `alwaysActive` extensions (sf-pi-manager, sf-brain) hide the toggle
+  row, so the helper is safe to call unconditionally. The new shared
+  group is `Lifecycle` (also where Close lives), giving every panel one
+  predictable place for both the close action and the toggle.
+- **sf-data360: panel actions now render in a popup (`openInfoPanel`)
+  instead of a chat-line notify.** When `/sf-data360` is invoked from
+  the settings panel, action results (`Show status`, `Show help`)
+  surface in the same overlay surface used by sf-slack, sf-devbar, and
+  the rest of the suite. Direct command-line invocations and headless
+  mode keep their previous behavior.
 - **Shared command panel: distinct color hierarchy + `exit`/`quit` close
   keywords.** Every `/sf-*` panel rendered through
   `lib/common/command-panel.ts` previously painted the panel title,

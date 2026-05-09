@@ -40,6 +40,12 @@ import {
 } from "./lib/skill-state.ts";
 import { requirePiVersion } from "../../lib/common/pi-compat.ts";
 import {
+  buildToggleExtensionAction,
+  LIFECYCLE_GROUP,
+  performToggleExtension,
+  type LifecycleActionId,
+} from "../sf-pi-manager/lib/extension-toggle.ts";
+import {
   type CommandPanelAction,
   type CommandPanelState,
   openCommandPanel,
@@ -60,7 +66,7 @@ const EMPTY_STATE: SkillsHudState = {
   usedCount: 0,
 };
 
-type SkillsAction = "summary" | "help" | "close";
+type SkillsAction = "summary" | "help" | "close" | LifecycleActionId;
 
 const SKILLS_ACTIONS: CommandPanelAction<SkillsAction>[] = [
   {
@@ -79,9 +85,16 @@ const SKILLS_ACTIONS: CommandPanelAction<SkillsAction>[] = [
     value: "close",
     label: "Close",
     description: "Dismiss this panel.",
-    group: "Reference",
+    group: LIFECYCLE_GROUP,
   },
 ];
+
+// Compose the live action list so the lifecycle toggle row reflects the
+// current enablement state on every panel open.
+function buildSkillsActions(cwd: string): CommandPanelAction<SkillsAction>[] {
+  const toggle = buildToggleExtensionAction({ extensionId: "sf-skills-hud", cwd });
+  return toggle ? [...SKILLS_ACTIONS, toggle] : SKILLS_ACTIONS;
+}
 
 function renderSkillsHelp(): string {
   return [
@@ -241,7 +254,7 @@ export default function sfSkillsHud(pi: ExtensionAPI) {
           `• Discovered     ${hudState.discoveredCount}`,
         ];
       },
-      actions: SKILLS_ACTIONS,
+      actions: () => buildSkillsActions(ctx.cwd),
       closeValue: "close",
       state: panelState,
       onAction: (action) => handleSkillsCommand(ctx, action, true),
@@ -253,6 +266,10 @@ export default function sfSkillsHud(pi: ExtensionAPI) {
     subcommand: string,
     fromPanel = false,
   ): Promise<void> {
+    if (subcommand === "lifecycle.toggle") {
+      await performToggleExtension(ctx, "sf-skills-hud");
+      return;
+    }
     if (subcommand === "help") {
       await emitSkillsOutput(ctx, "SF Skills HUD help", renderSkillsHelp(), "info", fromPanel);
       return;
