@@ -176,6 +176,12 @@ export default function sfSlack(pi: ExtensionAPI) {
   if (!requirePiVersion(pi, "sf-slack")) return;
 
   let identity: SlackIdentity | null = null;
+  // Last error captured by session_start / /sf-slack refresh, exposed via
+  // buildSlackPanelStatus() so users can see *which* step failed and why
+  // without grepping pi logs. Cleared on a successful detection or
+  // explicit refresh.
+  let lastError: { step: "auth.test" | "probe-or-prewarm" | "unknown"; message: string } | null =
+    null;
   // Count of scopes we asked for at OAuth time that Slack did NOT actually
   // grant this token. Populated by the header-driven scope probe. This is
   // surfaced as a neutral partial-grant signal because many workspaces
@@ -480,6 +486,7 @@ export default function sfSlack(pi: ExtensionAPI) {
       missingGrantedScopeCount = probeResult.missingGrantedScopes.length;
       grantedScopeCount = computeGrantedRequestedScopeCount(grantedScopes, requestedScopes);
 
+      lastError = null;
       updateStatus(ctx, "connected", generation);
     } catch (error) {
       // Distinguish user-cancelled (ctx.signal aborted, e.g. session_shutdown
@@ -490,6 +497,22 @@ export default function sfSlack(pi: ExtensionAPI) {
       // do not stay stuck at "loading" forever when the network or Slack
       // upstream is unreachable.
       if (isAbortError(error) && ctx.signal?.aborted) return;
+      const message = error instanceof Error ? error.message : String(error);
+      // Best-effort step attribution: identity has been set if and only if
+      // auth.test succeeded, so a still-null identity points at auth.test
+      // (or its surrounding setup); otherwise the failure was inside the
+      // Promise.all([probeAndGateTools, prewarmUserCache, prewarmChannelCache]).
+      lastError = {
+        step: identity ? "probe-or-prewarm" : "auth.test",
+        message,
+      };
+      // Surface the failure inline so the user is not stuck staring at a
+      // generic "Auth error" pill with no clue why. Keeps quiet for headless
+      // mode and for previously-seen errors so we do not spam the same toast
+      // on every reload.
+      if (ctx.hasUI) {
+        ctx.ui.notify(`Slack ${lastError.step} failed: ${message}`, "warning");
+      }
       deactivateSlackTools(pi);
       updateStatus(ctx, "error", generation);
     }
@@ -633,31 +656,33 @@ export default function sfSlack(pi: ExtensionAPI) {
           const grantedScopes = getGrantedScopes();
           missingGrantedScopeCount = probeResult.missingGrantedScopes.length;
           grantedScopeCount = computeGrantedRequestedScopeCount(grantedScopes, requestedScopes);
+          lastError = null;
           updateStatus(ctx, "connected", generation);
           const status = await buildAuthStatus(ctx);
           if (!isActiveSession(ctx, generation)) return;
           ctx.ui.setStatus(`-command`, undefined);
           await emitSlackOutput(ctx, "SF Slack refreshed", status, "success", fromPanel);
         } else {
+          const errMessage = (authResult as ApiErr).error;
+          lastError = { step: "auth.test", message: errMessage };
           deactivateSlackTools(pi);
           updateStatus(ctx, "error", generation);
           ctx.ui.setStatus(`-command`, undefined);
-          await emitSlackOutput(
-            ctx,
-            "Slack auth.test failed",
-            (authResult as ApiErr).error,
-            "error",
-            fromPanel,
-          );
+          await emitSlackOutput(ctx, "Slack auth.test failed", errMessage, "error", fromPanel);
         }
       } catch (err) {
         // See session_start handler for why we look at ctx.signal.aborted
         // instead of treating every AbortError as a user cancellation.
         if (isAbortError(err) && ctx.signal?.aborted) return;
+        const message = err instanceof Error ? err.message : String(err);
+        lastError = {
+          step: identity ? "probe-or-prewarm" : "auth.test",
+          message,
+        };
         deactivateSlackTools(pi);
         updateStatus(ctx, "error", generation);
         ctx.ui.setStatus(`-command`, undefined);
-        await emitSlackOutput(ctx, "Slack detection failed", String(err), "error", fromPanel);
+        await emitSlackOutput(ctx, "Slack detection failed", message, "error", fromPanel);
       }
       return;
     }
@@ -734,7 +759,7 @@ export default function sfSlack(pi: ExtensionAPI) {
       missingGrantedScopeCount,
     });
     const prefs = getPreferences();
-    return [
+    const lines = [
       `${identity ? "✓" : "○"} Identity      ${identity ? `@${identity.userName} (${identity.teamId})` : "not detected"}`,
       `${slackToolsRegistered ? "✓" : "○"} Tools         ${slackToolsRegistered ? "registered" : "not registered"}`,
       `${kind === "ready" || kind === "partial-grant" ? "✓" : "○"} Status        ${slackStatusLabel(kind)}`,
@@ -742,6 +767,10 @@ export default function sfSlack(pi: ExtensionAPI) {
       `• Token         ${tokenType}`,
       `• Preferences   fields=${prefs.defaultFields}, widget=${prefs.showWidget}`,
     ];
+    if (lastError) {
+      lines.push(`✗ Last error    ${lastError.step}: ${lastError.message}`);
+    }
+    return lines;
   }
 
   function renderSlackHelp(): string {
