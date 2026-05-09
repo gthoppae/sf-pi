@@ -12,7 +12,54 @@ See also:
 - [`README.md`](../README.md) — install, quick start, bundled extensions
 - [`ARCHITECTURE.md`](../ARCHITECTURE.md) — repo structure and conventions
 
-## Core
+## Manager
+
+### [SF Pi Manager](../extensions/sf-pi-manager/)
+
+_Core manager — provides /sf-pi commands_
+
+- Default: **always-on**
+- Commands: `/sf-pi`
+
+## Provider
+
+### [SF LLM Gateway Internal](../extensions/sf-llm-gateway-internal/)
+
+_Salesforce LLM Gateway provider with model discovery_
+
+- Default: **on**
+- Commands: `/sf-llm-gateway`, `/sf-llm-gateway-internal`
+- Providers: `sf-llm-gateway-internal`
+
+## Agent-tool
+
+### [SF Data 360](../extensions/sf-data360/)
+
+_Data Cloud/Data 360 direct REST helper — d360_api, compact d360_metadata discovery, d360_probe, and extension-owned progressive-disclosure skill references_
+
+- Default: **on**
+- Commands: `/sf-data360`
+- Tools: `d360_api`, `d360_metadata`, `d360_probe`
+
+### [SF Slack](../extensions/sf-slack/)
+
+_Slack integration — search messages, read threads, browse channel history_
+
+- Default: **on**
+- Commands: `/sf-slack`
+- Tools: `slack`, `slack_time_range`, `slack_resolve`, `slack_research`, `slack_channel`, `slack_user`, `slack_file`, `slack_canvas`, `slack_send`
+- Providers: `sf-slack`
+
+## Safety
+
+### [SF Guardrail](../extensions/sf-guardrail/)
+
+_Salesforce-aware safety hooks — file protection policies, dangerous-command gating, and org-aware confirmation for production deploys, apex runs, and data mutations_
+
+- Default: **on**
+- Commands: `/sf-guardrail`
+
+## Assistive
 
 ### [SF Agent Script Assist](../extensions/sf-agentscript-assist/)
 
@@ -28,14 +75,6 @@ _High-density Salesforce operator kernel injected once per session — describe-
 - Default: **on**
 - Commands: _none_
 
-### [SF Data 360](../extensions/sf-data360/)
-
-_Data Cloud/Data 360 direct REST helper — d360_api, compact d360_metadata discovery, d360_probe, and extension-owned progressive-disclosure skill references_
-
-- Default: **on**
-- Commands: `/sf-data360`
-- Tools: `d360_api`, `d360_metadata`, `d360_probe`
-
 ### [SF Feedback](../extensions/sf-feedback/)
 
 _Guided feedback and bug-report flow that collects sanitized SF Pi diagnostics and opens a GitHub issue_
@@ -43,45 +82,12 @@ _Guided feedback and bug-report flow that collects sanitized SF Pi diagnostics a
 - Default: **on**
 - Commands: `/sf-feedback`
 
-### [SF Guardrail](../extensions/sf-guardrail/)
-
-_Salesforce-aware safety hooks — file protection policies, dangerous-command gating, and org-aware confirmation for production deploys, apex runs, and data mutations_
-
-- Default: **on**
-- Commands: `/sf-guardrail`
-
 ### [SF LSP](../extensions/sf-lsp/)
 
 _Real-time Salesforce LSP diagnostics on write/edit with a working-indicator spinner, transcript rows, and a permanent top-bar health segment in sf-devbar_
 
 - Default: **on**
 - Commands: `/sf-lsp`
-
-### [SF Pi Manager](../extensions/sf-pi-manager/)
-
-_Core manager — provides /sf-pi commands_
-
-- Default: **always-on**
-- Commands: `/sf-pi`
-
-### [SF Slack](../extensions/sf-slack/)
-
-_Slack integration — search messages, read threads, browse channel history_
-
-- Default: **on**
-- Commands: `/sf-slack`
-- Tools: `slack`, `slack_time_range`, `slack_resolve`, `slack_research`, `slack_channel`, `slack_user`, `slack_file`, `slack_canvas`, `slack_send`
-- Providers: `sf-slack`
-
-## Provider
-
-### [SF LLM Gateway Internal](../extensions/sf-llm-gateway-internal/)
-
-_Salesforce LLM Gateway provider with model discovery_
-
-- Default: **on**
-- Commands: `/sf-llm-gateway`, `/sf-llm-gateway-internal`
-- Providers: `sf-llm-gateway-internal`
 
 ## Ui
 

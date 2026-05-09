@@ -93,6 +93,43 @@ sf-brain, sf-ohana-spinner, sf-lsp). New extensions scaffolded via
 `npm run scaffold` start from this template and pass the lint on
 first commit.
 
+### Tool registration convention
+
+When an extension contributes LLM tools (anything in `manifest.tools`):
+
+1. **One file per tool**, named `lib/<tool-name>-tool.ts`. Examples:
+   `lib/d360_api-tool.ts` would be ideal but the historical names
+   `lib/api-tool.ts` (sf-data360) and `lib/research-tool.ts` (sf-slack)
+   are also acceptable as long as the file owns exactly one tool.
+2. **Export a `register<PascalCase>Tool(pi)` function** from that file.
+   The entry point or session_start handler calls it. Tools with shared
+   plumbing (sf-slack) can keep that plumbing in `lib/api.ts` and reuse
+   it across per-tool files.
+3. **Declare the tool name as an exported `const`** (`export const X_TOOL_NAME = "x";`)
+   so panels and config-panel UIs can reference it without a magic string.
+4. The `npm run docs:health:check` lint enforces that every name in
+   `manifest.tools` resolves to a `pi.registerTool` call and an exact
+   string literal in the extension source. Renaming a tool requires
+   updating the manifest and the const in lockstep.
+
+Reference implementations: `extensions/sf-data360/lib/{api,metadata,probe}-tool.ts`
+and `extensions/sf-slack/lib/{research,send,canvas,channel,user,file,resolve,time-range}-tool.ts`.
+
+### Canonical panel filenames
+
+ADR 0005 reserves three filenames for the three panel surfaces. The
+`npm run check:panels` lint refuses the deprecated names.
+
+| Filename                   | Purpose                                                                                                             |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `lib/command-panel.ts`     | The no-args slash-command status & actions panel (built on `lib/common/command-panel.ts`).                          |
+| `lib/config-panel.ts`      | The `ConfigPanelFactory` invoked by sf-pi-manager when `manifest.configurable === true`. Required for that surface. |
+| `lib/preferences-panel.ts` | A separate mutable user-preferences UI when distinct from `config-panel.ts` (e.g. opened by `/sf-<id> settings`).   |
+
+Most extensions inline their command panel directly in `index.ts` and
+never need a separate file; pull it out only when the panel logic
+exceeds ~50 lines.
+
 ## Editing rules
 
 ### Keep the code simple

@@ -2,6 +2,11 @@
 /**
  * `/sf-slack settings` TUI — pi-native SettingsList (docs/tui.md Pattern 3).
  *
+ * Naming convention (sf-pi standard):
+ *   - `lib/command-panel.ts`     — the no-args slash-command status & actions panel
+ *   - `lib/config-panel.ts`      — ConfigPanelFactory invoked by sf-pi-manager
+ *   - `lib/preferences-panel.ts` — mutable user-preference editor (this file)
+ *
  * Exposes three user-facing toggles that the LLM-side and TUI-side code both
  * read via preferences.ts:
  *
@@ -19,17 +24,23 @@ import { Container, type SettingItem, SettingsList, Text } from "@earendil-works
 import { resolveUiGlyphs } from "../../../lib/common/ui-glyphs.ts";
 import type { DefaultFieldsMode, OnOff, SlackPreferences, ThreadBodyMode } from "./preferences.ts";
 
-export interface SettingsPanelOptions {
+export interface PreferencesPanelOptions {
   /** Called when the user changes a row. The caller is responsible for
    *  persisting via pi.appendEntry and updating in-memory preferences. */
   onChange: (prefs: SlackPreferences) => void;
 }
 
+/**
+ * Backwards-compatible alias so older imports keep working while the
+ * canonical name lands across the repo.
+ */
+export type SettingsPanelOptions = PreferencesPanelOptions;
+
 /** Opens the SettingsList overlay. Returns when the user dismisses it. */
-export async function openSettingsPanel(
+export async function openPreferencesPanel(
   ctx: ExtensionContext,
   current: SlackPreferences,
-  options: SettingsPanelOptions,
+  options: PreferencesPanelOptions,
 ): Promise<void> {
   const working: SlackPreferences = { ...current };
   const glyphs = resolveUiGlyphs(ctx.cwd);
@@ -122,3 +133,6 @@ export async function openSettingsPanel(
     };
   });
 }
+
+// Legacy alias kept for one release while callers migrate to openPreferencesPanel.
+export const openSettingsPanel = openPreferencesPanel;

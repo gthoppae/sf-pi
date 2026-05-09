@@ -3,7 +3,8 @@
     "id": "sf-agentscript-assist",
     "name": "SF Agent Script Assist",
     "description": "In-process Agent Script authoring companion — parse, compile, and code-action feedback on every .agent write",
-    "category": "core",
+    "category": "assistive",
+    "maturity": "stable",
     "defaultEnabled": true,
     "alwaysActive": false,
     "configurable": false,
@@ -17,7 +18,21 @@
       "session_shutdown",
       "tool_result"
     ],
-    "docs": {},
+    "docs": {
+      "summary": "Advisory diagnostics for `.agent` files: vendored SDK parses + compiles after every write/edit and appends LSP-style feedback into the tool result.",
+      "primaryFiles": [
+        "index.ts",
+        "lib/diagnostics.ts",
+        "lib/feedback.ts",
+        "lib/sdk.ts",
+        "lib/file-classify.ts",
+        "lib/code-actions.ts"
+      ],
+      "safety": [
+        "Stays silent on unsupported files and on failed write/edit results.",
+        "Never overrides the built-in write/edit tools."
+      ]
+    },
     "entry": "extensions/sf-agentscript-assist/index.ts",
     "hasReadme": true,
     "hasTests": true,
@@ -27,7 +42,8 @@
     "id": "sf-brain",
     "name": "SF Brain",
     "description": "High-density Salesforce operator kernel injected once per session — describe-before-query rules, API picker, anonymous Apex verification loop, and CLI power moves",
-    "category": "core",
+    "category": "assistive",
+    "maturity": "stable",
     "defaultEnabled": true,
     "alwaysActive": false,
     "configurable": false,
@@ -37,7 +53,21 @@
     "events": [
       "before_agent_start"
     ],
-    "docs": {},
+    "docs": {
+      "summary": "Injects the Salesforce Operator Kernel as a persistent hidden message exactly once per session so providers benefit from prompt caching and /resume replays it for free.",
+      "primaryFiles": [
+        "index.ts",
+        "lib/kernel.ts",
+        "SF_KERNEL.md"
+      ],
+      "stateFiles": [
+        "<globalAgentDir>/sf-brain/SF_KERNEL.md"
+      ],
+      "safety": [
+        "Never registers tools or mutates settings; the kernel is delivered through the session entry log only.",
+        "Honors a user override at <globalAgentDir>/sf-brain/SF_KERNEL.md."
+      ]
+    },
     "entry": "extensions/sf-brain/index.ts",
     "hasReadme": true,
     "hasTests": true,
@@ -47,7 +77,8 @@
     "id": "sf-data360",
     "name": "SF Data 360",
     "description": "Data Cloud/Data 360 direct REST helper — d360_api, compact d360_metadata discovery, d360_probe, and extension-owned progressive-disclosure skill references",
-    "category": "core",
+    "category": "agent-tool",
+    "maturity": "stable",
     "defaultEnabled": true,
     "alwaysActive": false,
     "configurable": true,
@@ -92,6 +123,7 @@
     "name": "SF DevBar",
     "description": "Bespoke Salesforce developer status bar with org context, model info, git, and context window progress",
     "category": "ui",
+    "maturity": "stable",
     "defaultEnabled": true,
     "alwaysActive": false,
     "configurable": false,
@@ -111,7 +143,16 @@
       "agent_end",
       "before_agent_start"
     ],
-    "docs": {},
+    "docs": {
+      "summary": "Two non-blocking status bars: a top widget with model/thinking/git/context, and a custom footer with project-scoped org info, monthly LLM-gateway budget, and active extension counts.",
+      "primaryFiles": [
+        "index.ts",
+        "lib/top-bar.ts",
+        "lib/bottom-bar.ts",
+        "lib/git-changes.ts",
+        "lib/settings-reader.ts"
+      ]
+    },
     "entry": "extensions/sf-devbar/index.ts",
     "hasReadme": true,
     "hasTests": true,
@@ -121,7 +162,8 @@
     "id": "sf-feedback",
     "name": "SF Feedback",
     "description": "Guided feedback and bug-report flow that collects sanitized SF Pi diagnostics and opens a GitHub issue",
-    "category": "core",
+    "category": "assistive",
+    "maturity": "stable",
     "defaultEnabled": true,
     "alwaysActive": false,
     "configurable": false,
@@ -149,13 +191,14 @@
     "entry": "extensions/sf-feedback/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 944
+    "srcLoc": 934
   },
   {
     "id": "sf-guardrail",
     "name": "SF Guardrail",
     "description": "Salesforce-aware safety hooks — file protection policies, dangerous-command gating, and org-aware confirmation for production deploys, apex runs, and data mutations",
-    "category": "core",
+    "category": "safety",
+    "maturity": "stable",
     "defaultEnabled": true,
     "alwaysActive": false,
     "configurable": true,
@@ -170,7 +213,30 @@
       "before_agent_start",
       "tool_call"
     ],
-    "docs": {},
+    "docs": {
+      "summary": "Salesforce-aware safety layer for pi: file-protection policies, AST-matched command gating, org-aware confirmation on production deploys/Apex/DML/destructive REST, plus a once-per-session prompt-injection that teaches the LLM the gating categories and validate-first workflow.",
+      "primaryFiles": [
+        "index.ts",
+        "lib/classify.ts",
+        "lib/policies.ts",
+        "lib/command-gate.ts",
+        "lib/org-aware-gate.ts",
+        "lib/hitl.ts",
+        "lib/audit.ts",
+        "lib/config.ts"
+      ],
+      "stateFiles": [
+        "session entries: SF_GUARDRAIL_DEFAULTS allow/deny memory and audit decisions"
+      ],
+      "env": [
+        "SF_GUARDRAIL_ALLOW_HEADLESS"
+      ],
+      "safety": [
+        "Fail-closed in headless mode unless SF_GUARDRAIL_ALLOW_HEADLESS=1.",
+        "Every block / allow / confirm decision is persisted as an audit entry.",
+        "alwaysActive=false but disabling removes the safety layer entirely; the manager surfaces this clearly."
+      ]
+    },
     "entry": "extensions/sf-guardrail/index.ts",
     "hasReadme": true,
     "hasTests": true,
@@ -181,6 +247,7 @@
     "name": "SF LLM Gateway Internal",
     "description": "Salesforce LLM Gateway provider with model discovery",
     "category": "provider",
+    "maturity": "stable",
     "defaultEnabled": true,
     "alwaysActive": false,
     "configurable": true,
@@ -199,7 +266,28 @@
       "after_provider_response",
       "session_shutdown"
     ],
-    "docs": {},
+    "docs": {
+      "summary": "Single pi-native provider for the Salesforce LLM Gateway. Static bootstrap catalog plus dynamic /v1/models discovery, family-aware presets, OpenAI-compat dispatcher that delegates Claude ids to the native Anthropic transport, and footer status with model + context + monthly usage.",
+      "primaryFiles": [
+        "index.ts",
+        "lib/discovery.ts",
+        "lib/transport.ts",
+        "lib/models.ts",
+        "lib/config.ts",
+        "lib/config-panel.ts",
+        "lib/command-panel.ts",
+        "lib/monthly-usage.ts",
+        "lib/doctor.ts"
+      ],
+      "stateFiles": [
+        "~/.pi/agent/settings.json (provider config + retry guidance)",
+        "<globalAgentDir>/sf-llm-gateway/* (saved api key, base url, monthly usage cache)"
+      ],
+      "safety": [
+        "Tokens are never echoed in panel output; only describeApiKey summaries are shown.",
+        "Pi's settings.json is mutated through pi-settings.ts helpers with race-aware reads."
+      ]
+    },
     "entry": "extensions/sf-llm-gateway-internal/index.ts",
     "hasReadme": true,
     "hasTests": true,
@@ -209,7 +297,8 @@
     "id": "sf-lsp",
     "name": "SF LSP",
     "description": "Real-time Salesforce LSP diagnostics on write/edit with a working-indicator spinner, transcript rows, and a permanent top-bar health segment in sf-devbar",
-    "category": "core",
+    "category": "assistive",
+    "maturity": "stable",
     "defaultEnabled": true,
     "alwaysActive": false,
     "configurable": false,
@@ -223,7 +312,22 @@
       "session_shutdown",
       "tool_result"
     ],
-    "docs": {},
+    "docs": {
+      "summary": "Advisory LSP diagnostics on write/edit for Apex/LWC/Agent Script files. Surfaces appear as a working indicator, transcript row, top-bar health segment (via sf-lsp-health registry), and a /sf-lsp doctor + activity panel.",
+      "primaryFiles": [
+        "index.ts",
+        "lib/lsp-client.ts",
+        "lib/feedback.ts",
+        "lib/file-classify.ts",
+        "lib/activity.ts",
+        "lib/working-indicator.ts",
+        "lib/command-panel.ts"
+      ],
+      "safety": [
+        "Never overrides the built-in write/edit tools (pi cross-extension conflict guard).",
+        "Defers .agent file diagnostics to sf-agentscript-assist when that extension is loaded."
+      ]
+    },
     "entry": "extensions/sf-lsp/index.ts",
     "hasReadme": true,
     "hasTests": true,
@@ -234,6 +338,7 @@
     "name": "SF Ohana Spinner",
     "description": "Salesforce-themed rainbow spinner during LLM thinking",
     "category": "ui",
+    "maturity": "stable",
     "defaultEnabled": true,
     "alwaysActive": false,
     "configurable": false,
@@ -244,7 +349,14 @@
       "session_start",
       "session_shutdown"
     ],
-    "docs": {},
+    "docs": {
+      "summary": "Pi setWorkingIndicator-driven rainbow spinner with rotating Salesforce ecosystem messages. Pi manages start/stop based on streaming activity; this extension only owns frame generation.",
+      "primaryFiles": [
+        "index.ts",
+        "lib/messages.ts",
+        "lib/rainbow.ts"
+      ]
+    },
     "entry": "extensions/sf-ohana-spinner/index.ts",
     "hasReadme": true,
     "hasTests": true,
@@ -254,7 +366,8 @@
     "id": "sf-pi-manager",
     "name": "SF Pi Manager",
     "description": "Core manager — provides /sf-pi commands",
-    "category": "core",
+    "category": "manager",
+    "maturity": "stable",
     "defaultEnabled": true,
     "alwaysActive": true,
     "configurable": true,
@@ -267,17 +380,40 @@
       "session_start",
       "session_shutdown"
     ],
-    "docs": {},
+    "docs": {
+      "summary": "Core manager for the sf-pi package. Provides /sf-pi list/enable/disable/status/display/recommended/announcements/skills/doctor commands plus the interactive TUI overlay. alwaysActive: enable/disable is mediated through this extension only.",
+      "primaryFiles": [
+        "index.ts",
+        "lib/overlay.ts",
+        "lib/extension-details.ts",
+        "lib/render.ts",
+        "lib/announcements.ts",
+        "lib/recommendations.ts",
+        "lib/doctor-command.ts",
+        "lib/skill-sources-command.ts",
+        "lib/config-panel.ts"
+      ],
+      "stateFiles": [
+        "~/.pi/agent/settings.json (sf-pi package filter list)",
+        "<globalAgentDir>/state/sf-pi/recommendations.json",
+        "<globalAgentDir>/state/sf-pi/announcements.json"
+      ],
+      "safety": [
+        "Owns the WRITE side of pi's package filter list via lib/common/sf-pi-package-state.ts.",
+        "alwaysActive cannot be disabled through the standard toggle action."
+      ]
+    },
     "entry": "extensions/sf-pi-manager/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 3359
+    "srcLoc": 2980
   },
   {
     "id": "sf-skills-hud",
     "name": "SF Skills HUD",
     "description": "Pinned top-right overlay that shows which skills are live in context versus earlier in the session",
     "category": "ui",
+    "maturity": "stable",
     "defaultEnabled": true,
     "alwaysActive": false,
     "configurable": false,
@@ -293,7 +429,14 @@
       "session_compact",
       "session_shutdown"
     ],
-    "docs": {},
+    "docs": {
+      "summary": "Non-capturing top-right HUD overlay that distinguishes Live skills (still in context) from Earlier skills (used on this branch but compacted out). Re-scans on message_end / session_tree / session_compact.",
+      "primaryFiles": [
+        "index.ts",
+        "lib/hud-component.ts",
+        "lib/skill-state.ts"
+      ]
+    },
     "entry": "extensions/sf-skills-hud/index.ts",
     "hasReadme": true,
     "hasTests": true,
@@ -303,7 +446,8 @@
     "id": "sf-slack",
     "name": "SF Slack",
     "description": "Slack integration — search messages, read threads, browse channel history",
-    "category": "core",
+    "category": "agent-tool",
+    "maturity": "stable",
     "defaultEnabled": true,
     "alwaysActive": false,
     "configurable": true,
@@ -329,17 +473,46 @@
       "session_shutdown",
       "before_agent_start"
     ],
-    "docs": {},
+    "docs": {
+      "summary": "Full Slack integration. Read-only search/thread/history/channel/user/file/canvas plus send-with-confirm. Tools register only after a token resolves (Pi auth store -> Keychain -> SLACK_USER_TOKEN), keeping the system prompt cache stable when Slack is not configured.",
+      "primaryFiles": [
+        "index.ts",
+        "lib/auth.ts",
+        "lib/api.ts",
+        "lib/tools.ts",
+        "lib/research-tool.ts",
+        "lib/send-tool.ts",
+        "lib/recipient-confirm.ts",
+        "lib/config-panel.ts",
+        "lib/preferences-panel.ts"
+      ],
+      "stateFiles": [
+        "Pi auth store via /login sf-slack",
+        "macOS Keychain (optional)",
+        "session entries: SlackSendAuditEntry, SlackPreferences"
+      ],
+      "env": [
+        "SLACK_USER_TOKEN",
+        "SLACK_TEAM_ID",
+        "SLACK_ALLOW_HEADLESS_SEND"
+      ],
+      "safety": [
+        "slack_send requires user confirmation in interactive mode and refuses headless unless SLACK_ALLOW_HEADLESS_SEND=1.",
+        "Read-only by default; only canvas create/edit and slack_send mutate.",
+        "Tokens are never displayed unmasked."
+      ]
+    },
     "entry": "extensions/sf-slack/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 10675
+    "srcLoc": 10687
   },
   {
     "id": "sf-welcome",
     "name": "SF Welcome",
     "description": "Salesforce-branded splash screen with environment status, extension health, and community info",
     "category": "ui",
+    "maturity": "stable",
     "defaultEnabled": true,
     "alwaysActive": false,
     "configurable": false,
@@ -355,7 +528,23 @@
       "tool_call",
       "session_shutdown"
     ],
-    "docs": {},
+    "docs": {
+      "summary": "Two-column startup splash with model/cost/extension health on the left and announcements/recommended extensions/recent sessions on the right. Dismissable overlay (default) or persistent header (quietStartup), plus /sf-welcome and /sf-setup-fonts commands.",
+      "primaryFiles": [
+        "index.ts",
+        "lib/splash-component.ts",
+        "lib/splash-data.ts",
+        "lib/announcements.ts",
+        "lib/recommendations-status.ts",
+        "lib/whats-new.ts",
+        "lib/sf-cli-status.ts",
+        "lib/extension-health.ts",
+        "lib/font-installer.ts"
+      ],
+      "stateFiles": [
+        "~/.pi/agent/sf-welcome-state.json"
+      ]
+    },
     "entry": "extensions/sf-welcome/index.ts",
     "hasReadme": true,
     "hasTests": true,

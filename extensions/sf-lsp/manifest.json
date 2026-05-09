@@ -2,8 +2,25 @@
   "id": "sf-lsp",
   "name": "SF LSP",
   "description": "Real-time Salesforce LSP diagnostics on write/edit with a working-indicator spinner, transcript rows, and a permanent top-bar health segment in sf-devbar",
-  "category": "core",
+  "category": "assistive",
+  "maturity": "stable",
   "defaultEnabled": true,
   "commands": ["/sf-lsp"],
-  "events": ["session_start", "session_shutdown", "tool_result"]
+  "events": ["session_start", "session_shutdown", "tool_result"],
+  "docs": {
+    "summary": "Advisory LSP diagnostics on write/edit for Apex/LWC/Agent Script files. Surfaces appear as a working indicator, transcript row, top-bar health segment (via sf-lsp-health registry), and a /sf-lsp doctor + activity panel.",
+    "primaryFiles": [
+      "index.ts",
+      "lib/lsp-client.ts",
+      "lib/feedback.ts",
+      "lib/file-classify.ts",
+      "lib/activity.ts",
+      "lib/working-indicator.ts",
+      "lib/command-panel.ts"
+    ],
+    "safety": [
+      "Never overrides the built-in write/edit tools (pi cross-extension conflict guard).",
+      "Defers .agent file diagnostics to sf-agentscript-assist when that extension is loaded."
+    ]
+  }
 }

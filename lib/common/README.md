@@ -14,8 +14,12 @@ code lives in `extensions/<id>/lib/`.
 
 | Module                                      | Owners (what uses it)                                                       | What it provides                                                                 |
 | ------------------------------------------- | --------------------------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| `command-actions.ts`                        | command-bearing extensions (incremental adoption)                           | One catalog → panel rows + completions + help + README table                     |
 | `command-panel.ts`                          | command-bearing extensions                                                  | Shared grouped status/actions panel built on Pi's native `ctx.ui.custom()`       |
 | `info-panel.ts`                             | command-bearing extensions                                                  | In-TUI info popup for command panels with headless `ctx.ui.notify()` fallback    |
+| `extension-toggle.ts`                       | every command-bearing extension                                             | Shared "Disable / Enable this extension" action row + `performToggleExtension`   |
+| `sf-pi-package-state.ts`                    | `extension-toggle.ts`, `sf-pi-manager`                                      | Read/write sf-pi's package filter list in pi `settings.json`                     |
+| `sf-pi-settings.ts`                         | `sf-pi-package-state.ts`, `sf-pi-manager`                                   | Tiny tolerant JSON read/write for global + project pi `settings.json`            |
 | `ui-glyphs.ts`                              | command-bearing extensions                                                  | Semantic UI glyphs for panels/popups with ASCII fallback (rides `glyph-policy`)  |
 | `pi-compat.ts`                              | all extensions                                                              | Feature-detecting shims for pi APIs that may not exist on older pi runtimes      |
 | `pi-paths.ts`                               | all extensions that touch settings                                          | Global + project `settings.json` paths, pi home dir resolution                   |

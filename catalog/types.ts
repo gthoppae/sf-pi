@@ -36,6 +36,34 @@ export type ConfigPanelFactory = (
 // Extension definition
 // -------------------------------------------------------------------------------------------------
 
+/**
+ * Categories used to group extensions in the manager UI and generated docs.
+ *
+ * Six buckets, each carrying real signal:
+ * - `manager`     — the sf-pi-manager itself; meta surface.
+ * - `provider`    — model / identity providers registered with Pi.
+ * - `agent-tool`  — contributes LLM tools or skills the agent calls.
+ * - `safety`      — gating, permission, or guardrail extensions.
+ * - `assistive`   — silent helpers, diagnostics, prompts, or feedback flows.
+ * - `ui`          — purely visual surfaces (splash, status bars, HUDs, spinners).
+ *
+ * `core`, `ui`, and `provider` were the original buckets. The richer set
+ * was introduced via ADR 0006 — see docs/adr/0006-extension-consistency-baseline.md.
+ */
+export type ExtensionCategory =
+  | "manager"
+  | "provider"
+  | "agent-tool"
+  | "safety"
+  | "assistive"
+  | "ui";
+
+/**
+ * Stability label surfaced in the manager and agent-orientation. Defaults
+ * to `stable` when omitted in the manifest.
+ */
+export type ExtensionMaturity = "stable" | "beta" | "experimental";
+
 export interface SfPiExtension {
   /** Unique slug used in commands (e.g., "sf-ohana-spinner"). */
   id: string;
@@ -46,7 +74,9 @@ export interface SfPiExtension {
   /** Relative path from package root (e.g., "extensions/sf-ohana-spinner/index.ts"). */
   file: string;
   /** Category tag for grouping in the UI. */
-  category: "ui" | "provider" | "core";
+  category: ExtensionCategory;
+  /** Stability label. Defaults to "stable" when omitted in the manifest. */
+  maturity?: ExtensionMaturity;
   /** Whether this extension is enabled on first install. */
   defaultEnabled: boolean;
   /** If true, cannot be disabled (used for the manager itself). */
@@ -86,7 +116,9 @@ export interface ExtensionManifest {
   id: string;
   name: string;
   description: string;
-  category: "ui" | "provider" | "core";
+  category: ExtensionCategory;
+  /** Stability label surfaced in catalog/index.json + manager. Defaults to "stable". */
+  maturity?: ExtensionMaturity;
   defaultEnabled: boolean;
   alwaysActive?: boolean;
   configurable?: boolean;

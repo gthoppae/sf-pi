@@ -30,7 +30,7 @@ Repo-level rules still apply; see root `AGENTS.md`.
 | Legacy provider-id settings migration          | `lib/migrate-unify-provider.ts` |
 | Footer + status report formatting              | `lib/status.ts`                 |
 | Standard command metadata + completions        | `lib/command-surface.ts`        |
-| No-args grouped status & controls panel        | `lib/panel.ts`                  |
+| No-args grouped status & controls panel        | `lib/command-panel.ts`          |
 | TUI setup wizard component                     | `lib/setup-overlay.ts`          |
 | Config panel (advanced form)                   | `lib/config-panel.ts`           |
 | Transform debug probe                          | `lib/debug.ts`                  |

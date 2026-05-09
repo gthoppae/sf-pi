@@ -24,7 +24,7 @@
  *   - sf-ohana-spinner (no command surface)
  */
 
-import { readFileSync, readdirSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import process from "node:process";
@@ -92,6 +92,28 @@ function readDirRecursive(dir) {
   return out;
 }
 
+const FORBIDDEN_FILENAMES = new Map([
+  [
+    "lib/panel.ts",
+    "renamed to lib/command-panel.ts \u2014 reserved name for the no-args slash-command panel",
+  ],
+  [
+    "lib/settings-panel.ts",
+    "renamed to lib/preferences-panel.ts \u2014 disambiguates from the manager-invoked lib/config-panel.ts",
+  ],
+]);
+
+function checkForbiddenFilenames(ext) {
+  const extDir = join(REPO_ROOT, "extensions", ext.id);
+  const violations = [];
+  for (const [rel, reason] of FORBIDDEN_FILENAMES) {
+    if (existsSync(join(extDir, rel))) {
+      violations.push(`${rel} \u2014 ${reason}`);
+    }
+  }
+  return violations;
+}
+
 function checkExtension(ext) {
   if (!Array.isArray(ext.commands) || ext.commands.length === 0) return null;
   if (EXEMPT_EXTENSIONS.has(ext.id)) return null;
@@ -125,7 +147,10 @@ function checkExtension(ext) {
     (req) => `${req.label} — ${req.rationale}`,
   );
 
-  return { id: ext.id, ok: missing.length === 0, missing };
+  const forbidden = checkForbiddenFilenames(ext).map((entry) => `forbidden filename ${entry}`);
+  const issues = [...missing, ...forbidden];
+
+  return { id: ext.id, ok: issues.length === 0, missing: issues };
 }
 
 function main() {
@@ -161,7 +186,7 @@ function main() {
     console.log("");
     console.log("How to fix:");
     console.log("  See lib/common/command-panel.ts and");
-    console.log("  extensions/sf-pi-manager/lib/extension-toggle.ts for the contract.");
+    console.log("  lib/common/extension-toggle.ts for the contract.");
     console.log("  sf-slack and sf-devbar are reference implementations.");
     process.exit(1);
   }

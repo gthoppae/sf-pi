@@ -110,14 +110,11 @@ extensions/sf-pi-manager/
     config-panel.ts         ← implementation module
     doctor-command.ts       ← implementation module
     extension-details.ts    ← implementation module
-    extension-toggle.ts     ← implementation module
     overlay.ts              ← implementation module
-    package-state.ts        ← implementation module
     recommendations-install.ts← implementation module
     recommendations-overlay.ts← implementation module
     recommendations.ts      ← implementation module
     render.ts               ← implementation module
-    settings.ts             ← implementation module
     skill-sources-command.ts← implementation module
     skill-sources-overlay.ts← implementation module
   tests/
@@ -152,9 +149,9 @@ extensions/sf-pi-manager/
 8. **Command handlers** — overlay, list, toggle, display, recommendations, announcements, skills, status, help
 9. **Footer status** — active extension count display plus recommendation / announcement nudges
 10. **Extension state helpers** — `buildExtensionStates`, footer summary
-11. **Settings I/O** — `lib/settings.ts`
-12. **Package entry discovery** — `lib/package-state.ts`
-13. **Extension state read/write** — `lib/package-state.ts`
+11. **Settings I/O** — `../../lib/common/sf-pi-settings.ts` (shared)
+12. **Package entry discovery** — `../../lib/common/sf-pi-package-state.ts` (shared)
+13. **Extension state read/write** — `../../lib/common/sf-pi-package-state.ts` (shared)
 14. **TUI Overlay** — `SfPiOverlayComponent` with list/detail navigation
 15. **Recommended extensions** — manifest/state in `recommendations*.ts`
 16. **External skill roots** — `/sf-pi skills` in `skill-sources*.ts`

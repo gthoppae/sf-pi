@@ -2,10 +2,34 @@
   "id": "sf-pi-manager",
   "name": "SF Pi Manager",
   "description": "Core manager — provides /sf-pi commands",
-  "category": "core",
+  "category": "manager",
+  "maturity": "stable",
   "defaultEnabled": true,
   "alwaysActive": true,
   "configurable": true,
   "commands": ["/sf-pi"],
-  "events": ["session_start", "session_shutdown"]
+  "events": ["session_start", "session_shutdown"],
+  "docs": {
+    "summary": "Core manager for the sf-pi package. Provides /sf-pi list/enable/disable/status/display/recommended/announcements/skills/doctor commands plus the interactive TUI overlay. alwaysActive: enable/disable is mediated through this extension only.",
+    "primaryFiles": [
+      "index.ts",
+      "lib/overlay.ts",
+      "lib/extension-details.ts",
+      "lib/render.ts",
+      "lib/announcements.ts",
+      "lib/recommendations.ts",
+      "lib/doctor-command.ts",
+      "lib/skill-sources-command.ts",
+      "lib/config-panel.ts"
+    ],
+    "stateFiles": [
+      "~/.pi/agent/settings.json (sf-pi package filter list)",
+      "<globalAgentDir>/state/sf-pi/recommendations.json",
+      "<globalAgentDir>/state/sf-pi/announcements.json"
+    ],
+    "safety": [
+      "Owns the WRITE side of pi's package filter list via lib/common/sf-pi-package-state.ts.",
+      "alwaysActive cannot be disabled through the standard toggle action."
+    ]
+  }
 }

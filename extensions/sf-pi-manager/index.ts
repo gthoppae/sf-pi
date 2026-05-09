@@ -67,7 +67,7 @@ import {
   getDisabledExtensions,
   getDisabledExtensionsForCwd,
   resolveEffectiveScope,
-} from "./lib/package-state.ts";
+} from "../../lib/common/sf-pi-package-state.ts";
 import { glyph, resolveGlyphMode } from "../../lib/common/glyph-policy.ts";
 import { requirePiVersion } from "../../lib/common/pi-compat.ts";
 import {
@@ -103,7 +103,7 @@ export {
   findSfPiPackageEntry,
   getDisabledExtensions,
   matchesPackageSource,
-} from "./lib/package-state.ts";
+} from "../../lib/common/sf-pi-package-state.ts";
 
 // -------------------------------------------------------------------------------------------------
 // Constants

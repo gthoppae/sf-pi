@@ -10,7 +10,10 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 import { GATEWAY_COMMAND_SURFACE } from "../lib/command-surface.ts";
-import { buildGatewayGroupedActionItems, buildGatewayPanelStatusLines } from "../lib/panel.ts";
+import {
+  buildGatewayGroupedActionItems,
+  buildGatewayPanelStatusLines,
+} from "../lib/command-panel.ts";
 
 const tempDirs: string[] = [];
 

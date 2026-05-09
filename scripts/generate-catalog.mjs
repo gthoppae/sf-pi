@@ -53,7 +53,14 @@ const README_TROUBLESHOOTING_START_MARKER = "<!-- GENERATED:troubleshooting-inde
 const README_TROUBLESHOOTING_END_MARKER = "<!-- GENERATED:troubleshooting-index:end -->";
 const EXT_FILE_STRUCTURE_START_MARKER = "<!-- GENERATED:file-structure:start -->";
 const EXT_FILE_STRUCTURE_END_MARKER = "<!-- GENERATED:file-structure:end -->";
-const README_CATEGORY_ORDER = ["core", "provider", "ui"];
+const README_CATEGORY_ORDER = ["manager", "provider", "agent-tool", "safety", "assistive", "ui"];
+const VALID_CATEGORIES = new Set(README_CATEGORY_ORDER);
+const VALID_MATURITIES = new Set(["stable", "beta", "experimental"]);
+// Extensions whose only doc surface is the manifest description — they have
+// no slash command, no LLM tool, and no provider, so populating docs.* would
+// be busywork. The lint below only requires docs.summary + docs.primaryFiles
+// for everything outside this set.
+const DOCS_OPTIONAL_FOR = new Set([]);
 const EXTENSION_FILE_MAP_INCLUDE = new Set([
   "AGENTS.md",
   "CREDITS.md",
@@ -101,6 +108,39 @@ function discoverManifests() {
         continue;
       }
 
+      if (!VALID_CATEGORIES.has(manifest.category)) {
+        console.error(
+          `❌ ${entry.name}/manifest.json has invalid category "${manifest.category}". Allowed: ${[...VALID_CATEGORIES].join(", ")}`,
+        );
+        process.exit(1);
+      }
+
+      if (manifest.maturity && !VALID_MATURITIES.has(manifest.maturity)) {
+        console.error(
+          `❌ ${entry.name}/manifest.json has invalid maturity "${manifest.maturity}". Allowed: ${[...VALID_MATURITIES].join(", ")}`,
+        );
+        process.exit(1);
+      }
+
+      // Mandate docs.summary + docs.primaryFiles so generated agent-orientation
+      // and the manager UI never fall back to the terse description. Optional
+      // for the few extensions opted into DOCS_OPTIONAL_FOR.
+      if (!DOCS_OPTIONAL_FOR.has(manifest.id)) {
+        const docs = manifest.docs;
+        if (
+          !docs ||
+          typeof docs.summary !== "string" ||
+          docs.summary.length === 0 ||
+          !Array.isArray(docs.primaryFiles) ||
+          docs.primaryFiles.length === 0
+        ) {
+          console.error(
+            `❌ ${entry.name}/manifest.json must populate docs.summary (non-empty string) and docs.primaryFiles (non-empty string[]). See docs/adr/0006-extension-consistency-baseline.md.`,
+          );
+          process.exit(1);
+        }
+      }
+
       if (manifest.id !== entry.name) {
         console.warn(
           `⚠ Warning: ${entry.name}/manifest.json id "${manifest.id}" doesn't match directory name`,
@@ -146,6 +186,9 @@ function generateRegistryTs(manifests) {
     lines.push(`    description: ${JSON.stringify(manifest.description)},`);
     lines.push(`    file: "extensions/${dir}/index.ts",`);
     lines.push(`    category: ${JSON.stringify(manifest.category)},`);
+    if (manifest.maturity) {
+      lines.push(`    maturity: ${JSON.stringify(manifest.maturity)},`);
+    }
     lines.push(`    defaultEnabled: ${manifest.defaultEnabled},`);
     pushOptionalStringArray(lines, manifest, "commands");
     pushOptionalStringArray(lines, manifest, "providers");
@@ -204,6 +247,7 @@ function generateIndexJson(manifests) {
     name: manifest.name,
     description: manifest.description,
     category: manifest.category,
+    maturity: manifest.maturity ?? "stable",
     defaultEnabled: manifest.defaultEnabled,
     alwaysActive: manifest.alwaysActive ?? false,
     configurable: manifest.configurable ?? false,
@@ -613,13 +657,13 @@ function generateAgentOrientationDoc(manifests) {
     "",
     "## Extension map",
     "",
-    "| Extension | Category | Default | Summary | Commands | Tools | Providers | Events | Key path |",
-    "| --------- | -------- | ------- | ------- | -------- | ----- | --------- | ------ | -------- |",
+    "| Extension | Category | Maturity | Default | Summary | Commands | Tools | Providers | Events | Key path |",
+    "| --------- | -------- | -------- | ------- | ------- | -------- | ----- | --------- | ------ | -------- |",
   ];
 
   for (const { dir, manifest } of sorted) {
     lines.push(
-      `| [${manifest.name}](../extensions/${dir}/) | ${manifest.category} | ${defaultLabel(manifest)} | ${manifest.docs?.summary ?? manifest.description} | ${generatedList(manifest.commands ?? [])} | ${generatedList(manifest.tools ?? [])} | ${generatedList(manifest.providers ?? [])} | ${generatedList(manifest.events ?? [])} | \`extensions/${dir}/index.ts\` |`,
+      `| [${manifest.name}](../extensions/${dir}/) | ${manifest.category} | ${manifest.maturity ?? "stable"} | ${defaultLabel(manifest)} | ${manifest.docs?.summary ?? manifest.description} | ${generatedList(manifest.commands ?? [])} | ${generatedList(manifest.tools ?? [])} | ${generatedList(manifest.providers ?? [])} | ${generatedList(manifest.events ?? [])} | \`extensions/${dir}/index.ts\` |`,
     );
   }
 

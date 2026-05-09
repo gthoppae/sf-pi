@@ -55,7 +55,7 @@ import {
   LIFECYCLE_GROUP,
   performToggleExtension,
   type LifecycleActionId,
-} from "../sf-pi-manager/lib/extension-toggle.ts";
+} from "../../lib/common/extension-toggle.ts";
 import type { SplashData } from "./lib/types.ts";
 import {
   matchesKey,

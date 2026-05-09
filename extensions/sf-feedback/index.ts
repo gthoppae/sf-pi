@@ -24,7 +24,9 @@
  *   /sf-feedback diagnostics | any                       | Emit sanitized diagnostics
  */
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { collectDiagnostics, type ExecFn } from "./lib/diagnostics.ts";
+import { collectDiagnostics } from "./lib/diagnostics.ts";
+import { buildExecFn } from "../../lib/common/exec-adapter.ts";
+import type { ExecFn } from "../../lib/common/sf-environment/detect.ts";
 import { buildIssueUrl, createIssueWithGh, openUrl } from "./lib/github.ts";
 import {
   buildDiagnosticsOnlyBody,
@@ -38,7 +40,7 @@ import {
   LIFECYCLE_GROUP,
   performToggleExtension,
   type LifecycleActionId,
-} from "../sf-pi-manager/lib/extension-toggle.ts";
+} from "../../lib/common/extension-toggle.ts";
 import {
   type CommandPanelAction,
   type CommandPanelState,
@@ -277,16 +279,6 @@ async function handleCommand(
   } finally {
     ctx.ui.setStatus(STATUS_KEY, "");
   }
-}
-
-function buildExecFn(pi: ExtensionAPI, cwd: string): ExecFn {
-  return async (command, args, options) => {
-    const result = await pi.exec(command, args, {
-      timeout: options?.timeout,
-      cwd: options?.cwd ?? cwd,
-    });
-    return { stdout: result.stdout, stderr: result.stderr, code: result.code };
-  };
 }
 
 function parseIssueKind(value: string | undefined): IssueKind {

@@ -66,6 +66,25 @@ Pi extensions:
    extension-local on/off behavior, but bundled extension enable/disable should
    link users back to `/sf-pi`.
 
+## Canonical filenames
+
+ADR 0005 (originally) didn't pin a filename for the per-extension panel
+module, and three names emerged in the wild: `lib/panel.ts`,
+`lib/config-panel.ts`, and `lib/settings-panel.ts`. That ambiguity made
+it hard to tell at a glance which file owned which surface, so the
+standard now reserves three names — each for one purpose:
+
+| Filename                   | Purpose                                                                                                             |
+| -------------------------- | ------------------------------------------------------------------------------------------------------------------- |
+| `lib/command-panel.ts`     | The no-args slash-command status & actions panel built on `lib/common/command-panel.ts`. Opened from `/sf-<id>`.    |
+| `lib/config-panel.ts`      | The `ConfigPanelFactory` invoked by sf-pi-manager when `manifest.configurable === true`. Required for that surface. |
+| `lib/preferences-panel.ts` | A separate mutable user-preferences UI, when distinct from `config-panel.ts` (e.g. opened by `/sf-<id> settings`).  |
+
+The deprecated names `lib/panel.ts` and `lib/settings-panel.ts` are
+rejected by `npm run check:panels`. Most extensions inline their panel
+directly inside `index.ts` and never need a separate file; pull it out
+only when the panel logic exceeds ~50 lines.
+
 ## Target panel shape
 
 A standard extension panel should fit this skeleton:

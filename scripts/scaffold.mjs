@@ -1,7 +1,8 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 // Scaffold a new sf-pi extension.
 //
-// Usage: node scripts/scaffold.mjs --id <extension-id> --category <ui|provider|core> [--name "Display Name"]
+// Usage: node scripts/scaffold.mjs --id <extension-id> --category <ui|provider|agent-tool|safety|assistive|manager> [--name "Display Name"]
+// See docs/adr/0006-extension-consistency-baseline.md for the category taxonomy.
 //
 // Creates:
 //   extensions/<id>/
@@ -89,7 +90,7 @@ import {
   LIFECYCLE_GROUP,
   performToggleExtension,
   type LifecycleActionId,
-} from "../sf-pi-manager/lib/extension-toggle.ts";
+} from "../../lib/common/extension-toggle.ts";
 
 const COMMAND_NAME = "${id}";
 
@@ -218,11 +219,17 @@ function manifestJson(id, name, category) {
         name,
         description: `TODO: Describe ${name}`,
         category,
+        // Maturity defaults to "stable" when omitted. Use "experimental" or
+        // "beta" while the extension is still settling.
+        maturity: "experimental",
         defaultEnabled: true,
         // Set configurable: true once you add a lib/config-panel.ts that
         // exports `createConfigPanel: ConfigPanelFactory`. Until then,
         // /sf-pi will skip the drill-down panel for this extension.
         commands: [`/${id}`],
+        // docs.summary + docs.primaryFiles are required by
+        // scripts/generate-catalog.mjs. Replace the TODOs before opening a
+        // PR — the generator refuses to write the catalog otherwise.
         docs: {
           summary: `TODO: Describe ${name} for generated orientation docs`,
           primaryFiles: ["index.ts"],
@@ -286,6 +293,43 @@ TODO fix.
 `;
 }
 
+function exampleToolTs(id) {
+  return `/* SPDX-License-Identifier: Apache-2.0 */
+/**
+ * Starter tool registration for ${id}.
+ *
+ * Convention (AGENTS.md):
+ *   - one file per tool: lib/<tool-name>-tool.ts
+ *   - export const <NAME>_TOOL_NAME = "<tool>" so panels/configs reference it
+ *   - export register<PascalCase>Tool(pi) and call it from the entry point
+ *   - add the same tool name to manifest.tools
+ */
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import { Type } from "typebox";
+
+export const EXAMPLE_TOOL_NAME = "${id}_example";
+
+const ExampleParams = Type.Object({
+  message: Type.String({ description: "Echoed back to the agent." }),
+});
+
+export function registerExampleTool(pi: ExtensionAPI): void {
+  pi.registerTool<typeof ExampleParams>({
+    name: EXAMPLE_TOOL_NAME,
+    label: "Example",
+    description: "Replace this with the real tool description.",
+    parameters: ExampleParams,
+    async execute(_id, params) {
+      return {
+        content: [{ type: "text", text: params.message }],
+        details: {},
+      };
+    },
+  });
+}
+`;
+}
+
 function smokeTestTs(id) {
   return `/* SPDX-License-Identifier: Apache-2.0 */
 /**
@@ -313,7 +357,7 @@ const { id, category, name: rawName } = parseArgs();
 
 if (!id) {
   console.error(
-    'Usage: node scripts/scaffold.mjs --id <extension-id> --category <ui|provider|core> [--name "Display Name"]',
+    'Usage: node scripts/scaffold.mjs --id <extension-id> --category <ui|provider|agent-tool|safety|assistive|manager> [--name "Display Name"]',
   );
   console.error("");
   console.error(
@@ -322,7 +366,10 @@ if (!id) {
   process.exit(1);
 }
 
-const validCategories = ["ui", "provider", "core"];
+// Categories must match catalog/types.ts > ExtensionCategory and the
+// VALID_CATEGORIES set in scripts/generate-catalog.mjs. Documented in
+// docs/adr/0006-extension-consistency-baseline.md.
+const validCategories = ["ui", "provider", "agent-tool", "safety", "assistive", "manager"];
 if (!validCategories.includes(category)) {
   console.error(`Invalid category: "${category}". Must be one of: ${validCategories.join(", ")}`);
   process.exit(1);
@@ -345,6 +392,12 @@ writeFileSync(path.join(extDir, "index.ts"), indexTs(id, name));
 writeFileSync(path.join(extDir, "manifest.json"), manifestJson(id, name, category));
 writeFileSync(path.join(extDir, "README.md"), readmeMd(id, name));
 writeFileSync(path.join(extDir, "tests", "smoke.test.ts"), smokeTestTs(id));
+
+// For agent-tool extensions, drop a starter tool module so the convention is
+// obvious from day one. See AGENTS.md → "Tool registration convention".
+if (category === "agent-tool") {
+  writeFileSync(path.join(extDir, "lib", "example-tool.ts"), exampleToolTs(id));
+}
 
 console.log(`✅ Scaffolded extensions/${id}/`);
 console.log(`   index.ts, manifest.json, README.md, lib/, tests/smoke.test.ts`);

@@ -24,7 +24,7 @@ import { GATEWAY_COMMAND_SURFACE, type GatewayPanelAction } from "./command-surf
 import {
   buildToggleExtensionAction,
   LIFECYCLE_GROUP,
-} from "../../sf-pi-manager/lib/extension-toggle.ts";
+} from "../../../lib/common/extension-toggle.ts";
 
 export interface GatewayPanelOptions {
   providerRegistered: boolean;

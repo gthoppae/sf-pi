@@ -69,7 +69,7 @@ import {
   LIFECYCLE_GROUP,
   performToggleExtension,
   type LifecycleActionId,
-} from "../sf-pi-manager/lib/extension-toggle.ts";
+} from "../../lib/common/extension-toggle.ts";
 import { openInfoPanel } from "../../lib/common/info-panel.ts";
 import { requirePiVersion } from "../../lib/common/pi-compat.ts";
 import { record, readRecent } from "./lib/audit.ts";

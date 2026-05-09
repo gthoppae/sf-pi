@@ -497,6 +497,7 @@ extensions/sf-slack/
     emoji.ts                ← implementation module
     file-tool.ts            ← implementation module
     format.ts               ← implementation module
+    preferences-panel.ts    ← implementation module
     preferences.ts          ← implementation module
     recipient-confirm.ts    ← implementation module
     render.ts               ← implementation module
@@ -506,7 +507,6 @@ extensions/sf-slack/
     scope-probe.ts          ← implementation module
     search-plan.ts          ← implementation module
     send-tool.ts            ← implementation module
-    settings-panel.ts       ← implementation module
     stats.ts                ← implementation module
     status.ts               ← implementation module
     time-range-tool.ts      ← implementation module

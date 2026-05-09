@@ -8,3 +8,4 @@ or accidentally contradicted in extension READMEs.
 - [0003: Slack Send Requires Human Confirmation](./0003-slack-send-hitl.md)
 - [0004: Guardrail Fails Closed](./0004-guardrail-fail-closed.md)
 - [0005: Standard Pi-Native Command Panels](./0005-standard-command-panels.md)
+- [0006: Extension Consistency Baseline](./0006-extension-consistency-baseline.md)

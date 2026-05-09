@@ -225,6 +225,7 @@ extensions/sf-llm-gateway-internal/
   lib/
     beta-controls.ts        ← implementation module
     claude-code-import.ts   ← implementation module
+    command-panel.ts        ← implementation module
     command-surface.ts      ← implementation module
     config-panel.ts         ← implementation module
     config.ts               ← implementation module
@@ -237,7 +238,6 @@ extensions/sf-llm-gateway-internal/
     monthly-usage.ts        ← implementation module
     onboarding.ts           ← implementation module
     open-url.ts             ← implementation module
-    panel.ts                ← implementation module
     pi-settings.ts          ← implementation module
     provider-telemetry.ts   ← implementation module
     retry-telemetry.ts      ← implementation module
@@ -250,6 +250,7 @@ extensions/sf-llm-gateway-internal/
     betas.test.ts           ← unit / smoke test
     claude-code-import.test.ts← unit / smoke test
     codex-regression.test.ts← unit / smoke test
+    command-panel.test.ts   ← unit / smoke test
     command-parsing.test.ts ← unit / smoke test
     command-surface.test.ts ← unit / smoke test
     config-panel-paste.test.ts← unit / smoke test
@@ -268,7 +269,6 @@ extensions/sf-llm-gateway-internal/
     onboarding.test.ts      ← unit / smoke test
     open-url.test.ts        ← unit / smoke test
     opus47-regression.test.ts← unit / smoke test
-    panel.test.ts           ← unit / smoke test
     provider-telemetry.test.ts← unit / smoke test
     retry-telemetry.test.ts ← unit / smoke test
     robust-retry.test.ts    ← unit / smoke test

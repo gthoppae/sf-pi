@@ -3,6 +3,7 @@
   "name": "SF LLM Gateway Internal",
   "description": "Salesforce LLM Gateway provider with model discovery",
   "category": "provider",
+  "maturity": "stable",
   "defaultEnabled": true,
   "configurable": true,
   "commands": ["/sf-llm-gateway", "/sf-llm-gateway-internal"],
@@ -13,5 +14,27 @@
     "model_select",
     "after_provider_response",
     "session_shutdown"
-  ]
+  ],
+  "docs": {
+    "summary": "Single pi-native provider for the Salesforce LLM Gateway. Static bootstrap catalog plus dynamic /v1/models discovery, family-aware presets, OpenAI-compat dispatcher that delegates Claude ids to the native Anthropic transport, and footer status with model + context + monthly usage.",
+    "primaryFiles": [
+      "index.ts",
+      "lib/discovery.ts",
+      "lib/transport.ts",
+      "lib/models.ts",
+      "lib/config.ts",
+      "lib/config-panel.ts",
+      "lib/command-panel.ts",
+      "lib/monthly-usage.ts",
+      "lib/doctor.ts"
+    ],
+    "stateFiles": [
+      "~/.pi/agent/settings.json (provider config + retry guidance)",
+      "<globalAgentDir>/sf-llm-gateway/* (saved api key, base url, monthly usage cache)"
+    ],
+    "safety": [
+      "Tokens are never echoed in panel output; only describeApiKey summaries are shown.",
+      "Pi's settings.json is mutated through pi-settings.ts helpers with race-aware reads."
+    ]
+  }
 }

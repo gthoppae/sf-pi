@@ -204,8 +204,8 @@ import {
 } from "./lib/command-surface.ts";
 import { type CommandPanelState } from "../../lib/common/command-panel.ts";
 import { openInfoPanel } from "../../lib/common/info-panel.ts";
-import { performToggleExtension } from "../sf-pi-manager/lib/extension-toggle.ts";
-import { openGatewayPanel } from "./lib/panel.ts";
+import { performToggleExtension } from "../../lib/common/extension-toggle.ts";
+import { openGatewayPanel } from "./lib/command-panel.ts";
 import {
   getMonthlyUsageState,
   refreshMonthlyUsage,

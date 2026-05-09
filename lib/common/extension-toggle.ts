@@ -1,16 +1,16 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /**
  * Shared "toggle this extension" action used by every per-extension
- * settings panel.
+ * command panel.
  *
- * Why this lives in sf-pi-manager:
- * - sf-pi-manager owns the write-side of pi's settings.json filter list
- *   (`applyExtensionState`), so the toggle action would have to import
- *   from here anyway.
- * - sf-pi-manager is `alwaysActive`, so any other extension that imports
- *   this module is guaranteed to find it loaded.
- * - Keeping it here also means `lib/common/` does not have to invert the
- *   dependency direction (lib/common stays extension-agnostic).
+ * Why this lives in lib/common:
+ * - 11 of 13 bundled extensions consume this helper from their own
+ *   command panels. Once a helper crosses two consumers it belongs in
+ *   lib/common, not inside another extension.
+ * - The WRITE-side filter-list logic lives next to it in
+ *   ./sf-pi-package-state.ts. Together they form the small "manager
+ *   surface" that any extension can call to disable or re-enable
+ *   itself.
  *
  * Public surface:
  * - {@link buildToggleExtensionAction}: returns a `CommandPanelAction`
@@ -24,15 +24,15 @@
  *   reload so the change takes effect.
  */
 import type { ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { SF_PI_REGISTRY } from "../../../catalog/registry.ts";
-import { isSfPiExtensionEnabled } from "../../../lib/common/sf-pi-extension-state.ts";
-import type { CommandPanelAction } from "../../../lib/common/command-panel.ts";
+import { SF_PI_REGISTRY } from "../../catalog/registry.ts";
+import { isSfPiExtensionEnabled } from "./sf-pi-extension-state.ts";
+import type { CommandPanelAction } from "./command-panel.ts";
 import {
   applyExtensionState,
   findPackageInSettings,
   getDisabledExtensions,
   resolveEffectiveScope,
-} from "./package-state.ts";
+} from "./sf-pi-package-state.ts";
 
 /**
  * Stable group label used by every panel that adopts the shared toggle

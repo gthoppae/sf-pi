@@ -64,10 +64,10 @@ import {
   LSP_TRANSCRIPT_CUSTOM_TYPE,
   type LspTranscriptDetails,
 } from "./lib/transcript.ts";
-import { openSfLspPanel, type SfLspPanelAction } from "./lib/panel.ts";
+import { openSfLspPanel, type SfLspPanelAction } from "./lib/command-panel.ts";
 import { openInfoPanel, type InfoPanelSeverity } from "../../lib/common/info-panel.ts";
 import { isSfPiExtensionEnabled } from "../../lib/common/sf-pi-extension-state.ts";
-import { performToggleExtension } from "../sf-pi-manager/lib/extension-toggle.ts";
+import { performToggleExtension } from "../../lib/common/extension-toggle.ts";
 import {
   readEffectiveSfLspSettings,
   writeScopedSfLspSettings,

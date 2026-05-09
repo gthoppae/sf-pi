@@ -1,20 +1,21 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /**
- * Settings file helpers for sf-pi-manager.
+ * Pi settings.json read/write helpers shared across sf-pi extensions.
  *
  * Keep this module intentionally small and boring:
- * - path resolution
+ * - path resolution (delegated to pi-paths.ts)
  * - tolerant JSON reads
  * - stable JSON writes
  *
- * Package discovery and extension filtering live in package-state.ts.
+ * sf-pi package discovery + filter state lives in sf-pi-package-state.ts,
+ * not here. This file only knows how to read and write a settings file.
  */
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   globalSettingsPath as resolveGlobalSettingsPath,
   projectSettingsPath as resolveProjectSettingsPath,
-} from "../../../lib/common/pi-paths.ts";
+} from "./pi-paths.ts";
 
 /** Global Pi settings file, e.g. ~/.pi/agent/settings.json for the normal Pi CLI. */
 export function globalSettingsPath(): string {

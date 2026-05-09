@@ -162,10 +162,10 @@ extensions/sf-lsp/
       types.ts              ← implementation module
       versioning.ts         ← implementation module
     activity.ts             ← implementation module
+    command-panel.ts        ← implementation module
     feedback.ts             ← implementation module
     file-classify.ts        ← implementation module
     lsp-client.ts           ← implementation module
-    panel.ts                ← implementation module
     settings-io.ts          ← implementation module
     transcript.ts           ← implementation module
     types.ts                ← implementation module

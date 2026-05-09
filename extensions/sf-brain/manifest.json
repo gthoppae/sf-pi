@@ -2,7 +2,17 @@
   "id": "sf-brain",
   "name": "SF Brain",
   "description": "High-density Salesforce operator kernel injected once per session — describe-before-query rules, API picker, anonymous Apex verification loop, and CLI power moves",
-  "category": "core",
+  "category": "assistive",
+  "maturity": "stable",
   "defaultEnabled": true,
-  "events": ["before_agent_start"]
+  "events": ["before_agent_start"],
+  "docs": {
+    "summary": "Injects the Salesforce Operator Kernel as a persistent hidden message exactly once per session so providers benefit from prompt caching and /resume replays it for free.",
+    "primaryFiles": ["index.ts", "lib/kernel.ts", "SF_KERNEL.md"],
+    "stateFiles": ["<globalAgentDir>/sf-brain/SF_KERNEL.md"],
+    "safety": [
+      "Never registers tools or mutates settings; the kernel is delivered through the session entry log only.",
+      "Honors a user override at <globalAgentDir>/sf-brain/SF_KERNEL.md."
+    ]
+  }
 }

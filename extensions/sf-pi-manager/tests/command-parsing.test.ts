@@ -19,7 +19,7 @@ import { parseDoctorArgs } from "../lib/doctor-command.ts";
 describe("parseCommandArgs", () => {
   it("defaults to overlay with auto-detect scope when no args", () => {
     // scope=undefined signals "resolve at dispatch time" (project > global).
-    // See lib/package-state.ts > resolveEffectiveScope.
+    // See lib/common/sf-pi-package-state.ts > resolveEffectiveScope.
     const result = parseCommandArgs("");
     expect(result.subcommand).toBe("overlay");
     expect(result.scope).toBeUndefined();

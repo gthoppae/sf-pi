@@ -88,7 +88,7 @@ import {
   setPreferences,
   type SlackPreferences,
 } from "./lib/preferences.ts";
-import { openSettingsPanel } from "./lib/settings-panel.ts";
+import { openPreferencesPanel } from "./lib/preferences-panel.ts";
 import { renderStatsLines, resetStats, setStatsListener } from "./lib/stats.ts";
 import { classifySlackStatus, slackStatusLabel } from "./lib/status.ts";
 import { clearSlackStatus, setSlackStatus } from "../../lib/common/slack-status/store.ts";
@@ -97,7 +97,7 @@ import {
   LIFECYCLE_GROUP,
   performToggleExtension,
   type LifecycleActionId,
-} from "../sf-pi-manager/lib/extension-toggle.ts";
+} from "../../lib/common/extension-toggle.ts";
 import {
   type CommandPanelAction,
   type CommandPanelState,
@@ -648,7 +648,7 @@ export default function sfSlack(pi: ExtensionAPI) {
         ctx.ui.notify("/sf-slack settings requires interactive mode.", "warning");
         return;
       }
-      await openSettingsPanel(
+      await openPreferencesPanel(
         ctx,
         { ...getPreferences() },
         {

@@ -6,14 +6,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { SF_PI_REGISTRY } from "../../../catalog/registry.ts";
 import { getDisabledExtensionFilesForCwd } from "../../../lib/common/sf-pi-extension-state.ts";
+import type { ExecFn } from "../../../lib/common/sf-environment/detect.ts";
+export type { ExecFn };
 import { sanitizeLines, sanitizeRemoteUrl, sanitizeText } from "./sanitize.ts";
 import type { CommandResult, Diagnostics, GithubStatus, ToolAvailability } from "./types.ts";
-
-export type ExecFn = (
-  command: string,
-  args: string[],
-  options?: { timeout?: number; cwd?: string },
-) => Promise<{ stdout: string; stderr: string; code: number }>;
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);

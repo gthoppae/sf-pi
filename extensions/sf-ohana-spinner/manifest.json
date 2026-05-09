@@ -3,6 +3,11 @@
   "name": "SF Ohana Spinner",
   "description": "Salesforce-themed rainbow spinner during LLM thinking",
   "category": "ui",
+  "maturity": "stable",
   "defaultEnabled": true,
-  "events": ["session_start", "session_shutdown"]
+  "events": ["session_start", "session_shutdown"],
+  "docs": {
+    "summary": "Pi setWorkingIndicator-driven rainbow spinner with rotating Salesforce ecosystem messages. Pi manages start/stop based on streaming activity; this extension only owns frame generation.",
+    "primaryFiles": ["index.ts", "lib/messages.ts", "lib/rainbow.ts"]
+  }
 }

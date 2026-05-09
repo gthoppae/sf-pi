@@ -179,22 +179,22 @@ per-extension view.
 
 Every slash command exposed by a bundled extension. See each extension README for subcommands and flags.
 
-| Command                    | Extension                                                        | Category |
-| -------------------------- | ---------------------------------------------------------------- | -------- |
-| `/sf-agentscript-assist`   | [SF Agent Script Assist](./extensions/sf-agentscript-assist/)    | core     |
-| `/sf-data360`              | [SF Data 360](./extensions/sf-data360/)                          | core     |
-| `/sf-feedback`             | [SF Feedback](./extensions/sf-feedback/)                         | core     |
-| `/sf-guardrail`            | [SF Guardrail](./extensions/sf-guardrail/)                       | core     |
-| `/sf-lsp`                  | [SF LSP](./extensions/sf-lsp/)                                   | core     |
-| `/sf-pi`                   | [SF Pi Manager](./extensions/sf-pi-manager/)                     | core     |
-| `/sf-slack`                | [SF Slack](./extensions/sf-slack/)                               | core     |
-| `/sf-llm-gateway`          | [SF LLM Gateway Internal](./extensions/sf-llm-gateway-internal/) | provider |
-| `/sf-llm-gateway-internal` | [SF LLM Gateway Internal](./extensions/sf-llm-gateway-internal/) | provider |
-| `/sf-devbar`               | [SF DevBar](./extensions/sf-devbar/)                             | ui       |
-| `/sf-org`                  | [SF DevBar](./extensions/sf-devbar/)                             | ui       |
-| `/sf-skills`               | [SF Skills HUD](./extensions/sf-skills-hud/)                     | ui       |
-| `/sf-welcome`              | [SF Welcome](./extensions/sf-welcome/)                           | ui       |
-| `/sf-setup-fonts`          | [SF Welcome](./extensions/sf-welcome/)                           | ui       |
+| Command                    | Extension                                                        | Category   |
+| -------------------------- | ---------------------------------------------------------------- | ---------- |
+| `/sf-pi`                   | [SF Pi Manager](./extensions/sf-pi-manager/)                     | manager    |
+| `/sf-llm-gateway`          | [SF LLM Gateway Internal](./extensions/sf-llm-gateway-internal/) | provider   |
+| `/sf-llm-gateway-internal` | [SF LLM Gateway Internal](./extensions/sf-llm-gateway-internal/) | provider   |
+| `/sf-data360`              | [SF Data 360](./extensions/sf-data360/)                          | agent-tool |
+| `/sf-slack`                | [SF Slack](./extensions/sf-slack/)                               | agent-tool |
+| `/sf-guardrail`            | [SF Guardrail](./extensions/sf-guardrail/)                       | safety     |
+| `/sf-agentscript-assist`   | [SF Agent Script Assist](./extensions/sf-agentscript-assist/)    | assistive  |
+| `/sf-feedback`             | [SF Feedback](./extensions/sf-feedback/)                         | assistive  |
+| `/sf-lsp`                  | [SF LSP](./extensions/sf-lsp/)                                   | assistive  |
+| `/sf-devbar`               | [SF DevBar](./extensions/sf-devbar/)                             | ui         |
+| `/sf-org`                  | [SF DevBar](./extensions/sf-devbar/)                             | ui         |
+| `/sf-skills`               | [SF Skills HUD](./extensions/sf-skills-hud/)                     | ui         |
+| `/sf-welcome`              | [SF Welcome](./extensions/sf-welcome/)                           | ui         |
+| `/sf-setup-fonts`          | [SF Welcome](./extensions/sf-welcome/)                           | ui         |
 
 <!-- GENERATED:command-reference:end -->
 
@@ -334,21 +334,21 @@ For the canonical machine-readable bundle list, see [`catalog/index.json`](./cat
 
 **Default** column: `on` = enabled on install, `opt-in` = disabled on install (enable with `/sf-pi enable <id>`), `always-on` = cannot be disabled.
 
-| Extension                                                        | Category | Default   | Description                                                                                                                                                          |
-| ---------------------------------------------------------------- | -------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| [SF Agent Script Assist](./extensions/sf-agentscript-assist/)    | core     | on        | In-process Agent Script authoring companion — parse, compile, and code-action feedback on every .agent write                                                         |
-| [SF Brain](./extensions/sf-brain/)                               | core     | on        | High-density Salesforce operator kernel injected once per session — describe-before-query rules, API picker, anonymous Apex verification loop, and CLI power moves   |
-| [SF Data 360](./extensions/sf-data360/)                          | core     | on        | Data Cloud/Data 360 direct REST helper — d360_api, compact d360_metadata discovery, d360_probe, and extension-owned progressive-disclosure skill references          |
-| [SF Feedback](./extensions/sf-feedback/)                         | core     | on        | Guided feedback and bug-report flow that collects sanitized SF Pi diagnostics and opens a GitHub issue                                                               |
-| [SF Guardrail](./extensions/sf-guardrail/)                       | core     | on        | Salesforce-aware safety hooks — file protection policies, dangerous-command gating, and org-aware confirmation for production deploys, apex runs, and data mutations |
-| [SF LSP](./extensions/sf-lsp/)                                   | core     | on        | Real-time Salesforce LSP diagnostics on write/edit with a working-indicator spinner, transcript rows, and a permanent top-bar health segment in sf-devbar            |
-| [SF Pi Manager](./extensions/sf-pi-manager/)                     | core     | always-on | Core manager — provides /sf-pi commands (always active)                                                                                                              |
-| [SF Slack](./extensions/sf-slack/)                               | core     | on        | Slack integration — search messages, read threads, browse channel history                                                                                            |
-| [SF LLM Gateway Internal](./extensions/sf-llm-gateway-internal/) | provider | on        | Salesforce LLM Gateway provider with model discovery                                                                                                                 |
-| [SF DevBar](./extensions/sf-devbar/)                             | ui       | on        | Bespoke Salesforce developer status bar with org context, model info, git, and context window progress                                                               |
-| [SF Ohana Spinner](./extensions/sf-ohana-spinner/)               | ui       | on        | Salesforce-themed rainbow spinner during LLM thinking                                                                                                                |
-| [SF Skills HUD](./extensions/sf-skills-hud/)                     | ui       | on        | Pinned top-right overlay that shows which skills are live in context versus earlier in the session                                                                   |
-| [SF Welcome](./extensions/sf-welcome/)                           | ui       | on        | Salesforce-branded splash screen with environment status, extension health, and community info                                                                       |
+| Extension                                                        | Category   | Default   | Description                                                                                                                                                          |
+| ---------------------------------------------------------------- | ---------- | --------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| [SF Pi Manager](./extensions/sf-pi-manager/)                     | manager    | always-on | Core manager — provides /sf-pi commands (always active)                                                                                                              |
+| [SF LLM Gateway Internal](./extensions/sf-llm-gateway-internal/) | provider   | on        | Salesforce LLM Gateway provider with model discovery                                                                                                                 |
+| [SF Data 360](./extensions/sf-data360/)                          | agent-tool | on        | Data Cloud/Data 360 direct REST helper — d360_api, compact d360_metadata discovery, d360_probe, and extension-owned progressive-disclosure skill references          |
+| [SF Slack](./extensions/sf-slack/)                               | agent-tool | on        | Slack integration — search messages, read threads, browse channel history                                                                                            |
+| [SF Guardrail](./extensions/sf-guardrail/)                       | safety     | on        | Salesforce-aware safety hooks — file protection policies, dangerous-command gating, and org-aware confirmation for production deploys, apex runs, and data mutations |
+| [SF Agent Script Assist](./extensions/sf-agentscript-assist/)    | assistive  | on        | In-process Agent Script authoring companion — parse, compile, and code-action feedback on every .agent write                                                         |
+| [SF Brain](./extensions/sf-brain/)                               | assistive  | on        | High-density Salesforce operator kernel injected once per session — describe-before-query rules, API picker, anonymous Apex verification loop, and CLI power moves   |
+| [SF Feedback](./extensions/sf-feedback/)                         | assistive  | on        | Guided feedback and bug-report flow that collects sanitized SF Pi diagnostics and opens a GitHub issue                                                               |
+| [SF LSP](./extensions/sf-lsp/)                                   | assistive  | on        | Real-time Salesforce LSP diagnostics on write/edit with a working-indicator spinner, transcript rows, and a permanent top-bar health segment in sf-devbar            |
+| [SF DevBar](./extensions/sf-devbar/)                             | ui         | on        | Bespoke Salesforce developer status bar with org context, model info, git, and context window progress                                                               |
+| [SF Ohana Spinner](./extensions/sf-ohana-spinner/)               | ui         | on        | Salesforce-themed rainbow spinner during LLM thinking                                                                                                                |
+| [SF Skills HUD](./extensions/sf-skills-hud/)                     | ui         | on        | Pinned top-right overlay that shows which skills are live in context versus earlier in the session                                                                   |
+| [SF Welcome](./extensions/sf-welcome/)                           | ui         | on        | Salesforce-branded splash screen with environment status, extension health, and community info                                                                       |
 
 <!-- GENERATED:bundled-extensions:end -->
 
@@ -517,6 +517,60 @@ blocks inside `README.md` / `ARCHITECTURE.md` / `extensions/*/README.md`.
 
 Jump to an extension's Troubleshooting section to see the full fix. This index is generated from the `## Troubleshooting` section in each extension README, so it never drifts.
 
+**[SF Pi Manager](./extensions/sf-pi-manager/#troubleshooting)**
+
+- `/sf-pi` says "package not found in settings"
+- `pi update` completes but `pi --version` is still old
+- Disabling an extension through the manager doesn't take effect
+- `/sf-pi enable-all` still leaves some extensions disabled
+- Project-scoped changes aren't sticking
+- Display profile change doesn't affect any output
+- `/sf-pi recommended` shows no items or the opposite — too many
+- `/sf-pi skills` says "No external skill directories detected"
+- `/sf-pi skills` added a root but pi still doesn't load the skills
+
+**[SF LLM Gateway Internal](./extensions/sf-llm-gateway-internal/#troubleshooting)**
+
+- Startup warning `No models match pattern "sf-llm-gateway-internal/*"`
+- Gateway fails on startup or tool calls error out immediately
+- Claude responses appear to truncate and the agent asks you to type "continue"
+- Opus 4.7 returns `api_error: Internal server error` on heavy turns
+- gpt-5.5 fails with `Function tools with reasoning_effort are not supported for gpt-5.5 in /v1/chat/completions. Please use /v1/responses instead.`
+- Footer shows `⚠` badge after a 429 or 5xx
+- I set `/thinking` to a different level but subsequent model switches reset it to `xhigh`
+- Beta headers aren't taking effect
+- Monthly-usage footer is stale or missing
+- Old and new gateway keys are confusing status or tests
+
+**[SF Data 360](./extensions/sf-data360/#troubleshooting)**
+
+- A simple DMO list returns too much data
+- Metadata search fails but DMO/DLO lists work
+- Connector detail returns `NOT_FOUND`
+- `/skill:sf-data360` is missing
+- A mutating call is blocked in headless mode
+- The wrong API version appears in my path
+
+**[SF Slack](./extensions/sf-slack/#troubleshooting)**
+
+- No Slack footer pill appears and no tools are available
+- Footer shows `✓ Connected` with fewer approved scopes than requested
+- `slack_send action=dm` says `im:write` is missing
+- A Slack user or channel reference resolves to the wrong target
+- `slack_canvas read` says "canvas not found"
+- `slack_canvas read` criteria returns invalid arguments
+- `slack_canvas read` returns section IDs but no metadata
+- Search returns nothing from DMs or multi-party IMs
+- `slack_send` refuses to run in `pi -p` / CI mode
+- I need to see what `slack_send` posted (or attempted to post)
+
+**[SF Guardrail](./extensions/sf-guardrail/#troubleshooting)**
+
+- All production confirms are firing on my sandbox
+- I cannot write to `destructiveChanges.xml` even though my rule is supposed to be off
+- Headless CI fails with "Blocked by sf-guardrail in headless mode"
+- `/sf-guardrail audit` is empty after /resume
+
 **[SF Agent Script Assist](./extensions/sf-agentscript-assist/#troubleshooting)**
 
 - `LSP setup note:` shows up once on a `.agent` file
@@ -532,27 +586,11 @@ Jump to an extension's Troubleshooting section to see the full fix. This index i
 - User override does not take effect
 - I want to see the kernel content in a session
 
-**[SF Data 360](./extensions/sf-data360/#troubleshooting)**
-
-- A simple DMO list returns too much data
-- Metadata search fails but DMO/DLO lists work
-- Connector detail returns `NOT_FOUND`
-- `/skill:sf-data360` is missing
-- A mutating call is blocked in headless mode
-- The wrong API version appears in my path
-
 **[SF Feedback](./extensions/sf-feedback/#troubleshooting)**
 
 - `/sf-feedback` opens a browser URL instead of creating the issue
 - Diagnostics show `unknown` or `unavailable`
 - A private value appears in the preview
-
-**[SF Guardrail](./extensions/sf-guardrail/#troubleshooting)**
-
-- All production confirms are firing on my sandbox
-- I cannot write to `destructiveChanges.xml` even though my rule is supposed to be off
-- Headless CI fails with "Blocked by sf-guardrail in headless mode"
-- `/sf-guardrail audit` is empty after /resume
 
 **[SF LSP](./extensions/sf-lsp/#troubleshooting)**
 
@@ -569,44 +607,6 @@ Jump to an extension's Troubleshooting section to see the full fix. This index i
 - Diagnostics take >6 seconds to arrive
 - `.agent` files show no feedback or unexpected subprocess output
 - Diagnostics keep firing against files I've closed
-
-**[SF Pi Manager](./extensions/sf-pi-manager/#troubleshooting)**
-
-- `/sf-pi` says "package not found in settings"
-- `pi update` completes but `pi --version` is still old
-- Disabling an extension through the manager doesn't take effect
-- `/sf-pi enable-all` still leaves some extensions disabled
-- Project-scoped changes aren't sticking
-- Display profile change doesn't affect any output
-- `/sf-pi recommended` shows no items or the opposite — too many
-- `/sf-pi skills` says "No external skill directories detected"
-- `/sf-pi skills` added a root but pi still doesn't load the skills
-
-**[SF Slack](./extensions/sf-slack/#troubleshooting)**
-
-- No Slack footer pill appears and no tools are available
-- Footer shows `✓ Connected` with fewer approved scopes than requested
-- `slack_send action=dm` says `im:write` is missing
-- A Slack user or channel reference resolves to the wrong target
-- `slack_canvas read` says "canvas not found"
-- `slack_canvas read` criteria returns invalid arguments
-- `slack_canvas read` returns section IDs but no metadata
-- Search returns nothing from DMs or multi-party IMs
-- `slack_send` refuses to run in `pi -p` / CI mode
-- I need to see what `slack_send` posted (or attempted to post)
-
-**[SF LLM Gateway Internal](./extensions/sf-llm-gateway-internal/#troubleshooting)**
-
-- Startup warning `No models match pattern "sf-llm-gateway-internal/*"`
-- Gateway fails on startup or tool calls error out immediately
-- Claude responses appear to truncate and the agent asks you to type "continue"
-- Opus 4.7 returns `api_error: Internal server error` on heavy turns
-- gpt-5.5 fails with `Function tools with reasoning_effort are not supported for gpt-5.5 in /v1/chat/completions. Please use /v1/responses instead.`
-- Footer shows `⚠` badge after a 429 or 5xx
-- I set `/thinking` to a different level but subsequent model switches reset it to `xhigh`
-- Beta headers aren't taking effect
-- Monthly-usage footer is stale or missing
-- Old and new gateway keys are confusing status or tests
 
 **[SF DevBar](./extensions/sf-devbar/#troubleshooting)**
 

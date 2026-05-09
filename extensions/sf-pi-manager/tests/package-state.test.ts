@@ -1,9 +1,9 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /**
- * Direct tests for package-state helper modules.
+ * Direct tests for the shared sf-pi-package-state helper module.
  *
  * These focus on scope precedence and package discovery, which now live in
- * lib/package-state.ts instead of the main entry file.
+ * lib/common/sf-pi-package-state.ts instead of the main entry file.
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
@@ -13,7 +13,7 @@ import {
   findPackageInSettings,
   getDisabledExtensionsForCwd,
   resolveEffectiveScope,
-} from "../lib/package-state.ts";
+} from "../../../lib/common/sf-pi-package-state.ts";
 import { TEST_PACKAGE_SOURCE } from "../../../lib/common/test-fixtures.ts";
 
 const tempDirs: string[] = [];

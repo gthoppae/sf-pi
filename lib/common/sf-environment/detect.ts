@@ -77,7 +77,7 @@ type SfdxProjectJson = {
 export type ExecFn = (
   command: string,
   args: string[],
-  options?: { timeout?: number },
+  options?: { timeout?: number; cwd?: string },
 ) => Promise<{ stdout: string; stderr: string; code: number | null }>;
 
 // -------------------------------------------------------------------------------------------------

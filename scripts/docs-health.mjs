@@ -214,6 +214,62 @@ function checkExtensionReadmes() {
   }
 }
 
+function checkManifestToolsMatchCode() {
+  // Enforce two things at once:
+  // 1. Every tool name listed in manifest.tools is actually registered in source.
+  // 2. The tool registration follows the standard module shape so agents always
+  //    know where to look:
+  //      - either lib/<tool>-tool.ts exports `register<PascalCase>Tool`, or
+  //      - any lib/*.ts file in the extension calls `pi.registerTool({ name: "<tool>", ... })`.
+  //
+  // Documented in AGENTS.md → "Tool registration convention".
+  for (const dir of extensionDirs()) {
+    const base = `extensions/${dir}`;
+    const manifestPath = `${base}/manifest.json`;
+    if (!existsSync(path.join(ROOT, manifestPath))) continue;
+    const manifest = readJson(manifestPath);
+    const tools = Array.isArray(manifest.tools) ? manifest.tools : [];
+    if (tools.length === 0) continue;
+
+    const libDir = path.join(ROOT, base, "lib");
+    const libFiles = existsSync(libDir)
+      ? readdirSync(libDir, { withFileTypes: true })
+          .filter((entry) => entry.isFile() && entry.name.endsWith(".ts"))
+          .map((entry) => path.join(libDir, entry.name))
+      : [];
+    const indexFile = path.join(ROOT, base, "index.ts");
+    const allFiles = [indexFile, ...libFiles];
+    const allSource = allFiles
+      .filter((p) => existsSync(p))
+      .map((p) => readFileSync(p, "utf8"))
+      .join("\n");
+
+    // Two-step check:
+    //   1. Some file in the extension calls pi.registerTool(...).
+    //   2. The exact tool-name string literal appears somewhere in source.
+    // This tolerates the common pattern of declaring `export const X_TOOL_NAME = "x"`
+    // and passing the constant to `name:` (sf-data360), without false positives
+    // from other extensions: a typo in manifest.tools wouldn't match the literal.
+    const hasRegisterCall = /\bpi\.registerTool\s*[<(]/.test(allSource);
+    if (!hasRegisterCall) {
+      fail(
+        manifestPath,
+        `manifest.tools is non-empty but no pi.registerTool() call was found in index.ts or lib/.`,
+      );
+      continue;
+    }
+    for (const tool of tools) {
+      const literalPattern = new RegExp(`["\`']${escapeRegex(tool)}["\`']`);
+      if (!literalPattern.test(allSource)) {
+        fail(
+          manifestPath,
+          `Tool "${tool}" listed in manifest.tools but the exact name literal was not found in index.ts or lib/. Either fix the manifest typo or expose the name via a const string.`,
+        );
+      }
+    }
+  }
+}
+
 function checkManifestEventsMatchCode() {
   for (const dir of extensionDirs()) {
     const base = `extensions/${dir}`;
@@ -296,6 +352,7 @@ function run() {
   checkGeneratedFilesExist();
   checkExtensionReadmes();
   checkManifestEventsMatchCode();
+  checkManifestToolsMatchCode();
   checkChangelog();
   checkPublicSafety();
   checkDocOwnership();

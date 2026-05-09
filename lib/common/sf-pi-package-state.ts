@@ -2,27 +2,31 @@
 /**
  * sf-pi package discovery + extension filter state.
  *
- * Responsibility split:
- * - settings.ts handles generic JSON file I/O
- * - this file understands Pi package entries and sf-pi exclusion patterns
+ * This module owns the WRITE side of pi's package filter list (the
+ * `!extensions/<id>/index.ts` exclusions in settings.json). The matching
+ * READ-only check lives in `./sf-pi-extension-state.ts`.
  *
- * Keeping the rules here makes index.ts easier to read during command work.
+ * Lives in lib/common because the toggle action helper (extension-toggle.ts)
+ * needs it, and that helper is consumed by every command-bearing extension.
+ * Keeping the rules here means index.ts in each extension stays focused on
+ * its own behavior.
  */
 import { homedir } from "node:os";
 import path from "node:path";
 import { realpathSync } from "node:fs";
 import { fileURLToPath } from "node:url";
-import { SF_PI_REGISTRY } from "../../../catalog/registry.ts";
+import { SF_PI_REGISTRY } from "../../catalog/registry.ts";
 import {
   globalSettingsPath,
   projectSettingsPath,
   readJsonFile,
   writeJsonFile,
-} from "./settings.ts";
+} from "./sf-pi-settings.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const PACKAGE_ROOT = path.resolve(__dirname, "../../..");
+// lib/common/sf-pi-package-state.ts → ../../ is the package root.
+const PACKAGE_ROOT = path.resolve(__dirname, "../..");
 
 export interface PackageEntryMatch {
   index: number;

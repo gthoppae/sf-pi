@@ -3,6 +3,7 @@
   "name": "SF DevBar",
   "description": "Bespoke Salesforce developer status bar with org context, model info, git, and context window progress",
   "category": "ui",
+  "maturity": "stable",
   "defaultEnabled": true,
   "commands": ["/sf-devbar", "/sf-org"],
   "events": [
@@ -14,5 +15,15 @@
     "turn_end",
     "agent_end",
     "before_agent_start"
-  ]
+  ],
+  "docs": {
+    "summary": "Two non-blocking status bars: a top widget with model/thinking/git/context, and a custom footer with project-scoped org info, monthly LLM-gateway budget, and active extension counts.",
+    "primaryFiles": [
+      "index.ts",
+      "lib/top-bar.ts",
+      "lib/bottom-bar.ts",
+      "lib/git-changes.ts",
+      "lib/settings-reader.ts"
+    ]
+  }
 }

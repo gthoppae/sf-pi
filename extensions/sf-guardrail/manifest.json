@@ -2,11 +2,32 @@
   "id": "sf-guardrail",
   "name": "SF Guardrail",
   "description": "Salesforce-aware safety hooks — file protection policies, dangerous-command gating, and org-aware confirmation for production deploys, apex runs, and data mutations",
-  "category": "core",
+  "category": "safety",
+  "maturity": "stable",
   "defaultEnabled": true,
   "configurable": true,
   "commands": ["/sf-guardrail"],
   "providers": [],
   "tools": [],
-  "events": ["session_start", "session_tree", "before_agent_start", "tool_call"]
+  "events": ["session_start", "session_tree", "before_agent_start", "tool_call"],
+  "docs": {
+    "summary": "Salesforce-aware safety layer for pi: file-protection policies, AST-matched command gating, org-aware confirmation on production deploys/Apex/DML/destructive REST, plus a once-per-session prompt-injection that teaches the LLM the gating categories and validate-first workflow.",
+    "primaryFiles": [
+      "index.ts",
+      "lib/classify.ts",
+      "lib/policies.ts",
+      "lib/command-gate.ts",
+      "lib/org-aware-gate.ts",
+      "lib/hitl.ts",
+      "lib/audit.ts",
+      "lib/config.ts"
+    ],
+    "stateFiles": ["session entries: SF_GUARDRAIL_DEFAULTS allow/deny memory and audit decisions"],
+    "env": ["SF_GUARDRAIL_ALLOW_HEADLESS"],
+    "safety": [
+      "Fail-closed in headless mode unless SF_GUARDRAIL_ALLOW_HEADLESS=1.",
+      "Every block / allow / confirm decision is persisted as an audit entry.",
+      "alwaysActive=false but disabling removes the safety layer entirely; the manager surfaces this clearly."
+    ]
+  }
 }
