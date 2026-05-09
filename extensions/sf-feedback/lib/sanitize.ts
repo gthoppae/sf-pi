@@ -59,7 +59,11 @@ export function sanitizeRemoteUrl(value: string | undefined | null): string {
     return `github.com/${githubHttps[1]}/${githubHttps[2]}`;
   }
 
-  if (/github\.com/i.test(withoutCredentials)) {
+  // Anchored: github.com must be the host of an http(s)/ssh/git URL, not a
+  // substring embedded in the path or query of a non-GitHub remote. Without
+  // the anchors, a URL like "https://evil.example.com/?ref=github.com" would
+  // bypass the redaction below and leak into the public issue body.
+  if (/^(?:https?|ssh|git):\/\/(?:[^/\s@]+@)?github\.com(?:[:/]|$)/i.test(withoutCredentials)) {
     return withoutCredentials;
   }
 

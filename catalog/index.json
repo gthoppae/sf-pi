@@ -149,7 +149,7 @@
     "entry": "extensions/sf-feedback/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 940
+    "srcLoc": 944
   },
   {
     "id": "sf-guardrail",

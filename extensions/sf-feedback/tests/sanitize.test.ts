@@ -31,4 +31,19 @@ describe("sf-feedback sanitize", () => {
       "<non-github-remote-redacted>",
     );
   });
+
+  it("does not let a non-GitHub remote bypass redaction by embedding github.com", () => {
+    // CodeQL js/regex/missing-regexp-anchor regression guard. Before the fix,
+    // these URLs slipped through the fallback because /github\.com/i was
+    // unanchored and matched anywhere in the string.
+    expect(sanitizeRemoteUrl("https://evil.example.com/?ref=github.com")).toBe(
+      "<non-github-remote-redacted>",
+    );
+    expect(sanitizeRemoteUrl("https://github.com.evil.example.com/owner/repo")).toBe(
+      "<non-github-remote-redacted>",
+    );
+    expect(sanitizeRemoteUrl("https://example.com/path/github.com/x")).toBe(
+      "<non-github-remote-redacted>",
+    );
+  });
 });
