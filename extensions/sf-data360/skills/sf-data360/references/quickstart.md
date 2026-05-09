@@ -1,7 +1,9 @@
 # SF Data 360 Quickstart
 
 Use `d360_api` with paths relative to `/services/data/vXX.X`. The tool supplies
-the active API version and target org.
+the active API version and target org. For validation runs or any session where
+the default org is not the intended Data 360 org, pass `target_org` explicitly on
+every call.
 
 ## List Data Model Objects
 
@@ -9,7 +11,8 @@ the active API version and target org.
 {
   "method": "GET",
   "path": "/ssot/data-model-objects",
-  "query": { "category": "Profile", "limit": 20 }
+  "query": { "category": "Profile", "limit": 20 },
+  "target_org": "my-data360-sandbox"
 }
 ```
 

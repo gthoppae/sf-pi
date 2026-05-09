@@ -31,6 +31,9 @@ Agent rules for editing this extension. Repo-level rules still apply.
 - Do not add hundreds of always-on endpoint-specific tools.
 - Keep `SKILL.md` short; put large endpoint catalogs and examples in
   `references/` files.
+- Use the public upstream repo, <https://github.com/forcedotcom/d360-mcp-server>,
+  as the first external reference for action-family and payload-shape questions
+  before broad web search.
 - If new mutating paths are added, update `lib/safety.ts` and tests.
 - Keep examples generic and public-safe; do not include real org aliases,
   instance URLs, customer data, internal links, or secrets.

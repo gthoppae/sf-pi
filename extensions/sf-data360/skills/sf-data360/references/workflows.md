@@ -27,6 +27,22 @@ Suggested read-only coverage:
 | DataKits                     | `GET /ssot/data-kits`                                                | Manifest reads only after verifying the accepted identifier/path        |
 | Search indexes/retrievers    | List endpoints                                                       | Treat `NOT_FOUND` as optional-surface unavailable                       |
 
+## Recursive family validation
+
+Use this when validating the broad 180+ operation surface.
+
+1. Read `action-coverage.md` and build a checklist from the public upstream
+   `FamilyCatalog.java` plus any local OpenAPI/Swagger file.
+2. Pass the intended target org explicitly on every `d360_api`, `d360_metadata`,
+   and `d360_probe` call. Do not rely on the default org during recursive tests.
+3. Start every family with read-only list/detail coverage and safe POSTs such as
+   query, search, validate, count, preview, prediction, and connection test.
+4. For every create/update/delete/run/publish/deploy/undeploy/deactivate/cancel/retry/signing-key
+   action, first call `d360_api` with `dry_run: true` and verify the resolved
+   target org, API version, path, and safety level.
+5. Execute mutating calls only in disposable orgs with isolated test resources and cleanup steps.
+6. Record results as `reachable`, `empty`, `feature_gated`, `not_found_optional`, `dry_run_ok`, `skipped_needs_payload`, or `failed`.
+
 ## Explore before querying
 
 1. Search metadata with `/connect/search/metadata/results`.

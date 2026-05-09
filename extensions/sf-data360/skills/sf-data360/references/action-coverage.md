@@ -1,0 +1,77 @@
+# Data 360 Action Coverage and Recursive Validation
+
+Use this reference when validating `sf-data360` against the broad Data 360 Connect REST surface.
+
+## Source order
+
+1. Local `sf-data360` references in this directory.
+2. The public upstream repo: <https://github.com/forcedotcom/d360-mcp-server>.
+   - Inspect `README.md` for the facade-tool rationale.
+   - Inspect `src/main/java/com/salesforce/data360/mcp/runtime/FamilyCatalog.java` for current action-family names.
+   - Inspect `src/main/resources/metadata/payload-examples.json` for public example payload source material.
+3. Official Salesforce docs or broader web search only after the local references and upstream repo do not answer the question.
+
+Do not run or embed the upstream Java MCP server from this extension. Use it as public reference material for action families, workflow shape, and payload examples.
+
+## Design target
+
+Data 360 exposes roughly 180+ REST operations. `sf-data360` must not register one always-on Pi tool per operation. Keep the public surface small:
+
+- `d360_probe` for read-only readiness.
+- `d360_metadata` for compact DMO/DLO discovery.
+- `d360_api` for direct REST execution with explicit method/path/query/body, API-version normalization, output controls, and safety classification.
+
+The upstream MCP server reaches the same goal with three facade tools: `search`, `payload_examples`, and `execute`. In `sf-data360`, the equivalent flow is:
+
+| Upstream concept   | `sf-data360` equivalent                                                                                                          |
+| ------------------ | -------------------------------------------------------------------------------------------------------------------------------- |
+| `search`           | Read `endpoint-families.md`, `workflows.md`, and upstream `FamilyCatalog.java`.                                                  |
+| `payload_examples` | Read `examples.md`, `data-shapes.md`, and upstream `payload-examples.json`; rewrite examples into generic, public-safe payloads. |
+| `execute`          | Call `d360_api` with `dry_run: true` first for mutating operations, then execute only against the intended target org.           |
+
+## Recursive validation recipe
+
+1. Choose a disposable Data 360 org and pass its alias explicitly on every call, including reads.
+2. Run `d360_probe` and classify the org as `ready`, `ready-empty`, `partial`, or `blocked`.
+3. Build the family checklist from upstream `FamilyCatalog.java` and the local OpenAPI/Swagger file if one is available.
+4. For each family:
+   - Run one list/read endpoint with a small limit.
+   - If the list returns a record, run one detail read for that record.
+   - Run safe POST endpoints only when the payload is small and read-like: query, search, validate, count, preview, connection test, or prediction.
+   - Run `dry_run: true` for create, update, delete, run, publish, deploy, undeploy, enable, disable, deactivate, cancel, retry, clone, signing-key, extract, and generate actions.
+   - Execute mutating actions only when the test creates isolated resources with a unique test prefix and has a cleanup step.
+5. Record each action as one of: `reachable`, `empty`, `feature_gated`, `not_found_optional`, `dry_run_ok`, `skipped_needs_payload`, `failed`.
+6. Treat empty collections and optional feature 404s as coverage signals, not automatic failures.
+
+## Family checklist
+
+Use approximate counts only; upstream action counts can drift between releases.
+
+- Query and metadata — SQL/query status/rows/cancel, metadata search, metadata entities, profile, calculated insight query, and data graph query.
+- DMO and DLO — list, get, create, update, delete.
+- Mappings and standard mappings — DLO-to-DMO mappings, field mapping changes, standard mapping preview/create.
+- Data streams — generic streams plus connector-specific stream create/run/read/update/delete.
+- Connections — connector catalog, connection CRUD, test actions, endpoint/object/schema/preview discovery.
+- Calculated insights — CRUD, validate, run, status, enable/disable where available.
+- Identity resolution — CRUD, publish, run-now.
+- Segments — CRUD, count, publish, deactivate.
+- Data spaces — spaces plus member management.
+- Activations — activation and activation target CRUD plus publish/data reads.
+- Data transforms — CRUD, validate, run, schedule, status/cancel/retry actions.
+- DataKit — list/get/manifest, deploy, undeploy, status, dependency and component reads.
+- Data actions — action and target lifecycle, including signing-key generation where available.
+- Semantic data models — model lifecycle, data objects, relationships, dimensions, measurements, calculated fields, metrics, permissions, validation, semantic query.
+- Search index and retrievers — lifecycle, config/version reads, process history, query where available.
+- Machine learning, Document AI, Data Clean Room, Data Graphs, Private Network Routes, Universal ID Lookup — validate with the OpenAPI/Swagger file and treat feature-gated surfaces as optional unless the org is expected to have them.
+
+## Safety expectations
+
+A recursive run should prove these design properties before executing broad live tests:
+
+- Every call includes an explicit intended target org.
+- API paths are normalized to the active target API version.
+- GET requests are read-only.
+- Read-like POST requests are safe-listed narrowly.
+- Unknown or operational `POST .../actions/...` requests are confirmed or dry-run only by default.
+- DELETE always requires confirmation.
+- Large responses use `output_mode: "summary"` or `"file_only"`.

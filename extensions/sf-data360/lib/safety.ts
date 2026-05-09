@@ -35,17 +35,28 @@ const SAFE_POST_PATTERNS = [
   /\/connect\/search\/metadata\/results$/i,
   /\/ssot\/query(?:-sql|v2)?$/i,
   /\/ssot\/data-transforms-validation$/i,
-  /\/actions\/validate$/i,
-  /\/connections\/actions\/test$/i,
+  /\/actions\/(?:validate|count)$/i,
+  /\/connections(?:\/[^/]+)?\/actions\/test$/i,
+  /\/connections\/[^/]+\/schema\/actions\/test$/i,
+  /\/connections\/[^/]+\/(?:database-schemas|databases|objects)$/i,
+  /\/connections\/[^/]+\/objects\/[^/]+\/(?:fields|preview)$/i,
+  /\/machine-learning\/predict$/i,
 ];
 
 const ALWAYS_CONFIRM_POST_PATTERNS: Array<{ pattern: RegExp; level: D360SafetyLevel }> = [
   { pattern: /\/actions\/publish(?:$|\/)/i, level: "publish" },
-  { pattern: /\/actions\/run(?:$|\/)/i, level: "run" },
+  {
+    pattern: /\/actions\/(?:run|run-now|refresh|refresh-status|retry|cancel)(?:$|\/)/i,
+    level: "run",
+  },
+  { pattern: /\/actions\/(?:deactivate|enable|disable)(?:$|\/)/i, level: "update" },
+  { pattern: /\/connections(?:\/[^/]+)?\/actions\/[^/]+$/i, level: "run" },
   { pattern: /\/run-now(?:$|\/)/i, level: "run" },
   { pattern: /\/run(?:$|\/)/i, level: "run" },
   { pattern: /\/undeploy(?:$|\/)/i, level: "deploy" },
   { pattern: /\/deployment|\/update-components$/i, level: "deploy" },
+  { pattern: /\/ssot\/data-kits\/[^/]+$/i, level: "deploy" },
+  { pattern: /\/signing-key$/i, level: "update" },
 ];
 
 export function classifyD360Request(
@@ -53,7 +64,7 @@ export function classifyD360Request(
   path: string,
   orgType: OrgType | "unknown",
 ): D360SafetyDecision {
-  const normalized = normalizeD360Path(path);
+  const normalized = stripQueryAndHash(normalizeD360Path(path));
   const productionLike = orgType === "production" || orgType === "unknown";
 
   if (method === "GET") {
@@ -80,11 +91,16 @@ export function classifyD360Request(
 
   for (const safe of SAFE_POST_PATTERNS) {
     if (safe.test(normalized)) {
-      const level = normalized.includes("query")
-        ? "query"
-        : normalized.includes("test")
-          ? "test"
-          : "validate";
+      const level =
+        normalized.includes("query") ||
+        normalized.includes("predict") ||
+        normalized.includes("count")
+          ? "query"
+          : normalized.includes("test")
+            ? "test"
+            : normalized.includes("validate")
+              ? "validate"
+              : "read";
       return {
         level,
         requiresConfirmation: false,
@@ -118,4 +134,8 @@ export function normalizeMethod(method: string): D360Method {
     return upper as D360Method;
   }
   throw new Error(`Unsupported Data 360 method: ${method}`);
+}
+
+function stripQueryAndHash(path: string): string {
+  return path.split(/[?#]/, 1)[0] || "/";
 }

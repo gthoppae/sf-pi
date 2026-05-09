@@ -81,6 +81,7 @@ Read these files only when needed:
 
 - `references/quickstart.md` — common `d360_api` examples.
 - `references/workflows.md` — end-to-end operation sequences, including read-only smoke test matrices.
+- `references/action-coverage.md` — recursive validation guidance for the roughly 180+ operation surface.
 - `references/endpoint-families.md` — endpoint families and representative paths.
 - `references/examples.md` — public-safe payload examples.
 - `references/data-shapes.md` — request-body shapes distilled from public examples and DTOs.
@@ -88,6 +89,11 @@ Read these files only when needed:
 - `references/safety.md` — mutating-operation safety policy.
 - `references/readiness.md` — how to interpret Data 360 readiness probes.
 - `references/troubleshooting.md` — common failures and recovery steps.
+
+When local references are not enough, inspect the public upstream repo before broad web
+search: <https://github.com/forcedotcom/d360-mcp-server>. Use it for action-family
+design, facade workflow, and public payload source material; do not run or embed
+its Java MCP server from this extension.
 
 ## Rules of thumb
 

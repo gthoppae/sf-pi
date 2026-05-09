@@ -8,7 +8,8 @@ import {
   getCachedSfEnvironment,
   getSharedSfEnvironment,
 } from "../../../lib/common/sf-environment/shared-runtime.ts";
-import type { OrgType, SfEnvironment } from "../../../lib/common/sf-environment/types.ts";
+import { detectOrg, type ExecFn } from "../../../lib/common/sf-environment/detect.ts";
+import type { OrgInfo, OrgType, SfEnvironment } from "../../../lib/common/sf-environment/types.ts";
 import { buildApiPath, type QueryParams } from "./path.ts";
 import {
   cleanD360CliOutput,
@@ -25,6 +26,8 @@ import {
 
 export const D360_TOOL_NAME = "d360_api";
 export const HEADLESS_WRITE_ENV = "SF_D360_ALLOW_HEADLESS_WRITE";
+
+const explicitOrgCache = new Map<string, OrgInfo>();
 
 export const D360ApiParams = Type.Object({
   method: StringEnum(["GET", "POST", "PATCH", "PUT", "DELETE"] as const, {
@@ -101,6 +104,7 @@ export function registerD360ApiTool(pi: ExtensionAPI): void {
     promptSnippet: "Call Salesforce Data 360 REST endpoints safely via sf api request rest",
     promptGuidelines: [
       "Use d360_api for Data Cloud/Data 360 REST endpoints instead of hand-rolled curl.",
+      "Pass target_org explicitly when the intended Data 360 org is not the active sf-pi default org.",
       "Use d360_api dry_run:true before mutating Data 360 create, update, run, publish, deploy, undeploy, or delete calls.",
       "Use /ssot/metadata-entities?entityType=DataModelObject for concise DMO lists; do not call /ssot/data-model-objects broadly unless full DMO definitions or fields are explicitly needed.",
       "Before querying DMO records, inspect the selected DMO with GET /ssot/data-model-objects/{dmoApiName}, then run COUNT(*) before sampling rows.",
@@ -111,7 +115,7 @@ export function registerD360ApiTool(pi: ExtensionAPI): void {
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       const input = params as D360ApiInput;
       const env = await resolveEnvironment(exec, ctx);
-      const resolved = resolveRequest(input, env);
+      const resolved = await resolveRequestForExecution(input, env, exec);
 
       if (input.dry_run) {
         return buildResult(
@@ -162,15 +166,49 @@ async function resolveEnvironment(
   return getCachedSfEnvironment(ctx.cwd) ?? (await getSharedSfEnvironment(exec, ctx.cwd));
 }
 
-export function resolveRequest(input: D360ApiInput, env: SfEnvironment): ResolvedRequest {
-  const method = normalizeMethod(input.method);
-  const apiVersion = env.org.apiVersion ?? env.project.sourceApiVersion ?? "66.0";
-  const apiPath = buildApiPath(input.path, apiVersion, input.query);
+export async function resolveRequestForExecution(
+  input: D360ApiInput,
+  env: SfEnvironment,
+  exec: ExecFn,
+): Promise<ResolvedRequest> {
   const targetOrg = normalizeTargetOrg(input.target_org, env);
-  const orgType = resolveOrgType(targetOrg, env);
+  const targetOrgInfo = await resolveExplicitTargetOrg(targetOrg, env, exec);
+  return resolveRequest(input, env, targetOrgInfo);
+}
+
+export function resolveRequest(
+  input: D360ApiInput,
+  env: SfEnvironment,
+  targetOrgInfo?: OrgInfo,
+): ResolvedRequest {
+  const method = normalizeMethod(input.method);
+  const targetOrg = normalizeTargetOrg(input.target_org, env);
+  const resolvedTargetOrgInfo = targetOrgInfo?.detected ? targetOrgInfo : undefined;
+  const apiVersion =
+    resolvedTargetOrgInfo?.apiVersion ??
+    env.org.apiVersion ??
+    env.project.sourceApiVersion ??
+    "66.0";
+  const apiPath = buildApiPath(input.path, apiVersion, input.query);
+  const orgType = resolveOrgType(targetOrg, env, resolvedTargetOrgInfo);
   const safety = classifyD360Request(method, input.path, orgType);
 
   return { method, apiPath, targetOrg, apiVersion, orgType, safety };
+}
+
+async function resolveExplicitTargetOrg(
+  targetOrg: string | undefined,
+  env: SfEnvironment,
+  exec: ExecFn,
+): Promise<OrgInfo | undefined> {
+  if (!targetOrg || targetMatchesEnvironment(targetOrg, env)) return undefined;
+
+  const cached = explicitOrgCache.get(targetOrg);
+  if (cached) return cached;
+
+  const org = await detectOrg(exec, targetOrg);
+  if (org.detected) explicitOrgCache.set(targetOrg, org);
+  return org.detected ? org : undefined;
 }
 
 function normalizeTargetOrg(targetOrg: string | undefined, env: SfEnvironment): string | undefined {
@@ -179,18 +217,22 @@ function normalizeTargetOrg(targetOrg: string | undefined, env: SfEnvironment): 
   return env.config.targetOrg ?? env.org.alias ?? env.org.username;
 }
 
-function resolveOrgType(targetOrg: string | undefined, env: SfEnvironment): OrgType | "unknown" {
+function resolveOrgType(
+  targetOrg: string | undefined,
+  env: SfEnvironment,
+  targetOrgInfo?: OrgInfo,
+): OrgType | "unknown" {
   if (!targetOrg) return "unknown";
-  if (
+  if (targetMatchesEnvironment(targetOrg, env)) return env.org.orgType;
+  return targetOrgInfo?.orgType ?? "unknown";
+}
+
+function targetMatchesEnvironment(targetOrg: string, env: SfEnvironment): boolean {
+  return (
     targetOrg === env.config.targetOrg ||
     targetOrg === env.org.alias ||
     targetOrg === env.org.username
-  ) {
-    return env.org.orgType;
-  }
-  // Do not run a second org display from the hot tool path. Unknown aliases fail
-  // closed in the safety classifier.
-  return "unknown";
+  );
 }
 
 export function buildSfApiRequestArgs(resolved: ResolvedRequest, body: unknown): string[] {

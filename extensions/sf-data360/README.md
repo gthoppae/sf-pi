@@ -127,7 +127,14 @@ target org, org type, and safety decision.
 
 The bundled `sf-data360` skill is intentionally short. It points agents to
 reference files under `skills/sf-data360/references/` for endpoint families,
-workflow recipes, request-body shapes, query patterns, examples, and safety rules.
+workflow recipes, action coverage, request-body shapes, query patterns, examples,
+and safety rules.
+
+When local references are not enough, use the public upstream Data 360 MCP server
+repo before broad web search: <https://github.com/forcedotcom/d360-mcp-server>.
+It is reference material for the roughly 180+ operation surface, facade workflow,
+action families, and public payload examples. This extension still does not run
+or embed the Java MCP server.
 
 Do not duplicate large endpoint catalogs in prompt injection. Keep large content
 behind file references so the agent loads it only when needed.
@@ -184,8 +191,8 @@ Covered by unit tests:
 - Compact metadata helper builds safe list/describe paths and summarizes DMO/DLO list and field payloads.
 - Path normalization strips caller-supplied `/services/data/vNN.N` prefixes so the active API version wins.
 - Query-string construction handles repeated values and skips nullish values.
-- Safety classification allows reads/search/query/validation calls, confirms deletes and action paths, and treats unknown target orgs conservatively.
-- Request resolution chooses the active org API version and fails closed for non-default target orgs.
+- Safety classification allows reads/search/query/validation/count/test/preview calls, confirms deletes and operational action paths, and treats unresolved target orgs conservatively.
+- Request resolution chooses the target org API version, resolves explicit non-default target orgs before execution, and fails closed if that resolution fails.
 - Known `sf api request rest` beta warning noise is stripped before output parsing.
 - Salesforce REST error arrays are classified as failed calls even when the CLI exits zero.
 

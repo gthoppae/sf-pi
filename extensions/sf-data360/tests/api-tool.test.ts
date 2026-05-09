@@ -5,6 +5,7 @@ import {
   buildSfApiRequestArgs,
   responseLooksLikeError,
   resolveRequest,
+  resolveRequestForExecution,
   type D360ApiInput,
 } from "../lib/api-tool.ts";
 import type { SfEnvironment } from "../../../lib/common/sf-environment/types.ts";
@@ -41,7 +42,7 @@ describe("sf-data360 request resolution", () => {
     });
   });
 
-  it("treats non-default target org type as unknown", () => {
+  it("treats non-default target org type as unknown until execution resolves it", () => {
     const input: D360ApiInput = {
       method: "POST",
       path: "/ssot/data-model-objects",
@@ -50,6 +51,57 @@ describe("sf-data360 request resolution", () => {
 
     expect(resolveRequest(input, env)).toMatchObject({
       targetOrg: "other-org",
+      orgType: "unknown",
+      safety: { level: "create", requiresConfirmation: true },
+    });
+  });
+
+  it("resolves explicit non-default target orgs before execution", async () => {
+    const input: D360ApiInput = {
+      method: "POST",
+      path: "/ssot/data-model-objects",
+      target_org: "other-org",
+    };
+    const resolved = await resolveRequestForExecution(input, env, async (command, args) => {
+      expect(command).toBe("sf");
+      expect(args).toEqual(["org", "display", "--target-org", "other-org", "--json"]);
+      return {
+        code: 0,
+        stderr: "",
+        stdout: JSON.stringify({
+          status: 0,
+          result: {
+            alias: "other-org",
+            username: "other@example.invalid",
+            instanceUrl: "https://other-dev-ed.develop.my.salesforce.com",
+            apiVersion: "66.0",
+          },
+        }),
+      };
+    });
+
+    expect(resolved).toMatchObject({
+      targetOrg: "other-org",
+      orgType: "developer",
+      apiVersion: "66.0",
+      safety: { level: "create", requiresConfirmation: false },
+    });
+  });
+
+  it("keeps explicit target orgs fail-closed when org display fails", async () => {
+    const input: D360ApiInput = {
+      method: "POST",
+      path: "/ssot/data-model-objects",
+      target_org: "missing-org",
+    };
+    const resolved = await resolveRequestForExecution(input, env, async () => ({
+      code: 1,
+      stderr: "",
+      stdout: JSON.stringify({ status: 1, message: "auth failed" }),
+    }));
+
+    expect(resolved).toMatchObject({
+      targetOrg: "missing-org",
       orgType: "unknown",
       safety: { level: "create", requiresConfirmation: true },
     });
