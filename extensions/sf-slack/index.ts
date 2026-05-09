@@ -94,6 +94,7 @@ import { classifySlackStatus, slackStatusLabel } from "./lib/status.ts";
 import { clearSlackStatus, setSlackStatus } from "../../lib/common/slack-status/store.ts";
 import {
   buildToggleExtensionAction,
+  isLifecycleToggleAction,
   LIFECYCLE_GROUP,
   performToggleExtension,
   type LifecycleActionId,
@@ -598,6 +599,9 @@ export default function sfSlack(pi: ExtensionAPI) {
       closeValue: "close",
       state: panelState,
       onAction: (action) => handleSlackCommand(action, ctx, true),
+      // Lifecycle toggle calls ctx.reload() — must close panel first so the
+      // ctx.ui.custom() promise resolves before the runtime is invalidated.
+      closeBeforeAction: isLifecycleToggleAction,
     });
   }
 

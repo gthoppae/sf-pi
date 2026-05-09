@@ -544,7 +544,13 @@ async function handlePanelCommand(pi: ExtensionAPI, ctx: ExtensionCommandContext
         scope = scope === "global" ? "project" : "global";
         return;
       }
+      // "close" can't actually reach here — lib/common/command-panel.ts
+      // dismisses the panel directly on the closeValue row — but the
+      // GatewayPanelAction union still includes it, so we narrow it out
+      // here for TypeScript and as a defense-in-depth no-op.
       if (action === "close") return;
+      // lifecycle.toggle is routed through closeBeforeAction so the panel
+      // closes BEFORE ctx.reload() runs. See lib/common/command-panel.ts.
       if (action === "lifecycle.toggle") {
         await performToggleExtension(ctx, "sf-llm-gateway-internal");
         return;

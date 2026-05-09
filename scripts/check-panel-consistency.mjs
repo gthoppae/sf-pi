@@ -62,6 +62,21 @@ const REQUIRED_IMPORTS = [
   },
 ];
 
+// Panels that route lifecycle.toggle through performToggleExtension MUST
+// pass closeBeforeAction so the panel closes BEFORE ctx.reload() runs.
+// Skipping it strands the ctx.ui.custom() promise and hangs the surrounding
+// slash-command handler. See lib/common/command-panel.ts (closeBeforeAction
+// docstring) for the full rationale.
+const CLOSE_BEFORE_ACTION_RULE = {
+  label: "closeBeforeAction wiring for lifecycle.toggle",
+  // Trigger: imports performToggleExtension AND calls openCommandPanel.
+  triggers: [/performToggleExtension/, /openCommandPanel\s*\(/],
+  // Required evidence: imports the helper AND uses it as closeBeforeAction.
+  required: [/isLifecycleToggleAction/, /closeBeforeAction\s*:\s*isLifecycleToggleAction/],
+  rationale:
+    "actions that call ctx.reload() must close the panel first, otherwise the ctx.ui.custom() promise dangles and the slash-command handler hangs",
+};
+
 function loadCatalog() {
   const raw = readFileSync(CATALOG_PATH, "utf8");
   const parsed = JSON.parse(raw);
@@ -147,8 +162,26 @@ function checkExtension(ext) {
     (req) => `${req.label} — ${req.rationale}`,
   );
 
+  // closeBeforeAction wiring lint. Only applies when the extension uses
+  // openCommandPanel AND routes lifecycle.toggle through performToggleExtension.
+  // (sf-lsp uses its own ctx.ui.custom layout that already closes the panel
+  // before invoking the action, which is why it is on the EXEMPT_EXTENSIONS
+  // list at the top.)
+  const triggers = CLOSE_BEFORE_ACTION_RULE.triggers.every((re) => re.test(allSources));
+  const closeBeforeViolations = [];
+  if (triggers) {
+    for (const re of CLOSE_BEFORE_ACTION_RULE.required) {
+      if (!re.test(allSources)) {
+        closeBeforeViolations.push(
+          `${CLOSE_BEFORE_ACTION_RULE.label} — ${CLOSE_BEFORE_ACTION_RULE.rationale}`,
+        );
+        break;
+      }
+    }
+  }
+
   const forbidden = checkForbiddenFilenames(ext).map((entry) => `forbidden filename ${entry}`);
-  const issues = [...missing, ...forbidden];
+  const issues = [...missing, ...closeBeforeViolations, ...forbidden];
 
   return { id: ext.id, ok: issues.length === 0, missing: issues };
 }

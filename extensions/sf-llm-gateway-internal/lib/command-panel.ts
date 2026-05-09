@@ -23,6 +23,7 @@ import { formatTokens, formatUsd } from "./models.ts";
 import { GATEWAY_COMMAND_SURFACE, type GatewayPanelAction } from "./command-surface.ts";
 import {
   buildToggleExtensionAction,
+  isLifecycleToggleAction,
   LIFECYCLE_GROUP,
 } from "../../../lib/common/extension-toggle.ts";
 
@@ -52,6 +53,9 @@ export async function openGatewayPanel(
     closeValue: "close",
     state: options.state,
     onAction: options.onAction,
+    // Lifecycle toggle calls ctx.reload() — must close panel first so the
+    // ctx.ui.custom() promise resolves before the runtime is invalidated.
+    closeBeforeAction: isLifecycleToggleAction,
   });
 }
 

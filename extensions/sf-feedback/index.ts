@@ -37,6 +37,7 @@ import {
 import { requirePiVersion } from "../../lib/common/pi-compat.ts";
 import {
   buildToggleExtensionAction,
+  isLifecycleToggleAction,
   LIFECYCLE_GROUP,
   performToggleExtension,
   type LifecycleActionId,
@@ -158,6 +159,9 @@ async function handleFeedbackPanel(
     closeValue: "close",
     state: panelState,
     onAction: (action) => handleCommand(pi, ctx, exec, action),
+    // Lifecycle toggle calls ctx.reload() — must close panel first so the
+    // ctx.ui.custom() promise resolves before the runtime is invalidated.
+    closeBeforeAction: isLifecycleToggleAction,
   });
 }
 

@@ -58,6 +58,7 @@ import { probeDoctor, renderDoctorReport, runExtensionDoctor } from "./lib/docto
 import { registerExtensionDoctor } from "../../lib/common/doctor/registry.ts";
 import {
   buildToggleExtensionAction,
+  isLifecycleToggleAction,
   LIFECYCLE_GROUP,
   performToggleExtension,
   type LifecycleActionId,
@@ -179,6 +180,9 @@ async function handleAgentScriptPanel(
     closeValue: "close",
     state: panelState,
     onAction: (action) => handleAgentScriptCommand(ctx, state, action, [], true),
+    // Lifecycle toggle calls ctx.reload() — must close panel first so the
+    // ctx.ui.custom() promise resolves before the runtime is invalidated.
+    closeBeforeAction: isLifecycleToggleAction,
   });
 }
 

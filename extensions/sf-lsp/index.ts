@@ -569,6 +569,10 @@ export default function sfLspExtension(pi: ExtensionAPI) {
     action: SfLspPanelAction | null,
     ctx: ExtensionCommandContext,
   ): Promise<void> {
+    // The bespoke openSfLspPanel calls done(item.value) on every selection
+    // so the panel closes BEFORE this handler runs. "close" still arrives
+    // here from list.onCancel; null arrives when the user dismisses without
+    // selecting. Both are no-ops.
     if (!action || action === "close") return;
 
     if (action === "refresh-doctor") {

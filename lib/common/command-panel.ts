@@ -49,8 +49,39 @@ export interface CommandPanelOptions<T extends string = string> {
    * When set, Enter runs this action without closing the panel. This is the
    * preferred mode for interactive command menus: action results can open an
    * overlay and return to the same selected row without the close/reopen flicker.
+   *
+   * Two contracts the panel enforces on top of this callback:
+   *
+   * 1. The row whose `value === closeValue` ALWAYS dismisses the panel and
+   *    NEVER calls `onAction`. Extensions don't have to add a no-op `"close"`
+   *    branch to their handler. Typed close keywords (`exit`, `quit`) and Esc
+   *    follow the same path.
+   * 2. If `closeBeforeAction(action)` returns true, the panel closes itself
+   *    (resolves done(closeValue)) BEFORE running `onAction(action)`. The
+   *    onAction work then runs OUTSIDE the panel context, after
+   *    `ctx.ui.custom()` has already settled. Use this for actions that call
+   *    `ctx.reload()`, `ctx.newSession()`, or anything else that invalidates
+   *    `ctx` — running them with the panel still mounted leaves the
+   *    `ctx.ui.custom()` promise dangling (pi's `resetExtensionUI()` unmounts
+   *    the panel during reload but never calls `done`), which strands the
+   *    surrounding slash-command handler on a Promise that will never
+   *    resolve. The user-visible symptom is a "silent hang" after toggle/
+   *    reload: editor input still works for plain text, but the captured
+   *    stale `ctx` keeps emitting "This extension ctx is stale..." errors
+   *    from any background async that resolves after reload.
    */
   onAction?: (action: T) => Promise<void> | void;
+  /**
+   * Optional. If provided and returns true for the chosen action, the panel
+   * closes BEFORE running `onAction`. See `onAction` docs for the full
+   * rationale; the short version is: use this for any action that triggers
+   * `ctx.reload()` or another ctx-invalidating operation.
+   *
+   * Tip: the standard `lifecycle.toggle` row from `extension-toggle.ts`
+   * always wants this — pass `isLifecycleToggleAction` from that module
+   * instead of writing the predicate inline.
+   */
+  closeBeforeAction?: (action: T) => boolean;
 }
 
 // Keywords that close the panel as soon as the user types them, no Enter
@@ -69,6 +100,18 @@ export async function openCommandPanel<T extends string>(
 ): Promise<T | null> {
   const state = options.state;
   const glyphs = resolveUiGlyphs(ctx.cwd);
+
+  // When `closeBeforeAction(action)` is true, GroupedActionList stashes the
+  // chosen action here, calls done(closeValue) to unmount the panel, and we
+  // run `onAction` AFTER `ctx.ui.custom()` resolves below. This keeps any
+  // ctx-invalidating side-effect (e.g. ctx.reload()) outside the panel's
+  // lifetime so pi's reload-time UI teardown doesn't strand a never-resolving
+  // ctx.ui.custom() promise. See the `closeBeforeAction` doc above.
+  let pendingPostCloseAction: T | null = null;
+  const stagePostCloseAction = (action: T) => {
+    pendingPostCloseAction = action;
+  };
+
   const result = await ctx.ui.custom<T | null>((tui, theme, keybindings, done) => {
     const container = new Container();
     container.addChild(new DynamicBorder((s: string) => theme.fg("borderAccent", s)));
@@ -98,6 +141,8 @@ export async function openCommandPanel<T extends string>(
       () => tui.requestRender(),
       state,
       options.onAction,
+      options.closeBeforeAction,
+      stagePostCloseAction,
     );
     container.addChild(list);
 
@@ -126,6 +171,14 @@ export async function openCommandPanel<T extends string>(
     };
   });
 
+  // Run any close-before-action handler now that the panel is fully
+  // unmounted and ctx.ui.custom() has resolved. Errors here propagate to the
+  // surrounding slash-command handler so its callers (and pi's error UI) see
+  // them — same surface area as a synchronous onAction error would have had.
+  if (pendingPostCloseAction !== null && options.onAction) {
+    await options.onAction(pendingPostCloseAction);
+  }
+
   return result ?? null;
 }
 
@@ -149,6 +202,8 @@ class GroupedActionList<T extends string> implements Component {
     private readonly requestRender: () => void,
     private readonly state?: CommandPanelState<T>,
     private readonly onAction?: (action: T) => Promise<void> | void,
+    private readonly closeBeforeAction?: (action: T) => boolean,
+    private readonly stagePostCloseAction?: (action: T) => void,
   ) {
     this.filter = state?.filter ?? "";
     this.selectedIndex = this.indexForSelectedValue(state?.selectedValue);
@@ -232,7 +287,25 @@ class GroupedActionList<T extends string> implements Component {
       const selected = this.filteredItems()[this.selectedIndex];
       if (selected) {
         if (this.state) this.state.selectedValue = selected.value;
+        // The closeValue row is always a panel-dismiss. Never route through
+        // onAction — extensions used to fall through to a generic "Unknown
+        // subcommand: close" warning when their handler didn't branch on it,
+        // and forcing every panel author to remember a "close" no-op was a
+        // contract trap.
+        if (selected.value === this.closeValue) {
+          this.done(this.closeValue);
+          return;
+        }
         if (this.onAction) {
+          // Actions that invalidate ctx (ctx.reload(), ctx.newSession(), …)
+          // must close the panel BEFORE running, otherwise the
+          // ctx.ui.custom() promise is left dangling. The opt-in is the
+          // closeBeforeAction predicate on CommandPanelOptions.
+          if (this.closeBeforeAction?.(selected.value)) {
+            this.stagePostCloseAction?.(selected.value);
+            this.done(this.closeValue);
+            return;
+          }
           this.runAction(selected.value);
         } else {
           this.done(selected.value);

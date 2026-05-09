@@ -52,6 +52,7 @@ import {
 import { openInfoPanel, type InfoPanelSeverity } from "../../lib/common/info-panel.ts";
 import {
   buildToggleExtensionAction,
+  isLifecycleToggleAction,
   LIFECYCLE_GROUP,
   performToggleExtension,
   type LifecycleActionId,
@@ -618,6 +619,9 @@ export default function sfWelcome(pi: ExtensionAPI) {
       closeValue: "close",
       state: panelState,
       onAction: (action) => handleWelcomeAction(ctx, action),
+      // Lifecycle toggle calls ctx.reload() — must close panel first so the
+      // ctx.ui.custom() promise resolves before the runtime is invalidated.
+      closeBeforeAction: isLifecycleToggleAction,
     });
   }
 
@@ -639,8 +643,8 @@ export default function sfWelcome(pi: ExtensionAPI) {
     ctx: ExtensionCommandContext,
     action: WelcomeAction,
   ): Promise<void> {
-    if (action === "close") return;
-
+    // The shared command-panel guarantees the closeValue row never reaches
+    // here — see lib/common/command-panel.ts. No "close" branch needed.
     if (action === "lifecycle.toggle") {
       await performToggleExtension(ctx, "sf-welcome");
       return;

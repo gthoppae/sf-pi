@@ -4,11 +4,18 @@
  *
  * The TUI rendering itself is covered by manual smoke testing inside pi
  * (we can't easily mount Pi's KeybindingsManager + Theme in a vitest
- * env). What we *can* unit-test is the close-keyword contract — that's
- * the piece extensions rely on, so it's the piece we lock down.
+ * env). What we *can* unit-test is:
+ *
+ *   1. The close-keyword contract — extensions rely on `exit` / `quit`
+ *      always closing the panel.
+ *   2. The lifecycle-action predicate exported from extension-toggle.ts —
+ *      every panel that wires `performToggleExtension` passes this as
+ *      `closeBeforeAction`. The lint `npm run check:panels` enforces the
+ *      wiring; this test pins the predicate itself.
  */
 import { describe, expect, it } from "vitest";
 import { matchesCloseKeyword } from "../command-panel.ts";
+import { isLifecycleToggleAction } from "../extension-toggle.ts";
 
 describe("matchesCloseKeyword", () => {
   it("matches the exact `exit` keyword", () => {
@@ -36,5 +43,28 @@ describe("matchesCloseKeyword", () => {
     expect(matchesCloseKeyword("")).toBe(false);
     expect(matchesCloseKeyword("save")).toBe(false);
     expect(matchesCloseKeyword("exitnow")).toBe(false);
+  });
+});
+
+describe("isLifecycleToggleAction", () => {
+  // This predicate is what every /sf-* command panel passes as
+  // `closeBeforeAction`. Changing the literal string would silently break
+  // the close-before-reload contract in 9 extensions.
+  it("matches the canonical lifecycle action id", () => {
+    expect(isLifecycleToggleAction("lifecycle.toggle")).toBe(true);
+  });
+
+  it("rejects close, status, refresh, and unrelated values", () => {
+    expect(isLifecycleToggleAction("close")).toBe(false);
+    expect(isLifecycleToggleAction("status")).toBe(false);
+    expect(isLifecycleToggleAction("refresh")).toBe(false);
+    expect(isLifecycleToggleAction("help")).toBe(false);
+    expect(isLifecycleToggleAction("")).toBe(false);
+  });
+
+  it("is exact-match (no prefix / case lenience)", () => {
+    expect(isLifecycleToggleAction("Lifecycle.toggle")).toBe(false);
+    expect(isLifecycleToggleAction("lifecycle.toggle.x")).toBe(false);
+    expect(isLifecycleToggleAction("lifecycle-toggle")).toBe(false); // hyphen, not dot
   });
 });

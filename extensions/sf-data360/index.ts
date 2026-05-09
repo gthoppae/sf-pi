@@ -40,6 +40,7 @@ import {
 import { openInfoPanel, type InfoPanelSeverity } from "../../lib/common/info-panel.ts";
 import {
   buildToggleExtensionAction,
+  isLifecycleToggleAction,
   LIFECYCLE_GROUP,
   performToggleExtension,
   type LifecycleActionId,
@@ -166,6 +167,9 @@ async function handleSfData360Panel(pi: ExtensionAPI, ctx: ExtensionCommandConte
     closeValue: "close",
     state: panelState,
     onAction: (action) => handleSfData360Action(pi, ctx, action, true),
+    // Lifecycle toggle calls ctx.reload() — must close panel first so the
+    // ctx.ui.custom() promise resolves before the runtime is invalidated.
+    closeBeforeAction: isLifecycleToggleAction,
   });
 }
 
@@ -175,8 +179,8 @@ async function handleSfData360Action(
   action: SfData360Action | string,
   fromPanel: boolean,
 ): Promise<void> {
-  if (action === "close") return;
-
+  // The shared command-panel guarantees the closeValue row never reaches
+  // here — see lib/common/command-panel.ts. No "close" branch needed.
   if (action === "lifecycle.toggle") {
     await performToggleExtension(ctx, "sf-data360");
     return;

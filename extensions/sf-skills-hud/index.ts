@@ -41,6 +41,7 @@ import {
 import { requirePiVersion } from "../../lib/common/pi-compat.ts";
 import {
   buildToggleExtensionAction,
+  isLifecycleToggleAction,
   LIFECYCLE_GROUP,
   performToggleExtension,
   type LifecycleActionId,
@@ -258,6 +259,9 @@ export default function sfSkillsHud(pi: ExtensionAPI) {
       closeValue: "close",
       state: panelState,
       onAction: (action) => handleSkillsCommand(ctx, action, true),
+      // Lifecycle toggle calls ctx.reload() — must close panel first so the
+      // ctx.ui.custom() promise resolves before the runtime is invalidated.
+      closeBeforeAction: isLifecycleToggleAction,
     });
   }
 

@@ -47,6 +47,29 @@ export const LIFECYCLE_GROUP = "Lifecycle";
  */
 export type LifecycleActionId = "lifecycle.toggle";
 
+/**
+ * Predicate for `CommandPanelOptions.closeBeforeAction`.
+ *
+ * Every panel that wires `lifecycle.toggle` to {@link performToggleExtension}
+ * MUST pass this as `closeBeforeAction`. The toggle action calls
+ * `ctx.reload()` which invalidates `ctx`; running it while the panel is
+ * still mounted leaves the underlying `ctx.ui.custom()` promise dangling
+ * (pi's reload-time UI teardown unmounts the panel but never calls `done`),
+ * which strands the surrounding slash-command handler. The lint
+ * `npm run check:panels` flags panels that omit this and use
+ * {@link performToggleExtension}.
+ *
+ * Generic in `A` so TypeScript still infers each panel's narrow action
+ * union from `onAction` instead of widening the inferred `T` to `string`
+ * via this predicate's parameter type. (We tried a non-generic
+ * `(action: string)` signature first — it caused TS2345 "Argument of type
+ * 'string' is not assignable to parameter of type 'WelcomeAction'" inside
+ * the panel's `onAction` because T was unified upward to `string`.)
+ */
+export function isLifecycleToggleAction<A extends string>(action: A): boolean {
+  return action === "lifecycle.toggle";
+}
+
 export interface BuildToggleActionOptions {
   /** sf-pi extension id, e.g. "sf-data360". */
   extensionId: string;
