@@ -28,6 +28,7 @@ import {
   type UsersInfoResponse,
   type UsersListResponse,
 } from "./types.ts";
+import { getSlackHttpDispatcher } from "./http-dispatcher.ts";
 
 interface SlackApiEnvelope {
   ok?: boolean;
@@ -183,7 +184,12 @@ async function fetchWithRetry(
 ): Promise<Response> {
   const first = buildRequest();
   const firstBudget = withRequestTimeout(signal);
-  let response = await fetch(first.url, { ...first.init, signal: firstBudget.signal });
+  let response = await fetch(first.url, {
+    ...first.init,
+    signal: firstBudget.signal,
+    // Pin slack.com requests to HTTP/1.1. See ./http-dispatcher.ts for why.
+    ...({ dispatcher: getSlackHttpDispatcher() } as object),
+  });
 
   if (response.status !== 429) return response;
 
@@ -199,7 +205,11 @@ async function fetchWithRetry(
 
   const second = buildRequest();
   const secondBudget = withRequestTimeout(signal);
-  response = await fetch(second.url, { ...second.init, signal: secondBudget.signal });
+  response = await fetch(second.url, {
+    ...second.init,
+    signal: secondBudget.signal,
+    ...({ dispatcher: getSlackHttpDispatcher() } as object),
+  });
   return response;
 }
 

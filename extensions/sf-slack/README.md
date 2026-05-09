@@ -498,6 +498,7 @@ extensions/sf-slack/
     extension-doctor.ts     ← implementation module
     file-tool.ts            ← implementation module
     format.ts               ← implementation module
+    http-dispatcher.ts      ← implementation module
     preferences-panel.ts    ← implementation module
     preferences.ts          ← implementation module
     recipient-confirm.ts    ← implementation module

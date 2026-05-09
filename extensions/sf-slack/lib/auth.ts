@@ -12,6 +12,7 @@ import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { existsSync, readFileSync } from "node:fs";
 import { execSync } from "node:child_process";
 import { globalAgentPath } from "../../../lib/common/pi-paths.ts";
+import { getSlackHttpDispatcher } from "./http-dispatcher.ts";
 import {
   PROVIDER_NAME,
   SLACK_API_BASE,
@@ -248,6 +249,8 @@ export async function loginSlack(callbacks: OAuthLoginCallbacks): Promise<OAuthC
         code,
         redirect_uri: redirectUri,
       }).toString(),
+      // Same H1.1 pin as Slack API calls in lib/api.ts.
+      ...({ dispatcher: getSlackHttpDispatcher() } as object),
     });
 
     const data = (await tokenResponse.json()) as SlackOAuthResponse;
@@ -306,6 +309,8 @@ export async function refreshSlackToken(credentials: OAuthCredentials): Promise<
         client_id: clientId,
         client_secret: clientSecret,
       }).toString(),
+      // Same H1.1 pin as Slack API calls in lib/api.ts.
+      ...({ dispatcher: getSlackHttpDispatcher() } as object),
     });
 
     const data = (await response.json()) as SlackOAuthResponse;
