@@ -41,6 +41,9 @@ npx prettier --check --log-level=warn .
 banner "Type check"
 npx tsc --noEmit -p tsconfig.json
 
+banner "Panel consistency"
+node scripts/check-panel-consistency.mjs
+
 banner "Tests"
 npx vitest run --reporter=dot
 

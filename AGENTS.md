@@ -68,6 +68,31 @@ Use these in order:
 - If you change any `manifest.json`, run `npm run generate-catalog`.
 - Prefer deriving extension lists from `catalog/index.json` or `catalog/registry.ts` instead of hardcoding them.
 
+### Standardized `/sf-*` panel pattern
+
+Every interactive extension command (`/sf-slack`, `/sf-devbar`,
+`/sf-data360`, ...) follows the same shape so users don't have to
+relearn each command:
+
+1. Open `lib/common/command-panel.ts` `openCommandPanel` when invoked
+   with no args and `ctx.hasUI`.
+2. Render action results via `lib/common/info-panel.ts` `openInfoPanel`
+   when `fromPanel === true`. Direct command-line invocations may
+   `notify` for short messages; headless mode falls through to stdout.
+3. Append the shared lifecycle toggle row from
+   `extensions/sf-pi-manager/lib/extension-toggle.ts` so users can
+   disable / enable the extension without leaving the panel.
+4. Place Close + the toggle in the `LIFECYCLE_GROUP`. Section labels
+   use `theme.fg("toolTitle")` for visible hierarchy.
+5. Support `Esc`, `q`, and typed `exit` / `quit` to dismiss.
+
+The lint `npm run check:panels` (and `npm run validate`) verifies the
+three imports above. Documented exceptions live in
+`scripts/check-panel-consistency.mjs` (currently sf-pi-manager,
+sf-brain, sf-ohana-spinner, sf-lsp). New extensions scaffolded via
+`npm run scaffold` start from this template and pass the lint on
+first commit.
+
 ## Editing rules
 
 ### Keep the code simple

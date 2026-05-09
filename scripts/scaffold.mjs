@@ -56,7 +56,7 @@ function toDisplayName(id) {
 // Templates
 // -------------------------------------------------------------------------------------------------
 
-function indexTs(id, _name) {
+function indexTs(id, name) {
   return `/* SPDX-License-Identifier: Apache-2.0 */
 /**
  * ${id} behavior contract
@@ -67,21 +67,147 @@ function indexTs(id, _name) {
  *
  * Behavior matrix:
  *
- *   Event           | Result
- *   ----------------|--------------------------------------------
- *   session_start   | TODO
- *   turn_start      | TODO
- *   turn_end        | TODO
+ *   Event/Trigger          | Result
+ *   -----------------------|--------------------------------------------
+ *   session_start          | TODO
+ *   /${id} (no args)       | Open standardized command panel
+ *   /${id} status          | Print status as plain text (headless-safe)
+ *   /${id} help            | Print command usage as plain text
  */
-import type { ExtensionAPI } from "@mariozechner/pi-coding-agent";
+import type {
+  ExtensionAPI,
+  ExtensionCommandContext,
+} from "@mariozechner/pi-coding-agent";
+import {
+  type CommandPanelAction,
+  type CommandPanelState,
+  openCommandPanel,
+} from "../../lib/common/command-panel.ts";
+import { openInfoPanel, type InfoPanelSeverity } from "../../lib/common/info-panel.ts";
+import {
+  buildToggleExtensionAction,
+  LIFECYCLE_GROUP,
+  performToggleExtension,
+  type LifecycleActionId,
+} from "../sf-pi-manager/lib/extension-toggle.ts";
+
+const COMMAND_NAME = "${id}";
+
+// Action ids exposed by the panel. Extend as the extension grows.
+type ${pascal(id)}Action = "status" | "help" | "close" | LifecycleActionId;
+
+const ${constName(id)}_ACTIONS: CommandPanelAction<${pascal(id)}Action>[] = [
+  {
+    value: "status",
+    label: "Show status",
+    description: "Print current state for this extension.",
+    group: "Diagnostics",
+  },
+  {
+    value: "help",
+    label: "Show help",
+    description: "Print command usage and links to references.",
+    group: "Reference",
+  },
+  {
+    value: "close",
+    label: "Close",
+    description: "Dismiss this panel.",
+    group: LIFECYCLE_GROUP,
+  },
+];
 
 export default function (pi: ExtensionAPI) {
-  // TODO: Register events, commands, tools
-  pi.on("session_start", async (_event, ctx) => {
-    // Extension loaded
+  pi.registerCommand(COMMAND_NAME, {
+    description: "${name} — status & controls",
+    handler: async (args, ctx) => {
+      const sub = (args ?? "").trim().toLowerCase();
+      if (sub === "" && ctx.hasUI) {
+        await handlePanel(ctx);
+        return;
+      }
+      await handleAction(ctx, sub === "" ? "status" : sub, false);
+    },
   });
 }
+
+async function handlePanel(ctx: ExtensionCommandContext): Promise<void> {
+  const state: CommandPanelState<${pascal(id)}Action> = {};
+  await openCommandPanel(ctx, {
+    title: "✨ ${name} — status & controls",
+    subtitle: "TODO: one-line description.",
+    statusLines: () => [
+      // TODO: replace with key/value lines describing the extension’s state.
+      "• Status placeholder",
+    ],
+    actions: () => buildActions(ctx.cwd),
+    closeValue: "close",
+    state,
+    onAction: (action) => handleAction(ctx, action, true),
+  });
+}
+
+function buildActions(cwd: string): CommandPanelAction<${pascal(id)}Action>[] {
+  const toggle = buildToggleExtensionAction({ extensionId: "${id}", cwd });
+  return toggle ? [...${constName(id)}_ACTIONS, toggle] : ${constName(id)}_ACTIONS;
+}
+
+async function handleAction(
+  ctx: ExtensionCommandContext,
+  action: string,
+  fromPanel: boolean,
+): Promise<void> {
+  if (action === "close") return;
+  if (action === "lifecycle.toggle") {
+    await performToggleExtension(ctx, "${id}");
+    return;
+  }
+  if (action === "status") {
+    await emitOutput(ctx, "${name} status", "TODO: status text", "info", fromPanel);
+    return;
+  }
+  if (action === "help") {
+    await emitOutput(ctx, "${name} help", "TODO: help text", "info", fromPanel);
+    return;
+  }
+  await emitOutput(
+    ctx,
+    "${name} — unknown subcommand",
+    \`Unknown /\${COMMAND_NAME} subcommand: \${action}\`,
+    "warning",
+    fromPanel,
+  );
+}
+
+async function emitOutput(
+  ctx: ExtensionCommandContext,
+  title: string,
+  body: string,
+  severity: InfoPanelSeverity,
+  fromPanel: boolean,
+): Promise<void> {
+  if (fromPanel && ctx.hasUI) {
+    await openInfoPanel(ctx, { title, body, severity });
+    return;
+  }
+  if (ctx.hasUI) {
+    ctx.ui.notify(body, severity === "success" ? "info" : severity);
+    return;
+  }
+  console.info(body);
+}
 `;
+}
+
+// Helpers used by the index.ts template above.
+function pascal(id) {
+  return id
+    .split("-")
+    .map((p) => p.charAt(0).toUpperCase() + p.slice(1))
+    .join("");
+}
+function constName(id) {
+  return id.replace(/-/g, "_").toUpperCase();
 }
 
 function manifestJson(id, name, category) {
@@ -93,6 +219,10 @@ function manifestJson(id, name, category) {
         description: `TODO: Describe ${name}`,
         category,
         defaultEnabled: true,
+        // Set configurable: true once you add a lib/config-panel.ts that
+        // exports `createConfigPanel: ConfigPanelFactory`. Until then,
+        // /sf-pi will skip the drill-down panel for this extension.
+        commands: [`/${id}`],
         docs: {
           summary: `TODO: Describe ${name} for generated orientation docs`,
           primaryFiles: ["index.ts"],

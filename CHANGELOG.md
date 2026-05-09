@@ -99,6 +99,23 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Features
 
+- **`scripts/check-panel-consistency.mjs` enforces the panel contract.**
+  New lint script that walks `catalog/index.json` and asserts every
+  command-bearing extension imports `openCommandPanel`,
+  `openInfoPanel`, and the shared lifecycle-toggle helper. Wired into
+  `npm run validate` (between Type check and Tests) and exposed as
+  `npm run check:panels` for ad-hoc runs. sf-lsp is documented as an
+  exempt extension (its rich Doctor + Recent activity layout is
+  intentional); sf-pi-manager / sf-brain / sf-ohana-spinner are exempt
+  for the obvious structural reasons.
+- **`scripts/scaffold.mjs` produces a ready-to-extend command panel.**
+  Running `npm run scaffold -- --id sf-foo --category core --name 'SF
+  Foo'` now generates an index.ts that already imports the shared
+  panel + info-panel + lifecycle-toggle helpers, registers a
+  `/sf-foo` command, opens a panel with Show status / Show help /
+  Close / Disable this extension actions, and routes results through
+  `openInfoPanel`. New extensions pass the panel-consistency lint
+  immediately.
 - **Drift migrations: sf-lsp, sf-llm-gateway-internal, and sf-welcome
   adopt the standardized panel + popup pattern.**
   - `/sf-lsp` keeps its rich Doctor + Recent activity panel but its
