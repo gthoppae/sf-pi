@@ -29,7 +29,7 @@
 
 import type { ProviderModelConfig } from "@earendil-works/pi-coding-agent";
 import { DEFAULT_MODEL_ID, FALLBACK_MODEL_ID, PREVIOUS_DEFAULT_MODEL_ID } from "./config.ts";
-import { toGatewayOpenAiBaseUrl, toGatewayRootBaseUrl } from "./gateway-url.ts";
+
 import {
   ANTHROPIC_FINE_GRAINED_TOOL_STREAMING_BETA,
   isGpt5FamilyResponsesModelId,
@@ -82,28 +82,16 @@ export const KNOWN_BETAS: ReadonlyArray<{ value: string; aliases: string[] }> = 
 // Constants
 // -------------------------------------------------------------------------------------------------
 
-const MODEL_FETCH_TIMEOUT_MS = 10_000;
-const MODEL_ID_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._:/-]{0,127}$/;
-const MAX_DISCOVERED_MODELS = 64;
+// Model-discovery timeouts and id-validation regex live in
+// `./models-internal/fetchers.ts`, next to the fetchers that consume them.
 
-/**
- * Bootstrap-only defaults used before live gateway discovery completes.
- *
- * Includes at least one model from each provider registration so the
- * `sf-llm-gateway-internal/*` and `sf-llm-gateway-internal-anthropic/*`
- * wildcards in Pi's `enabledModels` both resolve during synchronous startup
- * resolution — otherwise Pi prints
- * `Warning: No models match pattern "sf-llm-gateway-internal/*"` before
- * async discovery can populate the catalog. The OpenAI-compat representative
- * is `gpt-5`, which the gateway has exposed consistently; discovery overwrites
- * this list the first time it succeeds.
- */
-export const ALWAYS_INCLUDE_MODEL_IDS = [
-  DEFAULT_MODEL_ID,
-  PREVIOUS_DEFAULT_MODEL_ID,
-  FALLBACK_MODEL_ID,
-  "gpt-5",
-];
+// Bootstrap defaults + the static catalog live in `./models-internal/presets.ts`.
+// Imported here under the same names so internal callers in this file
+// (buildBootstrapModelList, getModelMetadata, getActiveModelDefinition,
+// getShortModelLabel) keep referring to the same symbols, and re-exported
+// below so external consumers see them at this module's surface.
+import { ALWAYS_INCLUDE_MODEL_IDS, MODEL_PRESETS } from "./models-internal/presets.ts";
+export { ALWAYS_INCLUDE_MODEL_IDS, MODEL_PRESETS };
 
 const ZERO_COST = { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 } as const;
 
@@ -151,37 +139,8 @@ const CODEX_THINKING_LEVEL_MAP: ProviderModelConfig["thinkingLevelMap"] = {
   xhigh: "high",
 };
 
-/**
- * Opus 4.7 thinking-level map.
- *
- * Pi hides the `xhigh` level from the thinking selector unless the model's
- * `thinkingLevelMap.xhigh` is explicitly set (opt-in since pi 0.72;
- * see `getSupportedThinkingLevels` in pi-ai). Opus 4.7 in the native
- * Anthropic API supports `low / medium / high / xhigh / max` effort tiers,
- * and Pi 0.73+ routes pi's xhigh straight through as the Anthropic `xhigh`
- * effort value. Without this map, users who set `DEFAULT_THINKING_LEVEL = "xhigh"` get
- * silently clamped to `high` because xhigh never appears in the selector
- * and pi-ai's `clampThinkingLevel` drops it to the nearest visible level.
- *
- * GATEWAY REALITY — live-verified against /v1/messages:
- *   The gateway's `/v1/model/info` may report `litellm_provider: "bedrock_converse"`
- *   for Opus 4.7. Pi 0.73+ preserves Opus 4.7's native `xhigh` effort value
- *   on Bedrock-family transports, so this extension no longer owns the normal
- *   effort mapping. It still keeps a Gateway-specific max_tokens floor in
- *   `transport.ts` so higher Pi thinking levels get enough output headroom.
- *
- *   We do NOT expose `max` here: Anthropic's native API honors it, but
- *   Bedrock Converse drops it the same way as `xhigh`, so adding it would
- *   only create a false sense of user control. Revisit if the gateway
- *   moves Claude off Bedrock Converse.
- *
- * We only declare the `xhigh` entry; every other pi level falls through to
- * Pi's native Anthropic effort mapping without needing a string override here
- * (undefined means "use the provider default").
- */
-const OPUS_47_THINKING_LEVEL_MAP: ProviderModelConfig["thinkingLevelMap"] = {
-  xhigh: "xhigh",
-};
+// Opus 4.7 thinking-level map lives in `./models-internal/presets.ts` next
+// to the model entries that consume it.
 
 // -------------------------------------------------------------------------------------------------
 // Types
@@ -275,248 +234,8 @@ export interface GatewayModelGroupInfo {
 
 export type GatewayModelGroupInfoMap = Record<string, GatewayModelGroupInfo>;
 
-// -------------------------------------------------------------------------------------------------
-// Static model catalog (presets for known models)
-// -------------------------------------------------------------------------------------------------
-
-export const MODEL_PRESETS: Record<string, Omit<GatewayModelDefinition, "id">> = {
-  // --- Opus 4.7 (current default) ---
-  //
-  // contextWindow is 1M: live probe confirmed the upstream accepts >500K
-  // input tokens with or without the context-1m beta header, so we surface
-  // 1M to pi-ai. We still set the context-1m beta header in `betaHeaders`
-  // so the request is on the documented 1M path. All other extended-
-  // thinking features are GA and need no beta headers.
-  //
-  // maxTokens is deliberately 64_000 here. Live probes showed
-  // `max_tokens: 128000 + effort: "max"` on heavier generations
-  // intermittently surfaces `api_error: Internal server error` from
-  // Anthropic upstream (~5% of trials). 64K matches what the gateway
-  // advertises via /v1/model/info and showed no failures in the same
-  // harness. The model hard ceiling is 128K (>128K returns 400); callers
-  // who need the extra headroom can override per-request.
-  [DEFAULT_MODEL_ID]: {
-    family: "anthropic",
-    name: "[SF LLM Gateway] Claude Opus 4.7 [1M] Global",
-    reasoning: true,
-    input: ["text", "image"],
-    contextWindow: 1_000_000,
-    maxTokens: 64_000,
-    betaHeaders: [ONE_M_CONTEXT_BETA],
-    thinkingLevelMap: OPUS_47_THINKING_LEVEL_MAP,
-  },
-  "claude-opus-4-7-v1": {
-    family: "anthropic",
-    name: "[SF LLM Gateway] Claude Opus 4.7 [1M] Legacy Alias",
-    reasoning: true,
-    input: ["text", "image"],
-    contextWindow: 1_000_000,
-    maxTokens: 64_000,
-    betaHeaders: [ONE_M_CONTEXT_BETA],
-    thinkingLevelMap: OPUS_47_THINKING_LEVEL_MAP,
-  },
-  "claude-opus-4-7-20250416": {
-    family: "anthropic",
-    name: "[SF LLM Gateway] Claude Opus 4.7 [1M]",
-    reasoning: true,
-    input: ["text", "image"],
-    contextWindow: 1_000_000,
-    maxTokens: 64_000,
-    betaHeaders: [ONE_M_CONTEXT_BETA],
-    thinkingLevelMap: OPUS_47_THINKING_LEVEL_MAP,
-  },
-  "us.anthropic.claude-opus-4-7-v1": {
-    family: "anthropic",
-    name: "[SF LLM Gateway] Claude Opus 4.7 [1M] US",
-    reasoning: true,
-    input: ["text", "image"],
-    contextWindow: 1_000_000,
-    maxTokens: 64_000,
-    betaHeaders: [ONE_M_CONTEXT_BETA],
-    thinkingLevelMap: OPUS_47_THINKING_LEVEL_MAP,
-  },
-  // --- Opus 4.6 (previous default) ---
-  [PREVIOUS_DEFAULT_MODEL_ID]: {
-    family: "anthropic",
-    name: "[SF LLM Gateway] Claude Opus 4.6 [1M] Global",
-    reasoning: true,
-    input: ["text", "image"],
-    contextWindow: 1_000_000,
-    maxTokens: 128_000,
-    betaHeaders: [...DEFAULT_ANTHROPIC_BETA_HEADERS],
-  },
-  "us.anthropic.claude-opus-4-6-v1": {
-    family: "anthropic",
-    name: "[SF LLM Gateway] Claude Opus 4.6 [1M] US",
-    reasoning: true,
-    input: ["text", "image"],
-    contextWindow: 1_000_000,
-    maxTokens: 128_000,
-    betaHeaders: [...DEFAULT_ANTHROPIC_BETA_HEADERS],
-  },
-  [FALLBACK_MODEL_ID]: {
-    family: "anthropic",
-    name: "[SF LLM Gateway] Claude Sonnet 4.6 Global",
-    reasoning: true,
-    input: ["text", "image"],
-    contextWindow: 200_000,
-    maxTokens: 64_000,
-    betaHeaders: [INTERLEAVED_THINKING_BETA],
-  },
-  "claude-opus-4-5-20251101": {
-    family: "anthropic",
-    name: "[SF LLM Gateway] Claude Opus 4.5",
-    reasoning: true,
-    input: ["text", "image"],
-    contextWindow: 200_000,
-    maxTokens: 32_768,
-    betaHeaders: [INTERLEAVED_THINKING_BETA],
-  },
-  "claude-opus-4-20250514": {
-    family: "anthropic",
-    name: "[SF LLM Gateway] Claude Opus 4",
-    reasoning: true,
-    input: ["text", "image"],
-    contextWindow: 200_000,
-    maxTokens: 32_768,
-    betaHeaders: [INTERLEAVED_THINKING_BETA],
-  },
-  "claude-sonnet-4-20250514": {
-    family: "anthropic",
-    name: "[SF LLM Gateway] Claude Sonnet 4",
-    reasoning: true,
-    input: ["text", "image"],
-    contextWindow: 200_000,
-    maxTokens: 64_000,
-    betaHeaders: [INTERLEAVED_THINKING_BETA],
-  },
-  "claude-sonnet-4-5-20250514": {
-    family: "anthropic",
-    name: "[SF LLM Gateway] Claude Sonnet 4.5",
-    reasoning: true,
-    input: ["text", "image"],
-    contextWindow: 200_000,
-    maxTokens: 64_000,
-    betaHeaders: [INTERLEAVED_THINKING_BETA],
-  },
-  "claude-haiku-4-5-20251001": {
-    family: "anthropic",
-    name: "[SF LLM Gateway] Claude Haiku 4.5",
-    reasoning: false,
-    input: ["text", "image"],
-    contextWindow: 200_000,
-    maxTokens: 8_192,
-    betaHeaders: [],
-  },
-  "claude-3-7-sonnet-20250219": {
-    family: "anthropic",
-    name: "[SF LLM Gateway] Claude 3.7 Sonnet",
-    reasoning: true,
-    input: ["text", "image"],
-    contextWindow: 200_000,
-    maxTokens: 64_000,
-    betaHeaders: [INTERLEAVED_THINKING_BETA],
-  },
-  "gemini-3.1-pro-preview": {
-    family: "google",
-    name: "[SF LLM Gateway] Gemini 3.1 Pro Preview",
-    reasoning: true,
-    input: ["text", "image"],
-    contextWindow: 1_000_000,
-    maxTokens: 65_536,
-  },
-  "gemini-2.5-pro": {
-    family: "google",
-    name: "[SF LLM Gateway] Gemini 2.5 Pro",
-    reasoning: true,
-    input: ["text", "image"],
-    contextWindow: 1_000_000,
-    maxTokens: 65_536,
-  },
-  "gemini-2.5-flash": {
-    family: "google",
-    name: "[SF LLM Gateway] Gemini 2.5 Flash",
-    reasoning: true,
-    input: ["text", "image"],
-    contextWindow: 1_000_000,
-    maxTokens: 65_536,
-  },
-  "gpt-5": {
-    family: "openai",
-    name: "[SF LLM Gateway] GPT-5",
-    reasoning: true,
-    input: ["text", "image"],
-    // Gateway /v1/model/info confirms 272K input / 128K output on the
-    // upstream OpenAI side. Probed live with ~233K-token prompt.
-    contextWindow: 272_000,
-    maxTokens: 128_000,
-  },
-  "gpt-5-mini": {
-    family: "openai",
-    name: "[SF LLM Gateway] GPT-5 Mini",
-    reasoning: true,
-    input: ["text", "image"],
-    contextWindow: 272_000,
-    maxTokens: 128_000,
-  },
-  // --- GPT-5.5 ---
-  //
-  // Gateway /v1/model/info reports 1,050,000 input / 128,000 output for this
-  // model — verified live. We advertise 1M context in the selector; the
-  // gateway will accept up to ~1.05M but rounding down keeps pi's context
-  // window math honest.
-  //
-  // Reasoning note: the sf-llm-gateway /v1/chat/completions route rejects
-  // `reasoning_effort` + function tools with 400 for this model, and the
-  // `/v1/responses` route the error points at is not exposed on this
-  // gateway (it 302s to SSO login). The extension's transport shim strips
-  // any `reasoning_effort` that pi-ai would otherwise inject based on the
-  // thinking selector. gpt-5.5 still performs implicit reasoning on every
-  // turn. `thinkingLevelMap` is intentionally omitted — there is no wire
-  // value we can attach to the selected level, so exposing the picker would
-  // be misleading. (Pi still falls back to its default level behavior.)
-  "gpt-5.5": {
-    family: "openai",
-    name: "[SF LLM Gateway] GPT-5.5 [1M]",
-    reasoning: true,
-    input: ["text", "image"],
-    contextWindow: 1_000_000,
-    maxTokens: 128_000,
-  },
-  "gpt-4o": {
-    family: "openai",
-    name: "[SF LLM Gateway] GPT-4o",
-    reasoning: false,
-    input: ["text", "image"],
-    contextWindow: 128_000,
-    maxTokens: 16_384,
-  },
-  "gpt-4o-mini": {
-    family: "openai",
-    name: "[SF LLM Gateway] GPT-4o Mini",
-    reasoning: false,
-    input: ["text", "image"],
-    contextWindow: 128_000,
-    maxTokens: 16_384,
-  },
-  "gpt-5.2-codex": {
-    family: "codex",
-    name: "[SF LLM Gateway] GPT-5.2 Codex",
-    reasoning: true,
-    input: ["text"],
-    // Gateway /v1/model/info reports 272K/128K; same GPT-5 family backbone.
-    contextWindow: 272_000,
-    maxTokens: 128_000,
-  },
-  "gpt-5.3-codex": {
-    family: "codex",
-    name: "[SF LLM Gateway] GPT-5.3 Codex",
-    reasoning: true,
-    input: ["text"],
-    contextWindow: 272_000,
-    maxTokens: 128_000,
-  },
-};
+// MODEL_PRESETS source of truth lives in `./models-internal/presets.ts`
+// and is re-exported above next to ALWAYS_INCLUDE_MODEL_IDS.
 
 // -------------------------------------------------------------------------------------------------
 // Model list building
@@ -966,200 +685,14 @@ export function getActiveModelDefinition(
 // Model discovery (network)
 // -------------------------------------------------------------------------------------------------
 
-export async function fetchGatewayModelIds(baseUrl: string, apiKey: string): Promise<string[]> {
-  const response = await fetchWithTimeout(
-    `${toGatewayOpenAiBaseUrl(baseUrl)}/models`,
-    {
-      method: "GET",
-      headers: {
-        Authorization: `Bearer ${apiKey}`,
-        "Content-Type": "application/json",
-      },
-    },
-    MODEL_FETCH_TIMEOUT_MS,
-  );
-
-  if (!response.ok) {
-    throw new Error(`Gateway model fetch failed (${response.status}).`);
-  }
-
-  let json: { data?: Array<{ id?: string }> };
-  try {
-    json = (await response.json()) as { data?: Array<{ id?: string }> };
-  } catch {
-    throw new Error("Gateway model response could not be parsed.");
-  }
-
-  const ids: string[] = [];
-  const seen = new Set<string>();
-  for (const entry of json.data || []) {
-    const id = (entry.id || "").trim();
-    if (!MODEL_ID_PATTERN.test(id)) continue;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    ids.push(id);
-    if (ids.length >= MAX_DISCOVERED_MODELS) break;
-  }
-  return ids;
-}
-
-/**
- * Fetch richer per-model metadata from `/v1/model/info` and return a map
- * keyed by `model_name`. Failures are swallowed because enrichment is
- * strictly optional — the extension must keep working even when the info
- * endpoint times out or 500s.
- */
-export async function fetchGatewayModelInfoMap(
-  baseUrl: string,
-  apiKey: string,
-): Promise<GatewayModelInfoMap> {
-  try {
-    const response = await fetchWithTimeout(
-      `${toGatewayOpenAiBaseUrl(baseUrl)}/model/info`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-      },
-      MODEL_FETCH_TIMEOUT_MS,
-    );
-
-    if (!response.ok) {
-      return {};
-    }
-
-    const json = (await response.json()) as {
-      data?: Array<{
-        model_name?: string;
-        model_info?: Record<string, unknown>;
-        litellm_params?: Record<string, unknown>;
-      }>;
-    };
-
-    const map: GatewayModelInfoMap = {};
-    for (const entry of json.data || []) {
-      const id = typeof entry.model_name === "string" ? entry.model_name.trim() : "";
-      if (!id || !MODEL_ID_PATTERN.test(id)) continue;
-      const mi = entry.model_info ?? {};
-      map[id] = {
-        id,
-        mode: typeof mi.mode === "string" ? (mi.mode as string) : undefined,
-        litellmProvider:
-          typeof mi.litellm_provider === "string" ? (mi.litellm_provider as string) : undefined,
-        maxInputTokens: typeof mi.max_input_tokens === "number" ? mi.max_input_tokens : undefined,
-        maxOutputTokens:
-          typeof mi.max_output_tokens === "number" ? mi.max_output_tokens : undefined,
-        inputCostPerToken:
-          typeof mi.input_cost_per_token === "number" ? mi.input_cost_per_token : undefined,
-        outputCostPerToken:
-          typeof mi.output_cost_per_token === "number" ? mi.output_cost_per_token : undefined,
-        cacheReadCostPerToken:
-          typeof mi.cache_read_input_token_cost === "number"
-            ? mi.cache_read_input_token_cost
-            : undefined,
-        cacheWriteCostPerToken:
-          typeof mi.cache_creation_input_token_cost === "number"
-            ? mi.cache_creation_input_token_cost
-            : undefined,
-        supportsReasoning:
-          typeof mi.supports_reasoning === "boolean" ? mi.supports_reasoning : undefined,
-        supportsVision: typeof mi.supports_vision === "boolean" ? mi.supports_vision : undefined,
-        supportsFunctionCalling:
-          typeof mi.supports_function_calling === "boolean"
-            ? mi.supports_function_calling
-            : undefined,
-        supportsPromptCaching:
-          typeof mi.supports_prompt_caching === "boolean" ? mi.supports_prompt_caching : undefined,
-        rpm: typeof mi.rpm === "number" ? mi.rpm : undefined,
-        tpm: typeof mi.tpm === "number" ? mi.tpm : undefined,
-      };
-    }
-    return map;
-  } catch {
-    return {};
-  }
-}
-
-/**
- * Fetch the `/model_group/info` snapshot, collapsed to `{group -> providers[]}`.
- * Failures are swallowed so this enrichment is strictly optional — the
- * extension must keep working when the gateway admin disables the
- * endpoint or the request times out.
- *
- * The upstream shape is an array of records with `model_group` and
- * `providers: string[]`. The map is ready for provider-drift diffing by
- * the discovery layer.
- */
-export async function fetchGatewayModelGroupInfo(
-  baseUrl: string,
-  apiKey: string,
-): Promise<GatewayModelGroupInfoMap> {
-  try {
-    const response = await fetchWithTimeout(
-      `${toGatewayRootBaseUrl(baseUrl)}/model_group/info`,
-      {
-        method: "GET",
-        headers: {
-          Authorization: `Bearer ${apiKey}`,
-          "Content-Type": "application/json",
-        },
-      },
-      MODEL_FETCH_TIMEOUT_MS,
-    );
-
-    if (!response.ok) return {};
-
-    const json = (await response.json()) as {
-      data?: Array<{
-        model_group?: string;
-        providers?: unknown;
-      }>;
-    };
-
-    const map: GatewayModelGroupInfoMap = {};
-    for (const entry of json.data || []) {
-      const group = typeof entry.model_group === "string" ? entry.model_group.trim() : "";
-      if (!group) continue;
-      const providers = Array.isArray(entry.providers)
-        ? entry.providers.filter((p): p is string => typeof p === "string").sort()
-        : [];
-      map[group] = { modelGroup: group, providers };
-    }
-    return map;
-  } catch {
-    return {};
-  }
-}
-
-/**
- * Compare two model-group snapshots and return the set of groups whose
- * providers changed. Each entry carries the old and new arrays so the
- * caller can format a readable drift message. Pure function, exported for
- * unit tests.
- */
-export interface ModelGroupDrift {
-  modelGroup: string;
-  previousProviders: string[];
-  currentProviders: string[];
-}
-
-export function diffModelGroupProviders(
-  previous: GatewayModelGroupInfoMap,
-  current: GatewayModelGroupInfoMap,
-): ModelGroupDrift[] {
-  const groups = new Set<string>([...Object.keys(previous), ...Object.keys(current)]);
-  const drift: ModelGroupDrift[] = [];
-  for (const group of groups) {
-    const prev = previous[group]?.providers ?? [];
-    const curr = current[group]?.providers ?? [];
-    if (prev.length !== curr.length || prev.some((p, i) => p !== curr[i])) {
-      drift.push({ modelGroup: group, previousProviders: prev, currentProviders: curr });
-    }
-  }
-  return drift.sort((a, b) => a.modelGroup.localeCompare(b.modelGroup));
-}
+export {
+  fetchGatewayModelGroupInfo,
+  fetchGatewayModelIds,
+  fetchGatewayModelInfoMap,
+  fetchWithTimeout,
+  diffModelGroupProviders,
+  type ModelGroupDrift,
+} from "./models-internal/fetchers.ts";
 
 // -------------------------------------------------------------------------------------------------
 // Formatting helpers
@@ -1248,19 +781,4 @@ function normalizeComparableModelId(id: string): string {
     .replace(/^(?:us\.)?anthropic\./, "")
     .replace(/-\d{8}$/, "")
     .replace(/-v\d+$/, "");
-}
-
-export async function fetchWithTimeout(
-  url: string,
-  init: RequestInit,
-  timeoutMs: number,
-): Promise<Response> {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    return await fetch(url, { ...init, signal: controller.signal });
-  } finally {
-    clearTimeout(timeoutId);
-  }
 }

@@ -223,6 +223,15 @@ and `usage-probe` show short self-explanatory descriptions while typing.
 ```
 extensions/sf-llm-gateway-internal/
   lib/
+    models-internal/
+      fetchers.ts           ← implementation module
+      presets.ts            ← implementation module
+    transport-internal/
+      anthropic.ts          ← implementation module
+      openai-chat.ts        ← implementation module
+      openai-responses.ts   ← implementation module
+      payloads.ts           ← implementation module
+      shared.ts             ← implementation module
     beta-controls.ts        ← implementation module
     claude-code-import.ts   ← implementation module
     command-panel.ts        ← implementation module

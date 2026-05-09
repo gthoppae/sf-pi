@@ -1,0 +1,68 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/**
+ * OpenAI Chat Completions transport for the SF LLM Gateway.
+ *
+ * Wraps pi-ai's `streamSimpleOpenAICompletions` with the gateway's quirks:
+ *
+ *   - Codex tools must be flattened to Responses-flat shape.
+ *   - Codex `reasoning_effort` must be in `low|medium|high`.
+ *   - Any OpenAI-family model with `reasoning_effort` set needs it
+ *     allow-listed via `allowed_openai_params`.
+ *   - gpt-5.5 force-strips `reasoning_effort` because the gateway rejects
+ *     it when combined with function tools on `/v1/chat/completions`.
+ *
+ * Non-OpenAI-family models pass through untouched.
+ */
+import {
+  streamSimpleOpenAICompletions,
+  type AssistantMessageEventStream,
+  type Context,
+  type Model,
+  type SimpleStreamOptions,
+} from "@earendil-works/pi-ai";
+import {
+  flattenCodexTools,
+  injectCodexGatewayParams,
+  injectOpenAiReasoningEffort,
+  injectOpenAiServiceTier,
+} from "./payloads.ts";
+import { isCodexModelId, isOpenAiModelId } from "./shared.ts";
+
+export function streamSfGatewayOpenAI(
+  model: Model<"openai-completions">,
+  context: Context,
+  options?: SimpleStreamOptions,
+): AssistantMessageEventStream {
+  const existingOnPayload = options?.onPayload;
+
+  const wrappedOptions: SimpleStreamOptions = {
+    ...options,
+    onPayload: async (payload, payloadModel) => {
+      let nextPayload = payload;
+
+      if (payload && typeof payload === "object" && !Array.isArray(payload)) {
+        const objectPayload = payload as Record<string, unknown>;
+
+        if (isCodexModelId(model.id)) {
+          flattenCodexTools(objectPayload);
+          injectCodexGatewayParams(objectPayload);
+          // Codex is an OpenAI-family model — honor the gateway's priority
+          // tier the same way gpt-5 does, even though Codex's Responses
+          // response shape does not echo `service_tier` back.
+          injectOpenAiServiceTier(objectPayload);
+        } else if (isOpenAiModelId(model.id)) {
+          // GPT-5 reasoning models get the strongest safe effort by default
+          // and LiteLLM needs the param allow-listed when it is present.
+          injectOpenAiReasoningEffort(objectPayload, model.id);
+          injectOpenAiServiceTier(objectPayload);
+        }
+
+        nextPayload = objectPayload;
+      }
+
+      return existingOnPayload ? existingOnPayload(nextPayload, payloadModel) : nextPayload;
+    },
+  };
+
+  return streamSimpleOpenAICompletions(model, context, wrappedOptions);
+}
