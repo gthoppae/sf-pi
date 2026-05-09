@@ -116,7 +116,7 @@
     "entry": "extensions/sf-data360/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 1797
+    "srcLoc": 1885
   },
   {
     "id": "sf-devbar",
@@ -505,7 +505,7 @@
     "entry": "extensions/sf-slack/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 10809
+    "srcLoc": 10821
   },
   {
     "id": "sf-welcome",

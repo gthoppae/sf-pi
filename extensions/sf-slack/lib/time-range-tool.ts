@@ -2,6 +2,7 @@
 /** Register slack_time_range, a deterministic date normalizer for Slack tools. */
 import type { ExtensionAPI, Theme } from "@earendil-works/pi-coding-agent";
 import { Text } from "@earendil-works/pi-tui";
+import type { SfPiToolResultEnvelope } from "../../../lib/common/display/types.ts";
 import { SlackTimeRangeParams } from "./types.ts";
 import { resolveSlackTimeRange, type SlackTimeRangeInput } from "./time-range.ts";
 
@@ -94,9 +95,20 @@ export function registerTimeRangeTool(pi: ExtensionAPI): void {
     async execute(_toolCallId, params) {
       try {
         const result = resolveSlackTimeRange(params as SlackTimeRangeInput);
+        const text = formatTimeRangeResult(result);
+        // Standard SF Pi tool-result envelope so renderers and downstream
+        // tooling can read a uniform shape across slack_* tools. The other
+        // slack_* tools get the envelope automatically via
+        // `buildSlackTextResult` in `./truncation.ts`; this tool builds it
+        // inline because it never truncates.
+        const sfPi: SfPiToolResultEnvelope = {
+          ok: true,
+          action: "slack_time_range",
+          summary: `${result.range.start_iso} \u2192 ${result.range.end_iso}`,
+        };
         return {
-          content: [{ type: "text", text: formatTimeRangeResult(result) }],
-          details: result,
+          content: [{ type: "text", text }],
+          details: { ...result, sfPi },
         };
       } catch (error) {
         const message = error instanceof Error ? error.message : String(error);

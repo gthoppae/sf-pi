@@ -10,6 +10,7 @@ import {
   withFileMutationQueue,
   type TruncationResult,
 } from "@earendil-works/pi-coding-agent";
+import type { SfPiToolResultEnvelope } from "../../../lib/common/display/types.ts";
 
 export type D360OutputMode = "inline" | "summary" | "file_only";
 
@@ -219,4 +220,57 @@ function buildTruncationNote(truncation: TruncationResult, fullOutputPath: strin
     `(${formatSize(truncation.outputBytes)} of ${formatSize(truncation.totalBytes)}). ` +
     `Full output saved to: ${fullOutputPath}]`
   );
+}
+
+/**
+ * Build the shared `details.sfPi` envelope (see
+ * `lib/common/display/types.ts > SfPiToolResultEnvelope`) for a Data 360
+ * tool result. Centralizing this here keeps the three d360 tools
+ * (api/metadata/probe) shipping the same shape so renderers and
+ * downstream tooling can read `details.sfPi.summary`, `truncation`, and
+ * `data` without per-tool branches.
+ */
+export function buildD360Envelope(
+  action: string,
+  ok: boolean,
+  text: string,
+  details: Record<string, unknown>,
+  output?: D360TruncatedOutput,
+): SfPiToolResultEnvelope {
+  const summary = pickSummary(details, text);
+  const envelope: SfPiToolResultEnvelope = {
+    ok,
+    action,
+    summary,
+  };
+
+  if (output?.truncation) {
+    envelope.truncation = {
+      truncated: output.truncation.truncated,
+      outputLines: output.truncation.outputLines,
+      totalLines: output.truncation.totalLines,
+      outputBytes: output.truncation.outputBytes,
+      totalBytes: output.truncation.totalBytes,
+      ...(output.fullOutputPath ? { fullOutputPath: output.fullOutputPath } : {}),
+    };
+  } else if (output?.fullOutputPath) {
+    envelope.truncation = {
+      truncated: false,
+      fullOutputPath: output.fullOutputPath,
+    };
+  }
+
+  return envelope;
+}
+
+function pickSummary(details: Record<string, unknown>, fallback: string): string | undefined {
+  if (typeof details.summary === "string" && details.summary.trim()) {
+    return details.summary.trim();
+  }
+  const firstLine = fallback
+    .split("\n")
+    .map((line) => line.trim())
+    .find((line) => line.length > 0);
+  if (!firstLine) return undefined;
+  return firstLine.length > 240 ? `${firstLine.slice(0, 237)}\u2026` : firstLine;
 }

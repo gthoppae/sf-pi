@@ -12,6 +12,7 @@ import { detectOrg, type ExecFn } from "../../../lib/common/sf-environment/detec
 import type { OrgInfo, OrgType, SfEnvironment } from "../../../lib/common/sf-environment/types.ts";
 import { buildApiPath, type QueryParams } from "./path.ts";
 import {
+  buildD360Envelope,
   cleanD360CliOutput,
   D360_OUTPUT_SUFFIX,
   formatD360Output,
@@ -319,6 +320,7 @@ async function buildResult(
   details: Record<string, unknown>,
 ) {
   const formatted = await formatD360Output(text, outputMode ?? "inline");
+  const ok = details.ok !== false;
   return {
     content: [{ type: "text" as const, text: formatted.text }],
     details: {
@@ -326,6 +328,9 @@ async function buildResult(
       outputMode: formatted.outputMode ?? outputMode ?? "inline",
       ...(formatted.truncation ? { truncation: formatted.truncation } : {}),
       ...(formatted.fullOutputPath ? { fullOutputPath: formatted.fullOutputPath } : {}),
+      // Standard SF Pi tool-result envelope for renderers + downstream tooling.
+      // See `lib/common/display/types.ts` and `lib/common/display/diagnostics.ts`.
+      sfPi: buildD360Envelope(D360_TOOL_NAME, ok, text, details, formatted),
     },
   };
 }

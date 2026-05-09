@@ -223,10 +223,65 @@ above 1500 LOC. The lint never fails CI — it exists purely so growth
 is visible during PR review without forcing today's refactor. Pairs
 with AGENTS.md §3 ("split by responsibility").
 
-## Out of scope (Wave 3 in the original plan)
+## Wave 3 follow-ups landed
 
-These remain explicitly deferred:
+### sf-llm-gateway-internal file splits
 
-- Splitting the two large extensions (`sf-slack`, `sf-llm-gateway-internal`)
-  by file size.
-- Adopting `lib/common/display/` for every LLM tool result.
+`transport.ts` (1209 LOC) is now a barrel re-exporting from five focused
+modules under `lib/transport-internal/`:
+
+- `shared.ts` (487 LOC) — constants, types, model-id detection, error
+  formatting, robust-retry wrapper
+- `payloads.ts` (190 LOC) — gateway payload mutators (codex tools,
+  OpenAI service tier, reasoning effort, Opus 4.7 max thinking)
+- `anthropic.ts` (81 LOC) — `streamSfGatewayAnthropic`
+- `openai-chat.ts` (68 LOC) — `streamSfGatewayOpenAI`
+- `openai-responses.ts` (170 LOC) — `streamSfGatewayResponses` + chat fallback
+
+`models.ts` (1267 → 787 LOC) extracts:
+
+- `models-internal/presets.ts` (285 LOC) — `MODEL_PRESETS` table +
+  `ALWAYS_INCLUDE_MODEL_IDS` + Opus 4.7 thinking-level map
+- `models-internal/fetchers.ts` (222 LOC) — HTTP discovery (model ids,
+  info map, group info, provider drift, `fetchWithTimeout`)
+
+### sf-slack send-tool split
+
+`send-tool.ts` (985 → 592 LOC) extracts the recipient-routing surface
+to `send-tool-recipient.ts` (403 LOC) — `routeRecipient`,
+DM-fallback search, candidate scoring, and the resolution failure
+formatters. The substring-based safety-invariants test reads both
+files concatenated so existing assertions still cover the whole
+slack_send surface.
+
+`api.ts` (805) and `types.ts` (826) stay where they are. Both are
+barely over the 800 advisory threshold and splitting them forces
+updates across every consumer for low payoff. The advisory lint
+surfaces them for organic touch.
+
+### `lib/common/display/` adoption
+
+All three Data 360 tools and the slack `slack_time_range` tool now
+emit `details.sfPi` matching `SfPiToolResultEnvelope` from
+`lib/common/display/types.ts`:
+
+- `sf-data360/lib/truncation.ts` exports a new `buildD360Envelope`
+  helper. `api-tool.ts`, `metadata-tool.ts`, and `probe-tool.ts` use
+  it on every success and main error path.
+- `sf-slack/lib/time-range-tool.ts` builds the envelope inline
+  (it never truncates, so the existing `buildSlackTextResult` does
+  not apply).
+
+Every other slack tool was already wrapped through
+`buildSlackTextResult` in `extensions/sf-slack/lib/truncation.ts`,
+so the envelope is now consistent across all 12 LLM tools shipped
+by sf-pi.
+
+## Status
+
+ADR 0006 is complete. The advisory lint flags a handful of files
+between 800 and 1500 LOC for visibility (sf-welcome/index.ts,
+sf-welcome/lib/splash-component.ts, sf-llm-gateway-internal/index.ts,
+sf-slack/lib/{api,types}.ts, sf-lsp/lib/lsp-client.ts) but none
+block CI — they surface during PR review when those files are next
+touched.

@@ -18,7 +18,12 @@ import {
 import type { SfEnvironment } from "../../../lib/common/sf-environment/types.ts";
 import { buildApiPath } from "./path.ts";
 import { responseLooksLikeError } from "./api-tool.ts";
-import { cleanD360CliOutput, truncateD360Output, writeFullD360Output } from "./truncation.ts";
+import {
+  buildD360Envelope,
+  cleanD360CliOutput,
+  truncateD360Output,
+  writeFullD360Output,
+} from "./truncation.ts";
 
 export const D360_METADATA_TOOL_NAME = "d360_metadata";
 
@@ -137,17 +142,27 @@ export function registerD360MetadataTool(pi: ExtensionAPI): void {
       const ok = result.code === 0 && !responseLooksLikeError(output);
       if (!ok) {
         const formatted = await truncateD360Output(output);
+        const errorDetails: Record<string, unknown> = {
+          ok,
+          action: input.action,
+          path: apiPath,
+          targetOrg,
+          exitCode: result.code,
+          stderr: result.stderr,
+          ...(formatted.truncation ? { truncation: formatted.truncation } : {}),
+          ...(formatted.fullOutputPath ? { fullOutputPath: formatted.fullOutputPath } : {}),
+        };
         return {
           content: [{ type: "text" as const, text: formatted.text }],
           details: {
-            ok,
-            action: input.action,
-            path: apiPath,
-            targetOrg,
-            exitCode: result.code,
-            stderr: result.stderr,
-            ...(formatted.truncation ? { truncation: formatted.truncation } : {}),
-            ...(formatted.fullOutputPath ? { fullOutputPath: formatted.fullOutputPath } : {}),
+            ...errorDetails,
+            sfPi: buildD360Envelope(
+              D360_METADATA_TOOL_NAME,
+              false,
+              output,
+              errorDetails,
+              formatted,
+            ),
           },
           isError: true,
         };
@@ -155,15 +170,22 @@ export function registerD360MetadataTool(pi: ExtensionAPI): void {
 
       const rawOutputPath = await writeFullD360Output(output);
       const summary = summarizeMetadataOutput(input, output, rawOutputPath);
+      const successDetails: Record<string, unknown> = {
+        ok: true,
+        action: input.action,
+        path: apiPath,
+        targetOrg,
+        rawOutputPath,
+        ...summary.details,
+      };
       return {
         content: [{ type: "text" as const, text: summary.text }],
         details: {
-          ok: true,
-          action: input.action,
-          path: apiPath,
-          targetOrg,
-          rawOutputPath,
-          ...summary.details,
+          ...successDetails,
+          sfPi: buildD360Envelope(D360_METADATA_TOOL_NAME, true, summary.text, successDetails, {
+            text: summary.text,
+            fullOutputPath: rawOutputPath,
+          }),
         },
       };
     },

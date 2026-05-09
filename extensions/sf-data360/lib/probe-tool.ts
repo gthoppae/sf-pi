@@ -17,6 +17,7 @@ import {
 } from "../../../lib/common/sf-environment/shared-runtime.ts";
 import type { SfEnvironment } from "../../../lib/common/sf-environment/types.ts";
 import { buildApiPath } from "./path.ts";
+import { buildD360Envelope } from "./truncation.ts";
 
 export const D360_PROBE_TOOL_NAME = "d360_probe";
 
@@ -128,17 +129,27 @@ export function registerD360ProbeTool(pi: ExtensionAPI): void {
 
       const summary = summarizeReadiness(probes);
       const text = JSON.stringify({ targetOrg, apiVersion, ...summary, probes }, null, 2);
+      const ok =
+        summary.state === "ready" || summary.state === "ready_empty" || summary.state === "partial";
+      const probeDetails: Record<string, unknown> = {
+        ok,
+        targetOrg,
+        apiVersion,
+        ...summary,
+        probes,
+      };
       return {
         content: [{ type: "text", text }],
         details: {
-          ok:
-            summary.state === "ready" ||
-            summary.state === "ready_empty" ||
-            summary.state === "partial",
-          targetOrg,
-          apiVersion,
-          ...summary,
-          probes,
+          ...probeDetails,
+          // Standard SF Pi tool-result envelope so renderers and downstream
+          // tooling can read summary + state without per-tool branches.
+          sfPi: buildD360Envelope(
+            D360_PROBE_TOOL_NAME,
+            ok,
+            `Data 360 readiness: ${summary.state}`,
+            { ...probeDetails, summary: `state=${summary.state}` },
+          ),
         },
       };
     },
