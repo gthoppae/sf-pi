@@ -53,6 +53,16 @@ export interface CommandPanelOptions<T extends string = string> {
   onAction?: (action: T) => Promise<void> | void;
 }
 
+// Keywords that close the panel as soon as the user types them, no Enter
+// required. Kept short and lowercase because we match against the literal
+// keystroke buffer. Adding more entries here propagates to every panel.
+const CLOSE_KEYWORDS = ["exit", "quit"] as const;
+const MAX_CLOSE_KEYWORD_LEN = Math.max(...CLOSE_KEYWORDS.map((k) => k.length));
+
+export function matchesCloseKeyword(buffer: string): boolean {
+  return (CLOSE_KEYWORDS as readonly string[]).includes(buffer);
+}
+
 export async function openCommandPanel<T extends string>(
   ctx: ExtensionCommandContext,
   options: CommandPanelOptions<T>,
@@ -97,7 +107,8 @@ export async function openCommandPanel<T extends string>(
       new Text(
         theme.fg(
           "dim",
-          options.helpText ?? "↑↓ move · type filter · Backspace edit · Enter run · Esc close",
+          options.helpText ??
+            "↑↓ move · type filter · Backspace edit · Enter run · Esc / type 'exit' to close",
         ),
         1,
         0,
@@ -122,6 +133,11 @@ class GroupedActionList<T extends string> implements Component {
   private filter = "";
   private selectedIndex = 0;
   private actionInFlight = false;
+  // Sliding window of the last few printable keystrokes used to detect typed
+  // close keywords (`exit`, `quit`). Reset whenever the user takes any
+  // navigational action so a stray substring inside the filter cannot trigger
+  // an accidental close.
+  private closeKeywordBuffer = "";
 
   constructor(
     private readonly theme: Theme,
@@ -203,10 +219,12 @@ class GroupedActionList<T extends string> implements Component {
     if (this.actionInFlight) return;
 
     if (this.keybindings.matches(data, "tui.select.up")) {
+      this.closeKeywordBuffer = "";
       this.move(-1);
       return;
     }
     if (this.keybindings.matches(data, "tui.select.down")) {
+      this.closeKeywordBuffer = "";
       this.move(1);
       return;
     }
@@ -229,10 +247,27 @@ class GroupedActionList<T extends string> implements Component {
     if (matchesKey(data, "backspace")) {
       this.filter = this.filter.slice(0, -1);
       this.selectedIndex = 0;
+      this.closeKeywordBuffer = "";
       this.persistSelection();
       return;
     }
     if (isPrintableFilterInput(data)) {
+      // Track typed lowercase letters in a small ring buffer and short-circuit
+      // close as soon as the buffer exactly matches a registered close
+      // keyword. We do NOT abort filtering when a partial match is in
+      // progress, so users can still filter actions whose names start with
+      // "e", "ex", etc. Only the final keystroke that completes the keyword
+      // closes the panel.
+      if (data.length === 1 && /^[a-z]$/i.test(data)) {
+        const next = (this.closeKeywordBuffer + data.toLowerCase()).slice(-MAX_CLOSE_KEYWORD_LEN);
+        this.closeKeywordBuffer = next;
+        if (matchesCloseKeyword(next)) {
+          this.done(this.closeValue);
+          return;
+        }
+      } else {
+        this.closeKeywordBuffer = "";
+      }
       this.filter += data;
       this.selectedIndex = 0;
       this.persistSelection();
@@ -250,7 +285,11 @@ class GroupedActionList<T extends string> implements Component {
 
   private renderGroupHeading(group: string, width: number): string {
     const icon = iconForCommandGroup(group, this.glyphs);
-    const label = `  ${this.theme.fg("accent", this.theme.bold(`${icon} ${group.toUpperCase()}`))}`;
+    // Group labels (DIAGNOSTICS / CONFIGURATION / LIFECYCLE / REFERENCE)
+    // sit one level below section headings, so they use `muted` + bold.
+    // That keeps them readable but visibly subordinate to the toolTitle
+    // section heading (STATUS / ACTIONS) directly above them.
+    const label = `  ${this.theme.fg("muted", this.theme.bold(`${icon} ${group.toUpperCase()}`))}`;
     const remaining = Math.max(0, width - visibleWidth(label) - 2);
     return truncateToWidth(
       `${label} ${this.theme.fg("borderMuted", "─".repeat(remaining))}`,
@@ -270,7 +309,10 @@ class GroupedActionList<T extends string> implements Component {
   }
 
   private renderDetailHeader(width: number): string {
-    const label = `  ${this.theme.fg("accent", this.theme.bold(`${this.glyphs.selected} SELECTED`))}`;
+    // SELECTED is a section-level callout under the action list, so it shares
+    // the toolTitle role with STATUS / ACTIONS rather than the row’s
+    // accent (which we reserve for the highlighted item itself).
+    const label = `  ${this.theme.fg("toolTitle", this.theme.bold(`${this.glyphs.selected} SELECTED`))}`;
     const remaining = Math.max(0, width - visibleWidth(label) - 2);
     return truncateToWidth(
       `${label} ${this.theme.fg("borderMuted", "─".repeat(remaining))}`,
@@ -346,7 +388,10 @@ class SectionHeading implements Component {
   ) {}
 
   render(width: number): string[] {
-    const text = ` ${this.theme.fg("accent", this.theme.bold(`${this.icon} ${this.label.toUpperCase()}`))}`;
+    // Section heading (STATUS / ACTIONS). Uses the toolTitle theme token to
+    // sit visibly below the panel title (accent) but above the group labels
+    // (muted bold). See the file header for the full hierarchy contract.
+    const text = ` ${this.theme.fg("toolTitle", this.theme.bold(`${this.icon} ${this.label.toUpperCase()}`))}`;
     const remaining = Math.max(0, width - visibleWidth(text) - 1);
     return [
       truncateToWidth(`${text} ${this.theme.fg("borderMuted", "─".repeat(remaining))}`, width, ""),

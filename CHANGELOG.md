@@ -99,6 +99,26 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
 
 ### Features
 
+- **Shared command panel: distinct color hierarchy + `exit`/`quit` close
+  keywords.** Every `/sf-*` panel rendered through
+  `lib/common/command-panel.ts` previously painted the panel title,
+  section headings (`STATUS`, `ACTIONS`), group labels (`DIAGNOSTICS`,
+  `LIFECYCLE`, ...), and the `SELECTED` callout in the same `accent`
+  theme token, which collapsed four distinct hierarchy levels onto one
+  color. The panel now uses a four-step ladder — `accent` (title) >
+  `toolTitle` (section heading + selected callout) > `muted` bold (group
+  labels) > `text` (rows) — so every theme distinguishes the levels
+  visibly without needing custom colors. `lib/common/info-panel.ts`
+  borders/title still use `borderAccent`/`accent` so it reads as a
+  distinct popup over the panel.
+- **Shared command and info panels: typing `exit` or `quit` closes the
+  popup.** Users reach for those keywords by muscle memory before
+  remembering Esc, but pi's stock TUIs ignore them. Both panels now
+  track typed keystrokes in a small ring buffer and dismiss the popup
+  the moment the buffer matches a registered close keyword. Esc / `q` /
+  Enter (info-panel) still work; partial filter prefixes that happen to
+  start with `e`, `q`, `ex`, ... still filter normally. Help footers
+  updated to mention the keyword.
 - **sf-data360: standardized `/sf-data360` settings panel.** `/sf-data360`
   with no args used to dump a status notification, while every other
   bundled extension (`/sf-slack`, `/sf-devbar`, `/sf-guardrail`,

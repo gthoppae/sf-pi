@@ -54,7 +54,18 @@ export async function openInfoPanel(
   );
 }
 
+// Close keywords mirror the command-panel contract so the same muscle memory
+// works in both popups. Kept inline (rather than imported from
+// command-panel.ts) so info-panel stays a leaf module with no sibling deps.
+const INFO_PANEL_CLOSE_KEYWORDS = ["exit", "quit"] as const;
+const INFO_PANEL_MAX_KEYWORD_LEN = Math.max(...INFO_PANEL_CLOSE_KEYWORDS.map((k) => k.length));
+
 class InfoPanelComponent {
+  // Sliding window of recent printable keystrokes used to detect typed close
+  // keywords (`exit`, `quit`). Reset by Enter/Esc/q so partial matches do not
+  // survive across panels.
+  private closeKeywordBuffer = "";
+
   constructor(
     private readonly theme: Theme,
     private readonly glyphs: UiGlyphs,
@@ -70,8 +81,24 @@ class InfoPanelComponent {
       matchesKey(data, "return") ||
       data === "q"
     ) {
+      this.closeKeywordBuffer = "";
       this.done();
+      return;
     }
+    // Detect typed `exit` / `quit` so users who reach for those keywords by
+    // muscle memory don’t get stuck inside the popup. Same contract as
+    // GroupedActionList in command-panel.ts.
+    if (data.length === 1 && /^[a-z]$/i.test(data)) {
+      this.closeKeywordBuffer = (this.closeKeywordBuffer + data.toLowerCase()).slice(
+        -INFO_PANEL_MAX_KEYWORD_LEN,
+      );
+      if ((INFO_PANEL_CLOSE_KEYWORDS as readonly string[]).includes(this.closeKeywordBuffer)) {
+        this.closeKeywordBuffer = "";
+        this.done();
+      }
+      return;
+    }
+    this.closeKeywordBuffer = "";
   }
 
   render(width: number): string[] {
@@ -113,7 +140,10 @@ class InfoPanelComponent {
     );
     lines.push(
       this.contentLine(
-        ` ${this.theme.fg("dim", this.options.footer ?? "Enter/Esc return to the previous panel")}`,
+        ` ${this.theme.fg(
+          "dim",
+          this.options.footer ?? "Enter/Esc / type 'exit' return to the previous panel",
+        )}`,
         width,
       ),
     );
