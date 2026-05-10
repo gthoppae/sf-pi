@@ -48,6 +48,20 @@ export interface SfapResponse<T = unknown> {
   endpoint: "" | "test." | "dev.";
 }
 
+/**
+ * Detect the canonical "this org isn't Agentforce/SFAP-enabled" failure mode
+ * (every host variant returns 404 / HTML error pages). Returning true means
+ * any retry across hosts will keep failing — the org just doesn't have these
+ * routes wired up.
+ */
+export function isSfapRoutingFailure<T>(resp: SfapResponse<T>): boolean {
+  if (resp.status !== 404) return false;
+  const body = resp.body as unknown;
+  if (!body) return false;
+  const text = typeof body === "string" ? body : JSON.stringify(body);
+  return /ERROR_HTTP_404|URL No Longer Exists/i.test(text);
+}
+
 // -------------------------------------------------------------------------------------------------
 // Internals
 // -------------------------------------------------------------------------------------------------
@@ -81,18 +95,32 @@ function inferStatusFromError(err: unknown): number {
   const direct = e.statusCode;
   if (typeof direct === "number" && direct >= 100 && direct < 600) return direct;
 
+  // jsforce often surfaces error bodies and codes via `message`, `errorCode`,
+  // and `name`. Build a search blob from all three so we don't miss the code.
   const message = typeof e.message === "string" ? e.message : "";
-  const match = /\b(\d{3})\b/.exec(message);
+  const errorCode = typeof e.errorCode === "string" ? e.errorCode : "";
+  const name = typeof e.name === "string" ? e.name : "";
+  const blob = `${message} ${errorCode} ${name}`;
+
+  // SFAP frequently reports its routing 404 as ERROR_HTTP_404 inside the body.
+  // Match those before the loose `\b\d{3}\b` so we get the actual status.
+  const errorHttp = /ERROR_HTTP_(\d{3})/.exec(blob);
+  if (errorHttp) {
+    const n = parseInt(errorHttp[1], 10);
+    if (n >= 100 && n < 600) return n;
+  }
+
+  const match = /\b(\d{3})\b/.exec(blob);
   if (match) {
     const n = parseInt(match[1], 10);
     if (n >= 100 && n < 600) return n;
   }
 
   // Network-level failures bubble through with no status. Treat as retryable 503.
-  if (/ENOTFOUND|ECONNREFUSED|ETIMEDOUT|ECONNRESET|EAI_AGAIN/i.test(message)) return 503;
+  if (/ENOTFOUND|ECONNREFUSED|ETIMEDOUT|ECONNRESET|EAI_AGAIN/i.test(blob)) return 503;
 
   // Auth failures end the run on the spot — don't retry.
-  if (/auth|token|expired|refresh|unauthorized/i.test(message)) return 401;
+  if (/auth|token|expired|refresh|unauthorized/i.test(blob)) return 401;
 
   return 500;
 }

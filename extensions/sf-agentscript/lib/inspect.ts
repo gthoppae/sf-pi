@@ -93,15 +93,30 @@ function unwrapScalar(value: unknown): string | number | boolean | undefined {
 
 interface CstMetaLite {
   range?: { start?: { line?: number } };
-  node?: { startRow?: number };
+  node?: {
+    startRow?: number;
+    parent?: { startRow?: number; type?: string };
+  };
 }
 
+/**
+ * Best-effort declaration line for a NamedMap entry / block. We prefer the
+ * **keyword line** (e.g. `topic billing:`) over the first body line (e.g. its
+ * `label:` field) because that's what humans expect when asked "where is
+ * @topic.billing declared?".
+ *
+ * The CST stores `range.start` at the body's start line (post-keyword). The
+ * `node.parent` (the enclosing mapping_element) starts at the keyword line,
+ * so we walk one parent up when present.
+ */
 function startLine(node: unknown): number | undefined {
   const cst = (node as { __cst?: CstMetaLite } | null)?.__cst;
-  const lspLine = cst?.range?.start?.line;
-  if (typeof lspLine === "number") return lspLine + 1; // 1-based for humans
+  const parentRow = cst?.node?.parent?.startRow;
+  if (typeof parentRow === "number") return parentRow + 1;
   const cstRow = cst?.node?.startRow;
   if (typeof cstRow === "number") return cstRow + 1;
+  const lspLine = cst?.range?.start?.line;
+  if (typeof lspLine === "number") return lspLine + 1;
   return undefined;
 }
 

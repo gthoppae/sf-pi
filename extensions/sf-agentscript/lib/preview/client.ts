@@ -18,7 +18,7 @@
 
 import { randomUUID } from "node:crypto";
 import type { Connection } from "@salesforce/core";
-import { sfapRequest } from "../eval/sfap.ts";
+import { isSfapRoutingFailure, sfapRequest } from "../eval/sfap.ts";
 import { fetchTrace } from "../eval/trace-client.ts";
 import {
   endSession as endSessionStore,
@@ -164,6 +164,12 @@ export async function startPreview(opts: PreviewStartOptions): Promise<PreviewSt
     compileResp.status >= 300 ||
     compileResp.body.status !== "success"
   ) {
+    if (isSfapRoutingFailure(compileResp)) {
+      throw new Error(
+        "Server compile is unavailable in this org — the Einstein AI Agent SFAP routes returned 404 across api / test.api / dev.api hosts. " +
+          "This typically means the org isn't Agentforce-enabled (e.g. a basic dev edition). Use a sandbox or production org with Agentforce enabled.",
+      );
+    }
     throw new Error(
       `Server compile failed (HTTP ${compileResp.status}): ${JSON.stringify(compileResp.body).slice(0, 600)}`,
     );
@@ -210,6 +216,12 @@ export async function startPreview(opts: PreviewStartOptions): Promise<PreviewSt
     },
   });
   if (sessionResp.status < 200 || sessionResp.status >= 300) {
+    if (isSfapRoutingFailure(sessionResp)) {
+      throw new Error(
+        "Preview session start is unavailable in this org — the SFAP routes returned 404 across api / test.api / dev.api hosts. " +
+          "Use an Agentforce-enabled org.",
+      );
+    }
     throw new Error(
       `Session start failed (HTTP ${sessionResp.status}): ${JSON.stringify(sessionResp.body).slice(0, 600)}`,
     );
@@ -421,6 +433,12 @@ export async function startPreviewByApiName(
     },
   });
   if (sessionResp.status < 200 || sessionResp.status >= 300) {
+    if (isSfapRoutingFailure(sessionResp)) {
+      throw new Error(
+        "Production-agent session start is unavailable in this org — the SFAP routes returned 404 across api / test.api / dev.api hosts. " +
+          "Use an Agentforce-enabled org.",
+      );
+    }
     throw new Error(
       `Production-agent session start failed (HTTP ${sessionResp.status}): ${JSON.stringify(sessionResp.body).slice(0, 600)}`,
     );

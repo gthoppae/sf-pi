@@ -210,7 +210,7 @@ async function actionActivate(input: Extract<ParamsAny, { action: "activate" }>)
       `🟢 ${input.agent_api_name} v${row.VersionNumber} activated`,
     );
   } catch (err) {
-    return classifyLifecycleError(err, input.agent_api_name);
+    return classifyLifecycleError(err, input.agent_api_name, "activate");
   }
 }
 
@@ -236,7 +236,7 @@ async function actionDeactivate(input: Extract<ParamsAny, { action: "deactivate"
       `⚫ ${input.agent_api_name} v${row.VersionNumber} deactivated`,
     );
   } catch (err) {
-    return classifyLifecycleError(err, input.agent_api_name);
+    return classifyLifecycleError(err, input.agent_api_name, "deactivate");
   }
 }
 
@@ -260,7 +260,7 @@ async function actionListVersions(input: Extract<ParamsAny, { action: "list_vers
     ];
     return toolOk({ ok: true as const, ...result }, lines.join("\n"));
   } catch (err) {
-    return classifyLifecycleError(err, input.agent_api_name);
+    return classifyLifecycleError(err, input.agent_api_name, "list_versions");
   }
 }
 
@@ -271,10 +271,29 @@ async function actionListVersions(input: Extract<ParamsAny, { action: "list_vers
 function classifyLifecycleError(
   err: unknown,
   agentApiName: string,
+  callingAction: "publish" | "activate" | "deactivate" | "list_versions",
 ): { content: { type: "text"; text: string }[]; details: ToolError } {
   const msg = err instanceof Error ? err.message : String(err);
+
+  // SFAP routing failure on dev / non-Agentforce orgs — give a friendlier hint.
+  if (/ERROR_HTTP_404|HTTP 404|URL No Longer Exists/i.test(msg)) {
+    return toolError(
+      `${msg.split("\n")[0]} — the org's Einstein AI Agent SFAP routes are not reachable.`,
+      "This typically means the org isn't Agentforce-enabled (e.g. a basic dev edition). Try a sandbox or production org with Agentforce enabled.",
+    );
+  }
+
+  // Agent-not-found path — only suggest list_versions if the LLM was already
+  // calling something else (activate/deactivate). For list_versions itself,
+  // a recover_via pointing back at list_versions is circular and useless.
   if (/not found/i.test(msg)) {
-    return toolError(msg, "Use list_versions to see what's in the org.", {
+    if (callingAction === "list_versions") {
+      return toolError(
+        msg,
+        'Verify the DeveloperName via `sf data query -q "SELECT DeveloperName FROM BotDefinition"`. There is no enumerate-all-agents tool yet.',
+      );
+    }
+    return toolError(msg, "Use list_versions to confirm the DeveloperName.", {
       tool: LIFECYCLE_TOOL_NAME,
       params: { action: "list_versions", agent_api_name: agentApiName },
     });

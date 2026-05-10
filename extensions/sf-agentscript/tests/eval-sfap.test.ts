@@ -15,7 +15,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, test, vi } from "vitest";
-import { sfapRequest } from "../lib/eval/sfap.ts";
+import { isSfapRoutingFailure, sfapRequest } from "../lib/eval/sfap.ts";
 
 interface RequestArg {
   url: string;
@@ -149,6 +149,50 @@ describe("sfapRequest", () => {
     });
     expect(result.endpoint).toBe("test.");
     expect(result.status).toBe(200);
+  });
+
+  test("infers 404 from ERROR_HTTP_404 in error body (jsforce surface)", async () => {
+    // Reproduces the live bug: dev-edition SFAP returns an HTML 404 that
+    // jsforce wraps with errorCode='ERROR_HTTP_404' and message=''. Without
+    // the dedicated regex, our naive `\b\d{3}\b` couldn't see `_404` because
+    // `_` is a word boundary char, so it fell back to 500.
+    const { conn } = fakeConn(() => ({
+      throws: { errorCode: "ERROR_HTTP_404", name: "ERROR_HTTP_404", message: "" },
+    }));
+    const result = await sfapRequest(conn as never, {
+      url: "https://api.salesforce.com/x",
+      method: "POST",
+      fallback: false,
+      maxRetries: 0,
+    });
+    expect(result.status).toBe(404);
+  });
+
+  test("isSfapRoutingFailure detects the canonical org-not-enabled response", async () => {
+    expect(
+      isSfapRoutingFailure({
+        status: 404,
+        endpoint: "",
+        body: { errorCode: "ERROR_HTTP_404", name: "ERROR_HTTP_404", message: "" },
+      }),
+    ).toBe(true);
+    expect(
+      isSfapRoutingFailure({
+        status: 404,
+        endpoint: "",
+        body: "<html><body>URL No Longer Exists</body></html>",
+      }),
+    ).toBe(true);
+    // Genuine 404 (e.g. wrong agent id) without the SFAP signature shouldn't trip this.
+    expect(
+      isSfapRoutingFailure({
+        status: 404,
+        endpoint: "",
+        body: { errorCode: "NOT_FOUND", message: "Agent does not exist" },
+      }),
+    ).toBe(false);
+    // Non-404 statuses obviously not.
+    expect(isSfapRoutingFailure({ status: 500, endpoint: "", body: {} })).toBe(false);
   });
 
   test("does not walk when fallback=false", async () => {
