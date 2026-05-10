@@ -31,18 +31,34 @@ import type { AgentScriptDiagnostic, AgentScriptQuickFix, AgentScriptRange } fro
 // Public types
 // -------------------------------------------------------------------------------------------------
 
+/** Common fields every mutate op accepts. */
+interface CommonMutateFields {
+  /**
+   * When true, compute the post-mutation source and return it as `diff` /
+   * `preview_source` without writing to disk. Useful for the LLM to see what
+   * a change would do before committing.
+   */
+  dry_run?: boolean;
+}
+
 export type MutateOp =
-  | { op: "set_field"; path: string; component: string; field: string; value: unknown }
-  | { op: "rename"; path: string; from: string; to: string }
-  | { op: "insert"; path: string; parent: string; child: unknown }
-  | { op: "delete"; path: string; target: string }
-  | {
+  | ({
+      op: "set_field";
+      path: string;
+      component: string;
+      field: string;
+      value: unknown;
+    } & CommonMutateFields)
+  | ({ op: "rename"; path: string; from: string; to: string } & CommonMutateFields)
+  | ({ op: "insert"; path: string; parent: string; child: unknown } & CommonMutateFields)
+  | ({ op: "delete"; path: string; target: string } & CommonMutateFields)
+  | ({
       op: "apply_quick_fix";
       path: string;
       diagnostic_code: string;
       line: number;
       fix_index?: number;
-    };
+    } & CommonMutateFields);
 
 export interface MutateResult {
   ok: boolean;
@@ -52,6 +68,12 @@ export interface MutateResult {
   diagnostics_after?: AgentScriptDiagnostic[];
   reason?: string;
   reason_detail?: string;
+  /** Set when dry_run=true. Unified-style diff of the proposed change. */
+  diff?: string;
+  /** Set when dry_run=true. The full source after the mutation. */
+  preview_source?: string;
+  /** Set when dry_run=true. The mutation was NOT written to disk. */
+  was_dry_run?: boolean;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -146,16 +168,77 @@ async function applyCoordFallback(
       reason_detail: "Quick fix produced identical source.",
     };
   }
+  return await commitOrPreview(op, sourceBefore, after, "coord_fallback", fix.title);
+}
+
+/**
+ * Either write `after` to disk and re-compile (default), or — when
+ * op.dry_run=true — return a unified diff + the proposed source without
+ * touching disk.
+ */
+async function commitOrPreview(
+  op: MutateOp,
+  sourceBefore: string,
+  after: string,
+  appliedVia: "ast" | "coord_fallback",
+  diffSummary: string,
+): Promise<MutateResult> {
+  if (op.dry_run) {
+    return {
+      ok: true,
+      applied_via: appliedVia,
+      diff_summary: diffSummary,
+      bytes_changed: after.length - sourceBefore.length,
+      was_dry_run: true,
+      preview_source: after,
+      diff: makeUnifiedDiff(op.path, sourceBefore, after),
+    };
+  }
   await fs.writeFile(op.path, after, "utf8");
   const recompile = await checkAgentScriptFile(op.path);
-
   return {
     ok: true,
-    applied_via: "coord_fallback",
-    diff_summary: fix.title,
+    applied_via: appliedVia,
+    diff_summary: diffSummary,
     bytes_changed: after.length - sourceBefore.length,
     diagnostics_after: recompile.ok ? recompile.diagnostics : [],
   };
+}
+
+/**
+ * Tiny line-based diff renderer. Sufficient for the LLM's review needs;
+ * not a full unified-diff implementation. We use the LCS-free naive form:
+ * for each line, mark - if removed, + if added, surrounded by 2 lines of
+ * context.
+ */
+function makeUnifiedDiff(filePath: string, before: string, after: string): string {
+  const a = before.split("\n");
+  const b = after.split("\n");
+  // Trim common prefix + suffix.
+  let i = 0;
+  while (i < a.length && i < b.length && a[i] === b[i]) i++;
+  let endA = a.length;
+  let endB = b.length;
+  while (endA > i && endB > i && a[endA - 1] === b[endB - 1]) {
+    endA--;
+    endB--;
+  }
+
+  const ctxBefore = Math.max(0, i - 2);
+  const ctxAfterA = Math.min(a.length, endA + 2);
+  const ctxAfterB = Math.min(b.length, endB + 2);
+
+  const lines: string[] = [];
+  lines.push(`--- ${filePath}`);
+  lines.push(`+++ ${filePath} (proposed)`);
+  lines.push(
+    `@@ -${ctxBefore + 1},${ctxAfterA - ctxBefore} +${ctxBefore + 1},${ctxAfterB - ctxBefore} @@`,
+  );
+  for (let k = ctxBefore; k < i; k++) lines.push(` ${a[k] ?? ""}`);
+  for (let k = i; k < endA; k++) lines.push(`-${a[k] ?? ""}`);
+  for (let k = i; k < endB; k++) lines.push(`+${b[k] ?? ""}`);
+  for (let k = endA; k < ctxAfterA; k++) lines.push(` ${a[k] ?? ""}`);
+  return lines.join("\n");
 }
 
 /**
@@ -269,15 +352,7 @@ async function applyAstSetField(
     if (after === sourceBefore) {
       return { ok: false, reason: "noop", reason_detail: "Mutation did not change source." };
     }
-    await fs.writeFile(op.path, after, "utf8");
-    const recompile = await checkAgentScriptFile(op.path);
-    return {
-      ok: true,
-      applied_via: "ast",
-      diff_summary: `set ${op.component}.${op.field}`,
-      bytes_changed: after.length - sourceBefore.length,
-      diagnostics_after: recompile.ok ? recompile.diagnostics : [],
-    };
+    return await commitOrPreview(op, sourceBefore, after, "ast", `set ${op.component}.${op.field}`);
   } catch (err) {
     return {
       ok: false,
@@ -334,16 +409,13 @@ async function applyAstRename(
     if (after === sourceBefore) {
       return { ok: false, reason: "noop", reason_detail: "Rename produced identical source." };
     }
-    await fs.writeFile(op.path, after, "utf8");
-    const recompile = await checkAgentScriptFile(op.path);
-
-    return {
-      ok: true,
-      applied_via: "ast",
-      diff_summary: `renamed topic.${entryName} → subagent.${entryName}`,
-      bytes_changed: after.length - sourceBefore.length,
-      diagnostics_after: recompile.ok ? recompile.diagnostics : [],
-    };
+    return await commitOrPreview(
+      op,
+      sourceBefore,
+      after,
+      "ast",
+      `renamed topic.${entryName} → subagent.${entryName}`,
+    );
   } catch (err) {
     return {
       ok: false,

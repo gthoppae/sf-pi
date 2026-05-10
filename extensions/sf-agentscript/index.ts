@@ -69,6 +69,7 @@ import { registerCompileTool } from "./lib/compile-tool.ts";
 import { registerCreateTool } from "./lib/create-tool.ts";
 import { registerEvalTool } from "./lib/eval-tool.ts";
 import { registerInspectTool } from "./lib/inspect-tool.ts";
+import { registerLifecycleTool } from "./lib/lifecycle-tool.ts";
 import { registerMutateTool } from "./lib/mutate-tool.ts";
 import { registerPreviewTool } from "./lib/preview-tool.ts";
 import { handleEvalAction } from "./lib/command/eval-action.ts";
@@ -97,6 +98,7 @@ export default function sfAgentScriptExtension(pi: ExtensionAPI): void {
   registerMutateTool(pi);
   registerPreviewTool(pi);
   registerEvalTool(pi);
+  registerLifecycleTool(pi);
 
   registerExtensionDoctor(EXTENSION_ID, (cwd) => runExtensionDoctor(cwd));
 }

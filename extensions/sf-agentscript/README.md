@@ -108,6 +108,8 @@ extensions/sf-agentscript/
     file-classify.ts        ← implementation module
     inspect-tool.ts         ← implementation module
     inspect.ts              ← implementation module
+    lifecycle-tool.ts       ← implementation module
+    lifecycle.ts            ← implementation module
     mutate-tool.ts          ← implementation module
     mutate.ts               ← implementation module
     preview-tool.ts         ← implementation module
@@ -123,7 +125,9 @@ extensions/sf-agentscript/
     eval-sfap.test.ts       ← unit / smoke test
     feedback.test.ts        ← unit / smoke test
     file-classify.test.ts   ← unit / smoke test
+    inspect-actions.test.ts ← unit / smoke test
     inspect.test.ts         ← unit / smoke test
+    mutate-dry-run.test.ts  ← unit / smoke test
     mutate.test.ts          ← unit / smoke test
     preview-session-store.test.ts← unit / smoke test
     self-recovery.test.ts   ← unit / smoke test

@@ -18,6 +18,14 @@ import { toolError, toolOk } from "./tool-types.ts";
 
 export const MUTATE_TOOL_NAME = "agentscript_mutate";
 
+// Common dry_run schema fragment, applied to every variant.
+const DryRunField = Type.Optional(
+  Type.Boolean({
+    description:
+      "When true, return a unified diff + the proposed source without writing to disk. Use to preview a change before committing.",
+  }),
+);
+
 // Discriminated-union parameter schema. Each variant pins the `op` literal and
 // the fields that op needs.
 const Params = Type.Union([
@@ -30,6 +38,7 @@ const Params = Type.Union([
     }),
     field: Type.String(),
     value: Type.Any(),
+    dry_run: DryRunField,
   }),
   Type.Object({
     op: Type.Literal("rename"),
@@ -41,17 +50,20 @@ const Params = Type.Union([
       description:
         "Target component path. Currently only 'topic.X' → 'subagent.X' is AST-supported.",
     }),
+    dry_run: DryRunField,
   }),
   Type.Object({
     op: Type.Literal("insert"),
     path: Type.String(),
     parent: Type.String(),
     child: Type.Any(),
+    dry_run: DryRunField,
   }),
   Type.Object({
     op: Type.Literal("delete"),
     path: Type.String(),
     target: Type.String(),
+    dry_run: DryRunField,
   }),
   Type.Object({
     op: Type.Literal("apply_quick_fix"),
@@ -67,6 +79,7 @@ const Params = Type.Union([
         description: "Pick a non-default fix when multiple are available. Default 0.",
       }),
     ),
+    dry_run: DryRunField,
   }),
 ]);
 
@@ -123,6 +136,13 @@ export function registerMutateTool(pi: ExtensionAPI): void {
           diff_summary: result.diff_summary,
           bytes_changed: result.bytes_changed,
           diagnostics_after: result.diagnostics_after,
+          ...(result.was_dry_run
+            ? {
+                was_dry_run: true,
+                diff: result.diff,
+                preview_source: result.preview_source,
+              }
+            : {}),
         },
         renderSummary(absPath, result),
       );
@@ -137,8 +157,18 @@ function renderSummary(
     diff_summary?: string;
     bytes_changed?: number;
     diagnostics_after?: { severity: number }[];
+    was_dry_run?: boolean;
+    diff?: string;
   },
 ): string {
+  if (result.was_dry_run) {
+    const truncated = (result.diff ?? "").split("\n").slice(0, 30).join("\n");
+    return [
+      `🔍 Dry-run: ${result.diff_summary ?? "mutation"} (${result.applied_via})`,
+      `${filePath}  Δ ${result.bytes_changed ?? 0} bytes (NOT written)`,
+      truncated,
+    ].join("\n");
+  }
   const errors = (result.diagnostics_after ?? []).filter((d) => d.severity === 1).length;
   const warnings = (result.diagnostics_after ?? []).filter((d) => d.severity === 2).length;
   const status = errors === 0 ? "✓ clean" : `❌ ${errors} error(s)`;

@@ -293,6 +293,220 @@ function extractSystemSummary(
   return summary;
 }
 
+// -------------------------------------------------------------------------------------------------
+// findReferences — walk AST expressions, collect every `@<ns>.<prop>` matching the symbol
+// -------------------------------------------------------------------------------------------------
+
+export interface ReferenceHit {
+  line: number;
+  character: number;
+  context: string;
+  is_declaration: boolean;
+}
+
+export interface FindReferencesResult {
+  ok: boolean;
+  reason?: "sdk_unavailable" | "read_failed" | "parse_failed" | "bad_symbol";
+  reason_detail?: string;
+  symbol?: string;
+  references?: ReferenceHit[];
+  total?: number;
+}
+
+export interface DefinitionResult {
+  ok: boolean;
+  reason?: "sdk_unavailable" | "read_failed" | "parse_failed" | "bad_symbol" | "not_found";
+  reason_detail?: string;
+  symbol?: string;
+  line?: number;
+  character?: number;
+  file?: string;
+}
+
+function parseSymbol(
+  symbol: string,
+): { ok: true; namespace: string; property: string } | { ok: false; reason: string } {
+  const m = /^@([\w-]+)\.([\w-]+)$/.exec(symbol);
+  if (!m) {
+    return {
+      ok: false,
+      reason: `Symbol must be of the form '@<namespace>.<property>', got '${symbol}'.`,
+    };
+  }
+  return { ok: true, namespace: m[1], property: m[2] };
+}
+
+function namedMapKeyFor(namespace: string): string | null {
+  if (
+    namespace === "topic" ||
+    namespace === "subagent" ||
+    namespace === "actions" ||
+    namespace === "variables"
+  ) {
+    return namespace;
+  }
+  return null;
+}
+
+export async function findReferences(
+  filePath: string,
+  symbol: string,
+): Promise<FindReferencesResult> {
+  const sdk = await loadAgentforceSDK();
+  if (!sdk) return { ok: false, reason: "sdk_unavailable", reason_detail: getSdkLoadError() };
+
+  const sym = parseSymbol(symbol);
+  if (sym.ok === false) return { ok: false, reason: "bad_symbol", reason_detail: sym.reason };
+
+  let source: string;
+  try {
+    source = await fs.readFile(filePath, "utf8");
+  } catch (err) {
+    return {
+      ok: false,
+      reason: "read_failed",
+      reason_detail: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  let doc: { ast: unknown };
+  try {
+    doc = (sdk as unknown as { parse: (s: string) => typeof doc }).parse(source);
+  } catch (err) {
+    return {
+      ok: false,
+      reason: "parse_failed",
+      reason_detail: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  const lines = source.split("\n");
+  const refs: ReferenceHit[] = [];
+
+  const walkExpressions = (
+    sdk as unknown as {
+      walkAstExpressions: (ast: unknown, visitor: (expr: unknown) => void) => void;
+    }
+  ).walkAstExpressions;
+
+  walkExpressions(doc.ast, (expr) => {
+    if (!expr || typeof expr !== "object") return;
+    const node = expr as {
+      __kind?: string;
+      object?: unknown;
+      property?: string;
+      __cst?: { range?: { start?: { line?: number; character?: number } } };
+    };
+    if (node.__kind !== "MemberExpression") return;
+    const objExpr = node.object as
+      | {
+          __kind?: string;
+          name?: string;
+          __cst?: { range?: { start?: { line?: number; character?: number } } };
+        }
+      | undefined;
+    if (!objExpr || objExpr.__kind !== "AtIdentifier") return;
+    if (objExpr.name !== sym.namespace || node.property !== sym.property) return;
+
+    const cst = objExpr.__cst?.range?.start;
+    if (!cst) return;
+    const lineIdx = cst.line ?? 0;
+    const charIdx = (cst.character ?? 0) > 0 ? (cst.character ?? 0) - 1 : 0;
+    refs.push({
+      line: lineIdx + 1,
+      character: charIdx,
+      context: (lines[lineIdx] ?? "").trim().slice(0, 120),
+      is_declaration: false,
+    });
+  });
+
+  // Add the declaration site if present in the corresponding NamedMap.
+  const ast = (doc.ast ?? {}) as Record<string, unknown>;
+  const mapKey = namedMapKeyFor(sym.namespace);
+  if (mapKey) {
+    const map = ast[mapKey];
+    if (map && typeof (map as { get?: unknown }).get === "function") {
+      const entry = (map as { get: (n: string) => unknown }).get(sym.property);
+      if (entry) {
+        const declLine = startLine(entry);
+        if (typeof declLine === "number") {
+          refs.unshift({
+            line: declLine,
+            character: 0,
+            context: (lines[declLine - 1] ?? "").trim().slice(0, 120),
+            is_declaration: true,
+          });
+        }
+      }
+    }
+  }
+
+  return { ok: true, symbol, references: refs, total: refs.length };
+}
+
+export async function findDefinition(filePath: string, symbol: string): Promise<DefinitionResult> {
+  const sdk = await loadAgentforceSDK();
+  if (!sdk) return { ok: false, reason: "sdk_unavailable", reason_detail: getSdkLoadError() };
+
+  const sym = parseSymbol(symbol);
+  if (sym.ok === false) return { ok: false, reason: "bad_symbol", reason_detail: sym.reason };
+
+  let source: string;
+  try {
+    source = await fs.readFile(filePath, "utf8");
+  } catch (err) {
+    return {
+      ok: false,
+      reason: "read_failed",
+      reason_detail: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  let doc: { ast: unknown };
+  try {
+    doc = (sdk as unknown as { parse: (s: string) => typeof doc }).parse(source);
+  } catch (err) {
+    return {
+      ok: false,
+      reason: "parse_failed",
+      reason_detail: err instanceof Error ? err.message : String(err),
+    };
+  }
+
+  const ast = (doc.ast ?? {}) as Record<string, unknown>;
+  const mapKey = namedMapKeyFor(sym.namespace);
+  if (!mapKey) {
+    return {
+      ok: false,
+      reason: "bad_symbol",
+      reason_detail: `Namespace '${sym.namespace}' is not declarable. Supported: @topic.X, @subagent.X, @actions.X, @variables.X.`,
+    };
+  }
+  const map = ast[mapKey];
+  if (!map || typeof (map as { get?: unknown }).get !== "function") {
+    return {
+      ok: false,
+      reason: "not_found",
+      reason_detail: `Namespace '${sym.namespace}' is empty.`,
+    };
+  }
+  const entry = (map as { get: (n: string) => unknown }).get(sym.property);
+  if (!entry) {
+    return { ok: false, reason: "not_found", reason_detail: `${symbol} is not declared.` };
+  }
+  const declLine = startLine(entry);
+  if (typeof declLine !== "number") {
+    return { ok: false, reason: "not_found", reason_detail: `${symbol} has no line metadata.` };
+  }
+  return {
+    ok: true,
+    symbol,
+    line: declLine,
+    character: 0,
+    file: filePath,
+  };
+}
+
 function resolveDialectInfo(source: string, sdk: unknown): InspectResult["dialect"] | undefined {
   const s = sdk as {
     parseDialectAnnotation?: (src: string) => { name?: string; version?: string } | null;

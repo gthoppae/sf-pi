@@ -18,7 +18,8 @@
       "agentscript_inspect",
       "agentscript_mutate",
       "agentscript_preview",
-      "agentscript_eval"
+      "agentscript_eval",
+      "agentscript_lifecycle"
     ],
     "events": [
       "session_start",
@@ -65,7 +66,7 @@
     "entry": "extensions/sf-agentscript/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 6576
+    "srcLoc": 7890
   },
   {
     "id": "sf-brain",

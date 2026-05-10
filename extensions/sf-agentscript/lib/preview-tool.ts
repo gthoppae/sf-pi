@@ -18,6 +18,7 @@ import {
   loadSession,
   sendMessage,
   startPreview,
+  startPreviewByApiName,
 } from "./preview/client.ts";
 import { fetchTrace } from "./eval/trace-client.ts";
 import { isAgentScriptFile, resolveToolPath } from "./file-classify.ts";
@@ -26,17 +27,26 @@ import { toolError, toolOk, type ToolError } from "./tool-types.ts";
 export const PREVIEW_TOOL_NAME = "agentscript_preview";
 
 const Params = Type.Union([
-  // start
+  // start — EITHER a local .agent file OR a published agent's api name.
   Type.Object({
     action: Type.Literal("start"),
     target_org: Type.Optional(Type.String()),
-    agent_file: Type.String({
-      description: "Path to a `.agent` file. Local-compiled before the server call.",
-    }),
+    agent_file: Type.Optional(
+      Type.String({
+        description:
+          "Path to a `.agent` file. Local-compiled before the server call. Use this OR agent_api_name.",
+      }),
+    ),
+    agent_api_name: Type.Optional(
+      Type.String({
+        description:
+          "Converse with a published, activated agent in the org. Use this OR agent_file. Skips local compile + server compile entirely.",
+      }),
+    ),
     agent_name: Type.Optional(
       Type.String({
         description:
-          "Display name used as the on-disk session-store agent folder. Defaults to the basename of agent_file.",
+          "Display name used as the on-disk session-store agent folder. Defaults to the basename of agent_file (or agent_api_name).",
       }),
     ),
     mock_mode: Type.Optional(Type.Union([Type.Literal("Mock"), Type.Literal("Live Test")])),
@@ -48,6 +58,12 @@ const Params = Type.Union([
     agent_name: Type.String(),
     session_id: Type.String(),
     message: Type.String(),
+    apex_debug: Type.Optional(
+      Type.Boolean({
+        description:
+          "When true, capture the latest ApexLog produced during this turn and include it on the result.",
+      }),
+    ),
   }),
   // end
   Type.Object({
@@ -74,11 +90,19 @@ type ParamsAny =
   | {
       action: "start";
       target_org?: string;
-      agent_file: string;
+      agent_file?: string;
+      agent_api_name?: string;
       agent_name?: string;
       mock_mode?: "Mock" | "Live Test";
     }
-  | { action: "send"; target_org?: string; agent_name: string; session_id: string; message: string }
+  | {
+      action: "send";
+      target_org?: string;
+      agent_name: string;
+      session_id: string;
+      message: string;
+      apex_debug?: boolean;
+    }
   | { action: "end"; agent_name: string; session_id: string }
   | { action: "trace"; target_org?: string; session_id: string; plan_id: string }
   | { action: "cleanup"; older_than_days?: number; dry_run?: boolean };
@@ -131,7 +155,56 @@ async function actionStart(
   content: { type: "text"; text: string }[];
   details: Record<string, unknown> | ToolError;
 }> {
-  const filePath = resolveToolPath(input.agent_file, ctx.cwd);
+  // Validate exclusivity — exactly one of agent_file / agent_api_name.
+  if (input.agent_file && input.agent_api_name) {
+    return toolError(
+      "Pass agent_file OR agent_api_name, not both.",
+      "agent_file = preview a local `.agent` (compiles + uploads). agent_api_name = converse with an already-published agent.",
+    );
+  }
+  if (!input.agent_file && !input.agent_api_name) {
+    return toolError(
+      "Pass agent_file or agent_api_name.",
+      "agent_file = local `.agent` path. agent_api_name = an already-published agent's DeveloperName.",
+    );
+  }
+
+  // Path A — published agent (no local file, no compile).
+  if (input.agent_api_name) {
+    const agentName = input.agent_name ?? input.agent_api_name;
+    try {
+      const conn = await connFromAlias(input.target_org);
+      const result = await startPreviewByApiName({
+        conn,
+        cwd: ctx.cwd,
+        agentApiName: input.agent_api_name,
+      });
+      return toolOk(
+        {
+          ok: true as const,
+          session_id: result.sessionId,
+          agent_response: result.agentResponse,
+          started_at: result.startedAt,
+          session_dir: result.sessionDir,
+          agent_name: agentName,
+          via: "api_name" as const,
+        },
+        `🎬 Preview started against published ${input.agent_api_name} · session ${result.sessionId.slice(0, 8)}…\n${result.agentResponse}`,
+      );
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      if (/not found in the org/i.test(msg)) {
+        return toolError(msg, undefined, {
+          tool: "agentscript_lifecycle",
+          params: { action: "list_versions", agent_api_name: input.agent_api_name },
+        });
+      }
+      return toolError(msg);
+    }
+  }
+
+  // Path B — local .agent file.
+  const filePath = resolveToolPath(input.agent_file ?? "", ctx.cwd);
   if (!isAgentScriptFile(filePath)) {
     return toolError(`Not an Agent Script file: ${filePath}`, "Pass a path ending in `.agent`.");
   }
@@ -162,6 +235,7 @@ async function actionStart(
         started_at: result.startedAt,
         session_dir: result.sessionDir,
         agent_name: agentName,
+        via: "agent_file" as const,
       },
       `🎬 Preview started · session ${result.sessionId.slice(0, 8)}…\n${result.agentResponse}`,
     );
@@ -209,6 +283,7 @@ async function actionSend(
       agentName: input.agent_name,
       sessionId: input.session_id,
       message: input.message,
+      apexDebug: input.apex_debug,
     });
     stream("Trace captured");
     return toolOk(
@@ -220,6 +295,7 @@ async function actionSend(
         latency_ms: result.latencyMs,
         plan_id: result.planId,
         trace_file: result.traceFile,
+        ...(result.apexDebugLog ? { apex_debug_log: result.apexDebugLog } : {}),
       },
       [
         `🤖 ${result.agentResponse}`,

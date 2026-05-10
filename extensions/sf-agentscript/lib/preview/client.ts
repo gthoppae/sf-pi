@@ -40,6 +40,12 @@ const SESSIONS_URL = "https://api.salesforce.com/einstein/ai-agent/v1.1/preview/
 const MESSAGES_URL = (sid: string): string =>
   `https://api.salesforce.com/einstein/ai-agent/v1.1/preview/sessions/${sid}/messages`;
 
+// Production-agent (already published) lives on /v1/agents/<botId>/sessions —
+// no agentDefinition payload, just a session start. Used by
+// startPreviewByApiName when the LLM wants to converse with a live agent.
+const PROD_AGENT_SESSION_URL = (botId: string): string =>
+  `https://api.salesforce.com/einstein/ai-agent/v1/agents/${botId}/sessions`;
+
 interface CompileResponseBody {
   status?: string;
   compiledArtifact?: AgentJson;
@@ -89,6 +95,8 @@ export interface PreviewSendOptions {
   agentName: string;
   sessionId: string;
   message: string;
+  /** When true, fetch + return Apex debug log captured during this turn. */
+  apexDebug?: boolean;
 }
 
 export interface PreviewSendResult {
@@ -98,6 +106,13 @@ export interface PreviewSendResult {
   latencyMs?: number;
   planId: string;
   traceFile?: string;
+  apexDebugLog?: string;
+}
+
+export interface PreviewStartByApiNameOptions {
+  conn: Connection;
+  cwd: string;
+  agentApiName: string;
 }
 
 export interface PreviewEndOptions {
@@ -250,6 +265,7 @@ export async function sendMessage(opts: PreviewSendOptions): Promise<PreviewSend
     body: {
       message: { sequenceId: Date.now(), type: "Text", text: opts.message },
       variables: [],
+      ...(opts.apexDebug ? { apexDebugging: true } : {}),
     },
   });
   if (resp.status < 200 || resp.status >= 300) {
@@ -291,7 +307,43 @@ export async function sendMessage(opts: PreviewSendOptions): Promise<PreviewSend
     }
   }
 
-  return { agentResponse, topic, invokedActions, latencyMs, planId, traceFile };
+  // When apex_debug is requested, fetch the latest debug log captured during
+  // this turn. Best-effort — we use the user's UserId from conn.identity().
+  let apexDebugLog: string | undefined;
+  if (opts.apexDebug) {
+    try {
+      apexDebugLog = await fetchLatestApexDebugLog(opts.conn, start);
+    } catch {
+      /* non-fatal */
+    }
+  }
+
+  return { agentResponse, topic, invokedActions, latencyMs, planId, traceFile, apexDebugLog };
+}
+
+/**
+ * Fetch the most recent ApexLog row created since `sinceMs`. Best-effort.
+ * Returns `undefined` if no debug log was produced (apex_debug requires
+ * Apex execution during the turn AND the user's debug levels to be
+ * enabled).
+ */
+async function fetchLatestApexDebugLog(
+  conn: Connection,
+  sinceMs: number,
+): Promise<string | undefined> {
+  const sinceIso = new Date(sinceMs).toISOString();
+  const r = await conn.query<{ Id: string }>(
+    `SELECT Id FROM ApexLog ` +
+      `WHERE LastModifiedDate >= ${sinceIso} ` +
+      `ORDER BY LastModifiedDate DESC LIMIT 1`,
+  );
+  const logId = r.records[0]?.Id;
+  if (!logId) return undefined;
+  const body = (await conn.request({
+    method: "GET",
+    url: `/services/data/v${conn.getApiVersion()}/sobjects/ApexLog/${logId}/Body`,
+  } as Parameters<typeof conn.request>[0])) as string;
+  return typeof body === "string" ? body : undefined;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -336,6 +388,65 @@ function extractTopicAndActions(trace: unknown): { topic?: string; invokedAction
     }
   }
   return { topic, invokedActions: actions.length ? actions : undefined };
+}
+
+// -------------------------------------------------------------------------------------------------
+// startPreviewByApiName — converse with a published, activated agent
+// -------------------------------------------------------------------------------------------------
+
+export async function startPreviewByApiName(
+  opts: PreviewStartByApiNameOptions,
+): Promise<PreviewStartResult> {
+  // Resolve BotDefinition.Id by api name. We don't try to validate Active here;
+  // the server endpoint will fail clearly if it can't route.
+  const r = await opts.conn.query<{ Id: string }>(
+    `SELECT Id FROM BotDefinition WHERE DeveloperName='${soqlEscape(opts.agentApiName)}'`,
+  );
+  const botId = r.records[0]?.Id;
+  if (!botId) {
+    throw new Error(
+      `Agent '${opts.agentApiName}' not found in the org. Use agentscript_lifecycle action='list_versions' to discover agents.`,
+    );
+  }
+
+  const sessionResp = await sfapRequest<SessionStartBody>(opts.conn, {
+    url: PROD_AGENT_SESSION_URL(botId),
+    method: "POST",
+    headers: { "x-client-name": "sf-pi", "content-type": "application/json" },
+    body: {
+      externalSessionKey: randomUUID(),
+      instanceConfig: { endpoint: opts.conn.instanceUrl },
+      streamingCapabilities: { chunkTypes: ["Text"] },
+      bypassUser: true,
+    },
+  });
+  if (sessionResp.status < 200 || sessionResp.status >= 300) {
+    throw new Error(
+      `Production-agent session start failed (HTTP ${sessionResp.status}): ${JSON.stringify(sessionResp.body).slice(0, 600)}`,
+    );
+  }
+
+  const startTime = new Date().toISOString();
+  const sessionId = sessionResp.body.sessionId;
+  if (!sessionId) {
+    throw new Error("Production-agent session start returned no sessionId.");
+  }
+  const sessionDir = await initSession(opts.cwd, {
+    sessionId,
+    agentName: opts.agentApiName,
+    startTime,
+    mockMode: "Live Test",
+  });
+  const initialMsg = (sessionResp.body.messages ?? []).map((m) => m.message ?? "").join("\n");
+  await logTurn(sessionDir, {
+    timestamp: startTime,
+    agentName: opts.agentApiName,
+    sessionId,
+    role: "agent",
+    text: initialMsg,
+    raw: sessionResp.body.messages,
+  });
+  return { sessionId, agentResponse: initialMsg, startedAt: startTime, sessionDir };
 }
 
 // Re-export read-side helpers for the preview tool.
