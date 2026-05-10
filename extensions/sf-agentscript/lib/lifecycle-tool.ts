@@ -177,6 +177,12 @@ async function actionPublish(
       activate: input.activate ?? false,
       log: stream,
     });
+    const ab = result.authoring_bundle;
+    const bundleLine = ab
+      ? ab.error
+        ? `  ⚠️ AiAuthoringBundle deploy failed (Agent Script Studio will fall back to legacy builder): ${ab.error.slice(0, 200)}`
+        : `  • AiAuthoringBundle ${ab.full_name} deployed (target=${ab.target}, ${ab.created ? "created" : "updated"})`
+      : null;
     return toolOk(
       {
         ok: true as const,
@@ -186,13 +192,17 @@ async function actionPublish(
         version_developer_name: result.version_developer_name,
         was_new_agent: result.was_new_agent,
         activated: result.activated,
+        authoring_bundle: result.authoring_bundle,
       },
       [
         `📦 Published ${result.developer_name}`,
         result.was_new_agent ? "  • created new agent" : "  • new version of existing agent",
         `  • bot_version_id: ${result.bot_version_id}`,
+        bundleLine,
         result.activated ? "  • activated ✓" : "  • not activated (set activate=true to chain)",
-      ].join("\n"),
+      ]
+        .filter(Boolean)
+        .join("\n"),
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);

@@ -65,6 +65,20 @@ export interface PublishResult {
   activated?: boolean;
   /** Bot version DeveloperName (e.g. v3) — useful for the bundle-meta.xml `target` attribute. */
   version_developer_name?: string;
+  /**
+   * Outcome of deploying the AiAuthoringBundle metadata record. The bundle
+   * record is what tells Agent Script Studio "this agent has authoring
+   * source available"; without it the org's UI falls back to the legacy
+   * builder. Best-effort: a publish that creates the bot but fails to
+   * deploy the bundle still returns ok=true overall, and `authoring_bundle.
+   * error` carries the reason so the LLM (or human) can recover.
+   */
+  authoring_bundle?: {
+    full_name: string;
+    target: string;
+    created: boolean;
+    error?: string;
+  };
 }
 
 export interface BotVersionRow {
@@ -89,14 +103,23 @@ async function findBotId(conn: Connection, agentApiName: string): Promise<string
   return r.records[0]?.Id;
 }
 
-async function getVersionDeveloperName(
+async function getVersionDetails(
+  conn: Connection,
+  botVersionId: string,
+): Promise<{ DeveloperName?: string; VersionNumber?: number } | undefined> {
+  const r = await conn.query<{ DeveloperName?: string; VersionNumber?: number }>(
+    `SELECT DeveloperName, VersionNumber FROM BotVersion WHERE Id='${soqlEscape(botVersionId)}' LIMIT 1`,
+  );
+  return r.records[0];
+}
+
+// Kept for back-compat with callers that only need the version DeveloperName.
+// publishAgent uses `getVersionDetails` directly to read VersionNumber too.
+async function _getVersionDeveloperName(
   conn: Connection,
   botVersionId: string,
 ): Promise<string | undefined> {
-  const r = await conn.query<{ DeveloperName: string }>(
-    `SELECT DeveloperName FROM BotVersion WHERE Id='${soqlEscape(botVersionId)}' LIMIT 1`,
-  );
-  return r.records[0]?.DeveloperName;
+  return (await getVersionDetails(conn, botVersionId))?.DeveloperName;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -220,7 +243,53 @@ export async function publishAgent(opts: PublishOptions): Promise<PublishResult>
     throw new Error(`Publish returned no botId/botVersionId: ${errorMessage ?? "unknown"}`);
   }
 
-  const versionDeveloperName = await getVersionDeveloperName(opts.conn, botVersionId);
+  const versionDetails = await getVersionDetails(opts.conn, botVersionId);
+  const versionDeveloperName = versionDetails?.DeveloperName;
+  const versionNumber = versionDetails?.VersionNumber;
+
+  // Critical for Agent Script Studio: deploy the AiAuthoringBundle metadata
+  // record. Without this record, the org's UI falls back to the legacy
+  // builder for our published agent. The CLI does the same step via
+  // ComponentSet.fromSource(...).deploy(); we get the same effect via
+  // jsforce metadata.upsert without pulling in source-deploy-retrieve.
+  let authoringBundleResult: PublishResult["authoring_bundle"] = undefined;
+  if (versionDeveloperName && typeof versionNumber === "number") {
+    const bundleFullName = `${opts.agentApiName}_${versionNumber}`;
+    const target = `${opts.agentApiName}.${versionDeveloperName}`;
+    log(`Deploying AiAuthoringBundle ${bundleFullName} (target=${target})…`);
+    try {
+      const upserts = await (
+        opts.conn.metadata as unknown as {
+          upsert: (
+            type: string,
+            metadata: Array<Record<string, unknown>>,
+          ) => Promise<Array<{ created?: boolean; success?: boolean; errors?: unknown[] }>>;
+        }
+      ).upsert("AiAuthoringBundle", [{ fullName: bundleFullName, bundleType: "AGENT", target }]);
+      const r = upserts[0] ?? {};
+      if (r.success) {
+        authoringBundleResult = {
+          full_name: bundleFullName,
+          target,
+          created: Boolean(r.created),
+        };
+      } else {
+        authoringBundleResult = {
+          full_name: bundleFullName,
+          target,
+          created: false,
+          error: `metadata.upsert returned success=false: ${JSON.stringify(r.errors ?? []).slice(0, 240)}`,
+        };
+      }
+    } catch (err) {
+      authoringBundleResult = {
+        full_name: bundleFullName,
+        target,
+        created: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
+  }
 
   let activated = false;
   if (opts.activate) {
@@ -237,6 +306,7 @@ export async function publishAgent(opts: PublishOptions): Promise<PublishResult>
     was_new_agent: !existingBotId,
     activated,
     version_developer_name: versionDeveloperName,
+    authoring_bundle: authoringBundleResult,
   };
 }
 
