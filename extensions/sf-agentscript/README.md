@@ -131,9 +131,11 @@ extensions/sf-agentscript/
     feedback.test.ts        ← unit / smoke test
     file-classify.test.ts   ← unit / smoke test
     inspect-actions.test.ts ← unit / smoke test
+    inspect-cycle-safety.test.ts← unit / smoke test
     inspect.test.ts         ← unit / smoke test
     mutate-dry-run.test.ts  ← unit / smoke test
     mutate.test.ts          ← unit / smoke test
+    path-containment.test.ts← unit / smoke test
     preview-agent-api.test.ts← unit / smoke test
     preview-session-store.test.ts← unit / smoke test
     self-recovery.test.ts   ← unit / smoke test
