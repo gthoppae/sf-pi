@@ -3,15 +3,13 @@
  * Tool: agentscript_eval_resolve
  *
  * Resolve $active_bot_id / $active_bot_version_id / $active_planner_id from
- * the live org's Active BotVersion. Used by spec authors who want to bake
- * concrete ids into their specs (or by the LLM when debugging why a spec is
- * targeting a different version than expected).
+ * the live org's Active BotVersion via Connection.query (no subprocess).
  */
 
 import { Type } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { buildExecFn } from "../../../../lib/common/exec-adapter.ts";
-import { resolveActiveIds } from "../eval/orchestrator.ts";
+import { connFromAlias } from "../connection.ts";
+import { resolveActiveIds } from "../eval/active-ids.ts";
 
 export const EVAL_RESOLVE_TOOL_NAME = "agentscript_eval_resolve";
 
@@ -28,8 +26,6 @@ interface Input {
 }
 
 export function registerEvalResolveTool(pi: ExtensionAPI): void {
-  const exec = buildExecFn(pi);
-
   pi.registerTool({
     name: EVAL_RESOLVE_TOOL_NAME,
     label: "Agent Script eval — resolve active ids",
@@ -44,14 +40,9 @@ export function registerEvalResolveTool(pi: ExtensionAPI): void {
     parameters: Params,
     async execute(_id, params, _signal, _onUpdate, _ctx) {
       const input = params as Input;
-      const targetOrg = input.target_org ?? (await getDefaultOrg(exec));
-      if (!targetOrg) {
-        return errorResult(
-          "No target org. Suggested fix: pass target_org explicitly or set a default with `sf config set target-org=<alias>`.",
-        );
-      }
       try {
-        const ids = await resolveActiveIds(exec, input.agent_api_name, targetOrg);
+        const conn = await connFromAlias(input.target_org);
+        const ids = await resolveActiveIds(conn, input.agent_api_name);
         return {
           content: [
             {
@@ -59,7 +50,7 @@ export function registerEvalResolveTool(pi: ExtensionAPI): void {
               text: JSON.stringify(
                 {
                   agent_api_name: input.agent_api_name,
-                  target_org: targetOrg,
+                  target_org: input.target_org ?? conn.getUsername() ?? "<default>",
                   bot_id: ids.bot_id,
                   bot_version_id: ids.bot_version_id,
                   version_number: ids.version_number,
@@ -91,15 +82,4 @@ function errorResult(message: string): {
     content: [{ type: "text", text: `❌ ${message}` }],
     details: { ok: false, error: message },
   };
-}
-
-async function getDefaultOrg(exec: ReturnType<typeof buildExecFn>): Promise<string | undefined> {
-  try {
-    const r = await exec("sf", ["config", "get", "target-org", "--json"], { timeout: 10_000 });
-    if (r.code !== 0) return undefined;
-    const parsed = JSON.parse(r.stdout) as { result?: Array<{ name?: string; value?: string }> };
-    return parsed.result?.find((x) => x.name === "target-org")?.value;
-  } catch {
-    return undefined;
-  }
 }

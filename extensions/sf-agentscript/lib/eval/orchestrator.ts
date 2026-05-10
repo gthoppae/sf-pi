@@ -1,35 +1,40 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /**
- * The high-level run-eval orchestrator.
+ * High-level run-eval orchestrator.
  *
- * Responsibilities:
+ * Pipeline (8 phases):
  *   1. Resolve `$active_*` placeholders against the live org's Active BotVersion.
- *   2. Normalize the spec (alias remap on agent.* steps).
+ *   2. Normalize the spec (six passes — see normalize.ts).
  *   3. Resolve org metadata once (instanceUrl, orgId, userId) for SFAP headers.
- *   4. Split tests into ≤5-test batches and fan out concurrent POSTs.
+ *   4. Split tests into ≤ 5-test batches and fan out concurrent POSTs.
  *   5. HTML-decode the merged response.
  *   6. Optionally fan out planner-trace GETs (default: failed tests only).
  *   7. Persist the run to disk in the diff-friendly layout.
- *   8. Return a structured result for the caller (tool, command, or test).
+ *   8. Return a structured result for the caller.
  *
- * Concurrency model
- * -----------------
- * Eval batches: thread-pool fan-out at `concurrency` parallelism.
- * Trace fetches: separate fan-out at the same parallelism. Order independent.
- * Each `sf api request rest` invocation is its own subprocess, so this is
- * actually parallel (not just async).
+ * Transport: `@salesforce/core` `Connection.request` everywhere. No subprocess.
+ *
+ * Concurrency: bounded semaphore for batch POSTs and for trace GETs (same
+ * default of 8). Each `conn.request` is a real HTTP call so this is actual
+ * parallelism.
  */
 
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import path from "node:path";
-import type { ExecFn } from "../../../../lib/common/sf-environment/detect.ts";
+import type { Connection } from "@salesforce/core";
 import { callEval, type EvalApiHeaders, splitIntoBatches } from "./eval-client.ts";
 import { collectPlanKeys, fetchTracesConcurrent, type PlanKey } from "./trace-client.ts";
 import { deepDecode } from "./decode.ts";
 import { latencySummary, summarize, type BuildOptions } from "./render.ts";
-import { httpCall } from "./http.ts";
 import { newRunId, resolveRunDir, writeRun } from "./persist.ts";
 import { normalizeSpec } from "./normalize.ts";
+import {
+  resolveActiveIds,
+  specHasActivePlaceholders,
+  substitutePlaceholders,
+  type ResolvedAgentIds,
+} from "./active-ids.ts";
+import { resolveOrgIdentity } from "../connection.ts";
 import type {
   EvalApiResponse,
   EvalSpec,
@@ -41,171 +46,16 @@ import type {
 } from "./types.ts";
 
 // -------------------------------------------------------------------------------------------------
-// Active-version resolution
-// -------------------------------------------------------------------------------------------------
-
-export interface ResolvedAgentIds {
-  bot_id: string;
-  bot_version_id: string;
-  planner_id: string | null;
-  version_number: number;
-}
-
-function soqlEscape(s: string): string {
-  return s.replace(/'/g, "''");
-}
-
-async function sfDataQuery<T>(exec: ExecFn, soql: string, targetOrg: string): Promise<T[]> {
-  const result = await exec("sf", ["data", "query", "-q", soql, "-o", targetOrg, "--json"], {
-    timeout: 30_000,
-  });
-  if (result.code !== 0) {
-    throw new Error(
-      `sf data query failed (exit ${result.code}). Suggested fix: verify ` +
-        `the org alias '${targetOrg}' is reachable (\`sf org display -o ${targetOrg}\`).`,
-    );
-  }
-  const parsed = JSON.parse(result.stdout) as { result?: { records?: T[] } };
-  return parsed.result?.records ?? [];
-}
-
-export async function resolveActiveIds(
-  exec: ExecFn,
-  agentApiName: string,
-  targetOrg: string,
-): Promise<ResolvedAgentIds> {
-  const escName = soqlEscape(agentApiName);
-
-  const bots = await sfDataQuery<{ Id: string }>(
-    exec,
-    `SELECT Id FROM BotDefinition WHERE DeveloperName='${escName}'`,
-    targetOrg,
-  );
-  if (bots.length === 0) {
-    throw new Error(
-      `Agent '${agentApiName}' not found in org '${targetOrg}'. ` +
-        `Suggested fix: verify the DeveloperName via ` +
-        `\`sf data query -q "SELECT Id, DeveloperName FROM BotDefinition" -o ${targetOrg}\`.`,
-    );
-  }
-  const bot_id = bots[0].Id;
-
-  const versions = await sfDataQuery<{ Id: string; VersionNumber: number }>(
-    exec,
-    `SELECT Id, VersionNumber FROM BotVersion ` +
-      `WHERE BotDefinitionId='${bot_id}' AND Status='Active' ` +
-      `ORDER BY VersionNumber DESC LIMIT 1`,
-    targetOrg,
-  );
-  if (versions.length === 0) {
-    throw new Error(
-      `No Active BotVersion for '${agentApiName}' in '${targetOrg}'. ` +
-        `Suggested fix: activate a version in Setup → Einstein → Agents → ${agentApiName}.`,
-    );
-  }
-  const bot_version_id = versions[0].Id;
-  const version_number = versions[0].VersionNumber;
-
-  const planners = await sfDataQuery<{ Id: string }>(
-    exec,
-    `SELECT Id FROM GenAiPlannerDefinition ` +
-      `WHERE DeveloperName='${escName}_v${version_number}' LIMIT 1`,
-    targetOrg,
-  );
-
-  return {
-    bot_id,
-    bot_version_id,
-    planner_id: planners[0]?.Id ?? null,
-    version_number,
-  };
-}
-
-export function substitutePlaceholders<T>(obj: T, ids: ResolvedAgentIds): T {
-  if (typeof obj === "string") {
-    if (obj === "$active_bot_id") return ids.bot_id as unknown as T;
-    if (obj === "$active_bot_version_id") return ids.bot_version_id as unknown as T;
-    if (obj === "$active_planner_id") return ids.planner_id as unknown as T;
-    return obj;
-  }
-  if (Array.isArray(obj)) return obj.map((v) => substitutePlaceholders(v, ids)) as unknown as T;
-  if (obj && typeof obj === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(obj as Record<string, unknown>)) {
-      out[k] = substitutePlaceholders(v, ids);
-    }
-    return out as T;
-  }
-  return obj;
-}
-
-// -------------------------------------------------------------------------------------------------
-// Org metadata + userId for SFAP headers
-// -------------------------------------------------------------------------------------------------
-
-export interface OrgIdentity {
-  org_id: string;
-  instance_url: string;
-  user_id: string;
-}
-
-interface OrgDisplayResult {
-  result?: { id?: string; instanceUrl?: string; username?: string };
-}
-
-interface UserInfoResponse {
-  user_id?: string;
-}
-
-export async function resolveOrgIdentity(exec: ExecFn, targetOrg: string): Promise<OrgIdentity> {
-  const display = await exec("sf", ["org", "display", "-o", targetOrg, "--json"], {
-    timeout: 15_000,
-  });
-  if (display.code !== 0) {
-    throw new Error(
-      `sf org display failed for '${targetOrg}'. Suggested fix: re-auth with ` +
-        `\`sf org login web -a ${targetOrg}\`.`,
-    );
-  }
-  const parsed = JSON.parse(display.stdout) as OrgDisplayResult;
-  const r = parsed.result ?? {};
-  if (!r.id || !r.instanceUrl) {
-    throw new Error(
-      `sf org display returned no orgId/instanceUrl for '${targetOrg}'. ` +
-        `Suggested fix: confirm the alias is connected (\`sf org list --all\`).`,
-    );
-  }
-
-  // Fetch user_id via /services/oauth2/userinfo using the org's own auth context.
-  // We hit the instance URL via `sf api request rest` so token handling stays in sf CLI.
-  const userinfoUrl = `${r.instanceUrl}/services/oauth2/userinfo`;
-  const ui = await httpCall<UserInfoResponse>(exec, {
-    url: userinfoUrl,
-    method: "GET",
-    targetOrg,
-    timeoutMs: 15_000,
-    maxRetries: 1,
-    fallback: false, // instance URL — not SFAP, no fallback
-  });
-  if (ui.status !== 200 || !ui.body?.user_id) {
-    throw new Error(
-      `oauth2/userinfo returned status ${ui.status} for '${targetOrg}'. ` +
-        `Suggested fix: re-auth with \`sf org login web -a ${targetOrg}\`.`,
-    );
-  }
-
-  return { org_id: r.id, instance_url: r.instanceUrl, user_id: ui.body.user_id };
-}
-
-// -------------------------------------------------------------------------------------------------
 // Run options + result
 // -------------------------------------------------------------------------------------------------
 
 export interface RunEvalOptions {
-  spec: EvalSpec;
-  /** sf CLI alias / username. Required. */
+  /** Caller-resolved Connection. Required. */
+  conn: Connection;
+  /** sf CLI alias / username. Recorded in metadata. Required. */
   targetOrg: string;
-  /** For $active_* placeholder resolution. Default: spec must not use placeholders. */
+  spec: EvalSpec;
+  /** For $active_* placeholder resolution. Required when the spec uses them. */
   agentApiName?: string;
   /** Trace-fetch policy. Default `failed` (fetch traces for failing tests only). */
   tracesMode?: TracesMode;
@@ -245,7 +95,7 @@ export interface RunEvalResult {
 // Main entry point
 // -------------------------------------------------------------------------------------------------
 
-export async function runEval(exec: ExecFn, opts: RunEvalOptions): Promise<RunEvalResult> {
+export async function runEval(opts: RunEvalOptions): Promise<RunEvalResult> {
   const log = opts.log ?? (() => {});
   const startedAt = new Date();
   const concurrency = Math.max(1, opts.concurrency ?? 8);
@@ -262,7 +112,7 @@ export async function runEval(exec: ExecFn, opts: RunEvalOptions): Promise<RunEv
           `Suggested fix: pass agentApiName, or substitute the placeholders in the spec.`,
       );
     }
-    resolvedIds = await resolveActiveIds(exec, opts.agentApiName, opts.targetOrg);
+    resolvedIds = await resolveActiveIds(opts.conn, opts.agentApiName);
     log(
       `Active: ${opts.agentApiName}  ` +
         `botVersionId=${resolvedIds.bot_version_id}  plannerId=${resolvedIds.planner_id}`,
@@ -272,7 +122,7 @@ export async function runEval(exec: ExecFn, opts: RunEvalOptions): Promise<RunEv
   spec = normalizeSpec(spec);
 
   // 2. Resolve org identity for SFAP headers
-  const ident = await resolveOrgIdentity(exec, opts.targetOrg);
+  const ident = await resolveOrgIdentity(opts.conn);
   const headers: EvalApiHeaders = {
     orgId: ident.org_id,
     userId: ident.user_id,
@@ -296,7 +146,7 @@ export async function runEval(exec: ExecFn, opts: RunEvalOptions): Promise<RunEv
   await Promise.all(
     batches.map((b, idx) =>
       sema(async () => {
-        const res = await callEval(exec, b, opts.targetOrg, headers);
+        const res = await callEval(opts.conn, b, headers);
         if (res.status >= 200 && res.status < 300) {
           results[idx] = res.body.results ?? [];
           if (batches.length > 1) {
@@ -327,10 +177,7 @@ export async function runEval(exec: ExecFn, opts: RunEvalOptions): Promise<RunEv
       log(
         `Fetching ${unique} planner trace(s) (mode=${tracesMode}, concurrency=${Math.min(unique, concurrency)})…`,
       );
-      traces = await fetchTracesConcurrent(exec, planKeys, opts.targetOrg, {
-        concurrency,
-        log,
-      });
+      traces = await fetchTracesConcurrent(opts.conn, planKeys, { concurrency, log });
       const ok = Array.from(traces.values()).filter((v) => v != null).length;
       if (ok !== unique) {
         log(`  trace fetch: ${ok}/${unique} succeeded (missing planner data is non-fatal)`);
@@ -399,20 +246,7 @@ export async function runEval(exec: ExecFn, opts: RunEvalOptions): Promise<RunEv
   };
 }
 
-function specHasActivePlaceholders(spec: EvalSpec): boolean {
-  // Quick scan — JSON.stringify is fine for our payload sizes.
-  const s = JSON.stringify(spec);
-  return (
-    s.includes("$active_bot_id") ||
-    s.includes("$active_bot_version_id") ||
-    s.includes("$active_planner_id")
-  );
-}
-
-/**
- * Tiny semaphore for bounded concurrency. Avoids pulling in a dep just to run
- * `Promise.all` with a cap.
- */
+/** Tiny semaphore for bounded concurrency. */
 function makeSemaphore(max: number): <T>(fn: () => Promise<T>) => Promise<T> {
   let inFlight = 0;
   const queue: Array<() => void> = [];
@@ -493,3 +327,7 @@ export async function recordRunInIndex(
   entries = [runId, ...entries.filter((e) => e !== runId)].slice(0, 50);
   await writeFile(idxPath, JSON.stringify(entries, null, 2), "utf-8");
 }
+
+// Re-export ResolvedAgentIds + resolveActiveIds for the eval-resolve tool.
+export { resolveActiveIds } from "./active-ids.ts";
+export type { ResolvedAgentIds } from "./active-ids.ts";

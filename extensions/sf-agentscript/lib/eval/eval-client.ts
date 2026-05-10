@@ -7,10 +7,13 @@
  *  - The endpoint requires the full set of SFAP context headers (org, user,
  *    instance, app context, feature id) plus an x-sfdc-core-tenant-id derived
  *    from the org id. We resolve those once per run and reuse for all batches.
+ *
+ * Transport: `sfapRequest` over `@salesforce/core` `Connection.request`,
+ * with sandbox-safe SFAP host fallback (api → test.api → dev.api on 404).
  */
 
-import type { ExecFn } from "../../../../lib/common/sf-environment/detect.ts";
-import { httpCall, type HttpResponse } from "./http.ts";
+import type { Connection } from "@salesforce/core";
+import { sfapRequest, type SfapResponse } from "./sfap.ts";
 import type { EvalApiResponse, EvalTest } from "./types.ts";
 
 export const EVAL_URL = "https://api.salesforce.com/einstein/evaluation/v1/tests";
@@ -24,8 +27,7 @@ export interface EvalApiHeaders {
 
 /**
  * Build the custom-header set the eval API requires. The Authorization header
- * is supplied automatically by `sf api request rest` from the active org's
- * auth context.
+ * is supplied automatically by jsforce/Connection from the org's auth context.
  */
 export function buildEvalHeaders(h: EvalApiHeaders): Record<string, string> {
   return {
@@ -41,20 +43,17 @@ export function buildEvalHeaders(h: EvalApiHeaders): Record<string, string> {
 
 /**
  * POST a single batch (≤ 5 tests). Returns the raw response. The HTTP status
- * is included in the response object so callers can decide how to surface
- * partial failures.
+ * is included so callers can decide how to surface partial failures.
  */
 export async function callEval(
-  exec: ExecFn,
+  conn: Connection,
   tests: EvalTest[],
-  targetOrg: string,
   headers: EvalApiHeaders,
   opts?: { timeoutMs?: number },
-): Promise<HttpResponse<EvalApiResponse>> {
-  return httpCall<EvalApiResponse>(exec, {
+): Promise<SfapResponse<EvalApiResponse>> {
+  return sfapRequest<EvalApiResponse>(conn, {
     url: EVAL_URL,
     method: "POST",
-    targetOrg,
     headers: buildEvalHeaders(headers),
     body: { tests },
     timeoutMs: opts?.timeoutMs ?? 300_000,

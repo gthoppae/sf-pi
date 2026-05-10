@@ -10,7 +10,7 @@
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
-import { buildExecFn } from "../../../../lib/common/exec-adapter.ts";
+import { connFromAlias } from "../connection.ts";
 import { runEval, recordRunInIndex } from "../eval/orchestrator.ts";
 import { renderReport } from "../eval/render.ts";
 import type { EvalSpec, TracesMode } from "../eval/types.ts";
@@ -54,7 +54,7 @@ function parseArgs(rawArgs: string[]): Args {
 }
 
 export async function handleEvalAction(
-  pi: ExtensionAPI,
+  _pi: ExtensionAPI,
   ctx: ExtensionCommandContext,
   rawArgs: string[],
 ): Promise<void> {
@@ -64,18 +64,6 @@ export async function handleEvalAction(
       ctx.ui.notify(
         "Usage: /sf-agentscript eval <spec.json> [--org <alias>] [--agent <name>] " +
           "[--traces failed|all|off] [--concurrency N] [--prompt-chars N] [--verbose]",
-        "warning",
-      );
-    }
-    return;
-  }
-
-  const exec = buildExecFn(pi, ctx.cwd);
-  const targetOrg = args.target_org ?? (await getDefaultOrg(exec));
-  if (!targetOrg) {
-    if (ctx.hasUI) {
-      ctx.ui.notify(
-        "No target org. Pass --org <alias> or run `sf config set target-org=<alias>`.",
         "warning",
       );
     }
@@ -97,9 +85,11 @@ export async function handleEvalAction(
   if (ctx.hasUI) ctx.ui.notify(`Running eval suite (${spec.tests?.length ?? 0} tests)…`, "info");
 
   try {
-    const result = await runEval(exec, {
+    const conn = await connFromAlias(args.target_org);
+    const result = await runEval({
+      conn,
+      targetOrg: args.target_org ?? conn.getUsername() ?? "<default>",
       spec,
-      targetOrg,
       agentApiName: args.agent_api_name,
       tracesMode: args.traces_mode,
       concurrency: args.concurrency,
@@ -107,7 +97,6 @@ export async function handleEvalAction(
       cwd: ctx.cwd,
       specPath: args.spec_path,
       log: (m) => {
-        // Surface progress via lightweight notifications in interactive mode
         if (ctx.hasUI) ctx.ui.notify(m, "info");
       },
     });
@@ -152,15 +141,4 @@ function headline(
   return result.failed_batches > 0
     ? `${head}\n⚠ ${result.failed_batches} batch(es) returned non-200 (some tests may be missing)`
     : head;
-}
-
-async function getDefaultOrg(exec: ReturnType<typeof buildExecFn>): Promise<string | undefined> {
-  try {
-    const r = await exec("sf", ["config", "get", "target-org", "--json"], { timeout: 10_000 });
-    if (r.code !== 0) return undefined;
-    const parsed = JSON.parse(r.stdout) as { result?: Array<{ name?: string; value?: string }> };
-    return parsed.result?.find((x) => x.name === "target-org")?.value;
-  } catch {
-    return undefined;
-  }
 }

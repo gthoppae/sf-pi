@@ -6,17 +6,11 @@
  * full LLMExecutionStep / UpdateTopicStep / FunctionCallStep / ValidationPromptStep
  * sequence — strictly more detailed than the inline llmEvents the eval API
  * embeds.
- *
- * Two common use cases:
- *  - The run was successful but the LLM still wants to verify what the planner
- *    actually did (e.g. proving a topic was selected for the right reason).
- *  - You're debugging a session created outside of agentscript_eval_run (e.g.
- *    via `sf agent preview`) and want the same trace shape.
  */
 
 import { Type } from "typebox";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { buildExecFn } from "../../../../lib/common/exec-adapter.ts";
+import { connFromAlias } from "../connection.ts";
 import { fetchTrace } from "../eval/trace-client.ts";
 
 export const EVAL_TRACE_TOOL_NAME = "agentscript_eval_trace";
@@ -38,8 +32,6 @@ interface Input {
 }
 
 export function registerEvalTraceTool(pi: ExtensionAPI): void {
-  const exec = buildExecFn(pi);
-
   pi.registerTool({
     name: EVAL_TRACE_TOOL_NAME,
     label: "Agent Script eval — trace",
@@ -54,15 +46,9 @@ export function registerEvalTraceTool(pi: ExtensionAPI): void {
     parameters: Params,
     async execute(_id, params, _signal, _onUpdate, _ctx: ExtensionContext) {
       const input = params as Input;
-      const targetOrg = input.target_org ?? (await getDefaultOrg(exec));
-      if (!targetOrg) {
-        return errorResult(
-          "No target org. Suggested fix: pass target_org explicitly or set a default with `sf config set target-org=<alias>`.",
-        );
-      }
-
       try {
-        const trace = await fetchTrace(exec, input.session_id, input.plan_id, targetOrg, {
+        const conn = await connFromAlias(input.target_org);
+        const trace = await fetchTrace(conn, input.session_id, input.plan_id, {
           timeoutMs: input.timeout_ms ?? 60_000,
         });
         if (trace == null) {
@@ -100,15 +86,4 @@ function errorResult(message: string): {
     content: [{ type: "text", text: `❌ ${message}` }],
     details: { ok: false, error: message },
   };
-}
-
-async function getDefaultOrg(exec: ReturnType<typeof buildExecFn>): Promise<string | undefined> {
-  try {
-    const r = await exec("sf", ["config", "get", "target-org", "--json"], { timeout: 10_000 });
-    if (r.code !== 0) return undefined;
-    const parsed = JSON.parse(r.stdout) as { result?: Array<{ name?: string; value?: string }> };
-    return parsed.result?.find((x) => x.name === "target-org")?.value;
-  } catch {
-    return undefined;
-  }
 }

@@ -7,12 +7,15 @@
  *   - small runs (≤ inline_threshold failures, default 5): full failures inline
  *   - larger runs: summary + run_id pointer; LLM follows up via
  *     agentscript_eval_get_failure(run_id, test_id) to drill in
+ *
+ * Auth is via `@salesforce/core` `Connection.request` — no subprocess. Same
+ * sf CLI auth context (auth files reused, automatic token refresh).
  */
 
 import { readFile } from "node:fs/promises";
 import { Type } from "typebox";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { buildExecFn } from "../../../../lib/common/exec-adapter.ts";
+import { connFromAlias } from "../connection.ts";
 import { runEval, recordRunInIndex, type RunEvalResult } from "../eval/orchestrator.ts";
 import type { EvalSpec } from "../eval/types.ts";
 
@@ -83,9 +86,9 @@ export interface EvalRunInput {
   inline_threshold?: number;
 }
 
-export function registerEvalRunTool(pi: ExtensionAPI): void {
-  const exec = buildExecFn(pi);
+type OnUpdateFn = (msg: string) => void;
 
+export function registerEvalRunTool(pi: ExtensionAPI): void {
   pi.registerTool({
     name: EVAL_RUN_TOOL_NAME,
     label: "Agent Script eval — run",
@@ -99,29 +102,35 @@ export function registerEvalRunTool(pi: ExtensionAPI): void {
       "Default traces_mode is 'failed' — fetches full planner traces only for failing tests. Set 'all' only when you need traces for every turn (cost: extra round-trips).",
       "When a run returns a summary + run_id (large run), use agentscript_eval_get_failure(run_id, test_id) to drill into one failure at a time.",
       "Failed batches indicate transient platform issues; the run continues and returns whatever batches succeeded.",
+      "Progress is streamed via onUpdate so you see batch + trace progress mid-flight without polling.",
     ],
     parameters: EvalRunParams,
-    async execute(_toolCallId, params, _signal, _onUpdate, ctx) {
+    async execute(_toolCallId, params, _signal, onUpdate, ctx) {
       const input = params as EvalRunInput;
-      return await executeEvalRun(exec, ctx, input);
+      const log: OnUpdateFn = (msg) => {
+        try {
+          onUpdate?.({
+            content: [{ type: "text", text: msg }],
+            details: { progress: msg } as never,
+          });
+        } catch {
+          /* onUpdate is best-effort; never fail the run because of it */
+        }
+      };
+      return await executeEvalRun(ctx, input, log);
     },
   });
 }
 
 export async function executeEvalRun(
-  exec: ReturnType<typeof buildExecFn>,
   ctx: ExtensionContext,
   input: EvalRunInput,
+  log: OnUpdateFn = () => {},
 ): Promise<{
   content: Array<{ type: "text"; text: string }>;
   details: Record<string, unknown>;
 }> {
-  const targetOrg = input.target_org ?? (await getDefaultOrg(exec, ctx.cwd));
-  if (!targetOrg) {
-    return errorResult(
-      "No target org. Suggested fix: pass target_org explicitly or run `sf config set target-org=<alias>`.",
-    );
-  }
+  const targetOrg = input.target_org;
 
   const spec = await loadSpec(input, ctx.cwd);
   if (!spec) {
@@ -132,18 +141,18 @@ export async function executeEvalRun(
 
   let result: RunEvalResult;
   try {
-    result = await runEval(exec, {
+    const conn = await connFromAlias(targetOrg);
+    result = await runEval({
+      conn,
+      targetOrg: targetOrg ?? conn.getUsername() ?? "<default>",
       spec,
-      targetOrg,
       agentApiName: input.agent_api_name,
       tracesMode: input.traces_mode ?? "failed",
       concurrency: input.concurrency ?? 8,
       promptChars: input.prompt_chars ?? 600,
       cwd: ctx.cwd,
       specPath: input.spec_path,
-      log: () => {
-        /* runs may be long; we let the caller poll the run_dir for progress */
-      },
+      log,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -240,22 +249,4 @@ async function loadSpec(input: EvalRunInput, cwd: string): Promise<EvalSpec | nu
     return input.spec as EvalSpec;
   }
   return null;
-}
-
-async function getDefaultOrg(
-  exec: ReturnType<typeof buildExecFn>,
-  _cwd: string,
-): Promise<string | undefined> {
-  // Defer to sf CLI's notion of the default target org.
-  try {
-    const r = await exec("sf", ["config", "get", "target-org", "--json"], { timeout: 10_000 });
-    if (r.code !== 0) return undefined;
-    const parsed = JSON.parse(r.stdout) as {
-      result?: Array<{ name?: string; value?: string }>;
-    };
-    const e = parsed.result?.find((x) => x.name === "target-org");
-    return typeof e?.value === "string" && e.value ? e.value : undefined;
-  } catch {
-    return undefined;
-  }
 }

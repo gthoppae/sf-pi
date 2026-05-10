@@ -10,15 +10,15 @@
  * more detailed than `lastExecution.llmEvents`, which the eval API embeds
  * inline. The cost is one extra GET per (session, plan).
  *
- * Concurrency
- * -----------
- * Trace fetches are idempotent so we fan out a small thread pool. A trace
- * failure is logged but never fails the run — the trace is a debugging aid,
- * not a correctness signal.
+ * Concurrency: trace fetches are idempotent so we fan out a small thread
+ * pool. A trace failure is logged but never fails the run — the trace is a
+ * debugging aid, not a correctness signal.
+ *
+ * Transport: `sfapRequest` over `@salesforce/core` `Connection.request`.
  */
 
-import type { ExecFn } from "../../../../lib/common/sf-environment/detect.ts";
-import { httpCall } from "./http.ts";
+import type { Connection } from "@salesforce/core";
+import { sfapRequest } from "./sfap.ts";
 import type { EvalApiResponse } from "./types.ts";
 
 export const TRACE_URL_TPL =
@@ -37,17 +37,15 @@ export interface FetchTraceOpts {
 }
 
 export async function fetchTrace(
-  exec: ExecFn,
+  conn: Connection,
   sessionId: string,
   planId: string,
-  targetOrg: string,
   opts?: { timeoutMs?: number },
 ): Promise<unknown | null> {
   const url = TRACE_URL_TPL.replace("{sid}", sessionId).replace("{pid}", planId);
-  const res = await httpCall<unknown>(exec, {
+  const res = await sfapRequest<unknown>(conn, {
     url,
     method: "GET",
-    targetOrg,
     headers: { "x-client-name": "afdx" },
     timeoutMs: opts?.timeoutMs ?? 60_000,
     maxRetries: 2,
@@ -64,9 +62,8 @@ export async function fetchTrace(
  * the caller can correlate back to the requesting test.
  */
 export async function fetchTracesConcurrent(
-  exec: ExecFn,
+  conn: Connection,
   keys: PlanKey[],
-  targetOrg: string,
   opts?: FetchTraceOpts,
 ): Promise<Map<string, unknown | null>> {
   const concurrency = Math.max(1, opts?.concurrency ?? 8);
@@ -88,7 +85,7 @@ export async function fetchTracesConcurrent(
     while ((job = next()) !== undefined) {
       const key = `${job.sessionId}::${job.planId}`;
       try {
-        const trace = await fetchTrace(exec, job.sessionId, job.planId, targetOrg, {
+        const trace = await fetchTrace(conn, job.sessionId, job.planId, {
           timeoutMs: opts?.timeoutMs,
         });
         out.set(key, trace);

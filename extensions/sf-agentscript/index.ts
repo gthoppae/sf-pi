@@ -73,6 +73,7 @@ import { registerEvalResolveTool } from "./lib/tools/eval-resolve.ts";
 import { registerInspectTool } from "./lib/tools/inspect.ts";
 import { registerMutateTool } from "./lib/tools/mutate.ts";
 import { handleEvalAction } from "./lib/command/eval-action.ts";
+import { clearConnectionCache } from "./lib/connection.ts";
 
 const EXTENSION_ID = "sf-agentscript";
 const COMMAND_NAME = "sf-agentscript";
@@ -338,8 +339,14 @@ async function handleCheckSubcommand(
 // -------------------------------------------------------------------------------------------------
 
 function registerSessionHooks(pi: ExtensionAPI, state: AgentScriptAssistState): void {
-  pi.on("session_start", async () => resetState(state));
-  pi.on("session_shutdown", async () => resetState(state));
+  pi.on("session_start", async () => {
+    resetState(state);
+    clearConnectionCache();
+  });
+  pi.on("session_shutdown", async () => {
+    resetState(state);
+    clearConnectionCache();
+  });
 }
 
 // -------------------------------------------------------------------------------------------------
