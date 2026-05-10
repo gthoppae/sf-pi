@@ -22,18 +22,18 @@
 import { readFile } from "node:fs/promises";
 import { Type } from "typebox";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { connFromAlias } from "../connection.ts";
+import { connFromAlias } from "./connection.ts";
 import {
   runEval,
   recordRunInIndex,
   readFailures,
   readMetadata,
   type RunEvalResult,
-} from "../eval/orchestrator.ts";
-import { resolveActiveIds } from "../eval/active-ids.ts";
-import { fetchTrace } from "../eval/trace-client.ts";
-import { toolError, toolOk, type ToolError } from "../tool-types.ts";
-import type { EvalSpec, FailureRecord, RunMetadata } from "../eval/types.ts";
+} from "./eval/orchestrator.ts";
+import { resolveActiveIds } from "./eval/active-ids.ts";
+import { fetchTrace } from "./eval/trace-client.ts";
+import { toolError, toolOk, type ToolError } from "./tool-types.ts";
+import type { EvalSpec, FailureRecord, RunMetadata } from "./eval/types.ts";
 
 export const EVAL_TOOL_NAME = "agentscript_eval";
 
@@ -347,9 +347,7 @@ async function actionGetFailure(
 // action = trace
 // -------------------------------------------------------------------------------------------------
 
-async function actionTrace(
-  input: Extract<ParamsAny, { action: "trace" }>,
-): Promise<{
+async function actionTrace(input: Extract<ParamsAny, { action: "trace" }>): Promise<{
   content: { type: "text"; text: string }[];
   details: Record<string, unknown> | ToolError;
 }> {

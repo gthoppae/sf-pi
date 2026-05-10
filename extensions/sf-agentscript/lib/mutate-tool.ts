@@ -12,9 +12,9 @@
 
 import { Type } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { applyMutation, type MutateOp } from "../mutate.ts";
-import { isAgentScriptFile, resolveToolPath } from "../file-classify.ts";
-import { toolError, toolOk } from "../tool-types.ts";
+import { applyMutation, type MutateOp } from "./mutate.ts";
+import { isAgentScriptFile, resolveToolPath } from "./file-classify.ts";
+import { toolError, toolOk } from "./tool-types.ts";
 
 export const MUTATE_TOOL_NAME = "agentscript_mutate";
 

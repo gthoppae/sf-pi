@@ -775,7 +775,7 @@ because the agent isn't found, it returns:
 ```json
 {
   "ok": false,
-  "error": "Agent 'Billing_Bot' not found in target org Vivint-DevInt.",
+  "error": "Agent 'Billing_Bot' not found in target org <alias>.",
   "suggestion": "Verify the DeveloperName or the active version.",
   "recover_via": {
     "tool": "agentscript_eval",
@@ -2035,7 +2035,7 @@ individually:
 5. `convertShorthandRefs(steps)` — `{stepId.field}` → `$.outputs[N].field` using a step-id → output-index map. (Already in our normalize today; keep verbatim.)
 6. `injectDefaults(steps)` — `use_agent_api: true` on `agent.create_session` if neither it nor `planner_id` is set.
 
-**Skip `stripUnrecognizedFields`.** The Vivint regression suite needs
+**Skip `stripUnrecognizedFields`.** Real-world regression suites need
 `context_variables` on `agent.send_message`; the upstream whitelist would strip
 it. Permissive normalization preserves the workaround. (Same call we make today.)
 
@@ -2274,7 +2274,7 @@ internally so each commit is reviewable in isolation.
 | P4    | Collapse 4 eval tools into 1 multi-action `agentscript_eval` tool. Update manifest + skill. Run `npm run generate-catalog`.                                           | Yes — keep old files until P6.          |
 | P5    | Add `lib/preview/{client,session-store}.ts` + tests. Register `agentscript_preview`.                                                                                  | Yes — pure addition.                    |
 | P6    | Delete obsolete files (`http.ts`, old eval tool files, the giant `index.d.ts`, `lib/lsp/`). Trim `code-actions.ts` to coord-fallback only. Update README + AGENTS.md. | Manual revert if needed.                |
-| P7    | Run `npm run validate` + manual smoke against the Vivint sandbox. Tag release.                                                                                        | —                                       |
+| P7    | Run `npm run validate` + manual smoke against a sandbox of choice. Tag release.                                                                                       | —                                       |
 
 ## Testing
 
@@ -2337,7 +2337,7 @@ internally so each commit is reviewable in isolation.
 - [ ] Local-first policy enforced: `agentscript_compile` defaults to local; `agentscript_eval action=run` does a local pre-flight (compile + normalize + ref resolution) before any network call; `agentscript_preview action=start` compiles locally before hitting `/authoring/scripts`.
 - [ ] `agentscript_compile {fallback: "server"}` round-trips the server compile endpoint and returns `compiled_via: "server"`.
 - [ ] When local SDK is unavailable, every tool returns a `ToolError` with `recover_via: {tool: "sf-agentscript", params: {action: "doctor"}}`.
-- [ ] An eval run against the Vivint sandbox completes in < (today's time) − 3s for a 30-call run.
+- [ ] An eval run against a sandbox completes in < (today's baseline) − 3s for a 30-call workload.
 - [ ] `tests/self-recovery.test.ts` exercises the full loop: broken `.agent` → compile → inspect → mutate → compile clean → eval green.
 - [ ] All vitest tests pass; `npm run validate` is green.
 - [ ] LOC ≤ 3 600; no `lib/*` file > 250 lines; no `tools/*` file > 100 lines.

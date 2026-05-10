@@ -65,12 +65,12 @@ import { withSafeCommandHandler } from "../../lib/common/safe-command-handler.ts
 import { openInfoPanel } from "../../lib/common/info-panel.ts";
 import { requirePiVersion } from "../../lib/common/pi-compat.ts";
 
-import { registerCompileTool } from "./lib/tools/compile.ts";
-import { registerCreateTool } from "./lib/tools/create.ts";
-import { registerEvalTool } from "./lib/tools/eval.ts";
-import { registerInspectTool } from "./lib/tools/inspect.ts";
-import { registerMutateTool } from "./lib/tools/mutate.ts";
-import { registerPreviewTool } from "./lib/tools/preview.ts";
+import { registerCompileTool } from "./lib/compile-tool.ts";
+import { registerCreateTool } from "./lib/create-tool.ts";
+import { registerEvalTool } from "./lib/eval-tool.ts";
+import { registerInspectTool } from "./lib/inspect-tool.ts";
+import { registerMutateTool } from "./lib/mutate-tool.ts";
+import { registerPreviewTool } from "./lib/preview-tool.ts";
 import { handleEvalAction } from "./lib/command/eval-action.ts";
 import { clearConnectionCache } from "./lib/connection.ts";
 

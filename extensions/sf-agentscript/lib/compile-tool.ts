@@ -14,10 +14,10 @@
 
 import { Type } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { checkAgentScriptFile } from "../diagnostics.ts";
-import { isAgentScriptFile, resolveToolPath } from "../file-classify.ts";
-import { toolError, toolOk } from "../tool-types.ts";
-import type { AgentScriptQuickFix } from "../types.ts";
+import { checkAgentScriptFile } from "./diagnostics.ts";
+import { isAgentScriptFile, resolveToolPath } from "./file-classify.ts";
+import { toolError, toolOk } from "./tool-types.ts";
+import type { AgentScriptQuickFix } from "./types.ts";
 
 export const COMPILE_TOOL_NAME = "agentscript_compile";
 

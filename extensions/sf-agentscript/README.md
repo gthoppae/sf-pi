@@ -1,22 +1,31 @@
-# SF Agent Script
+# sf-agentscript
 
-Single plugin owning the entire Agent Script developer loop:
+Single plugin owning the entire `.agent` developer loop — **agent-first** authoring,
+local-first compile, AST-safe edits, live-org preview, and multi-turn regression
+testing against the Salesforce Evaluation API. One npm dep
+(`@salesforce/core`); no subprocess shelling on the hot path.
 
-- **Authoring assist** — in-process compile-on-save with `LSP feedback:` blocks for `.agent` files.
-- **First-class compile tool** — `agentscript_compile` exposes the same parser/compiler the on-save hook uses.
-- **Multi-turn eval** — `agentscript_eval_run` runs regression specs against the Salesforce Evaluation API with full LLM-debug context.
-- **Planner trace fetch** — `agentscript_eval_trace` pulls the per-turn LLMExecutionStep / UpdateTopicStep / FunctionCallStep sequence for deep debugging.
-- **Active BotVersion resolution** — `agentscript_eval_resolve` materializes `$active_*` placeholders.
-- **LSP placeholder** — directory reserved for the future Agent Script LSP server (replaces the vendored SDK approach when ready).
+## What It Does
 
-This extension is the canonical owner of the `.agent` namespace within sf-pi.
-sf-lsp yields `.agent` files when this plugin is loaded.
+Six LLM-callable tools that close the **inspect → create → correct → self-recover** loop:
+
+| Tool                  | What it does                                                                                                                                                               |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agentscript_compile` | Local-first compile via vendored `@agentscript/agentforce` SDK (~10 ms). Quick fixes carry `apply_via` pointing at `agentscript_mutate`.                                   |
+| `agentscript_create`  | Scaffold new `.agent` + `bundle-meta.xml`. Validates locally before writing. Returns `next_steps`.                                                                         |
+| `agentscript_inspect` | Walks the parsed AST and returns a navigable JSON graph (topics, subagents, variables, actions, line numbers, `@`-references). LLM uses it instead of re-reading the file. |
+| `agentscript_mutate`  | AST-safe edits via `Document.mutateComponent` + `emit`; coordinate fallback for `apply_quick_fix`. Always re-compiles after writing.                                       |
+| `agentscript_preview` | Live-org preview — `start` / `send` / `end` / `trace` / `cleanup`. Sessions land at `.sfdx/agents/<id>/sessions/<sid>/`. Streams progress on `send`.                       |
+| `agentscript_eval`    | Multi-turn regression — `run` / `get_failure` / `trace` / `resolve_active`. Streams progress mid-flight. Hybrid result (inline failures small / `run_id` pointer big).     |
+
+Plus an automatic **compile-on-save hook** that runs after every successful
+`write` / `edit` of a `.agent` file and appends `LSP feedback:` to the tool result.
 
 ## Slash commands
 
 ```
 /sf-agentscript                   Open status & controls panel
-/sf-agentscript doctor            Show vendored SDK status + readiness
+/sf-agentscript doctor            SDK + @salesforce/core + .sfdx/agents writability
 /sf-agentscript check <file>      Manually compile a `.agent` file
 /sf-agentscript eval <spec.json>  Run a multi-turn regression suite
   [--org <alias>] [--agent <api-name>] [--traces failed|all|off]
@@ -24,75 +33,43 @@ sf-lsp yields `.agent` files when this plugin is loaded.
 /sf-agentscript help              Show command usage
 ```
 
-## Tools (LLM-callable)
-
-| Tool                           | Purpose                                                                    |
-| ------------------------------ | -------------------------------------------------------------------------- |
-| `agentscript_compile`          | In-process `.agent` compile + diagnostics + quick fixes                    |
-| `agentscript_eval_run`         | Multi-turn regression run against `/einstein/evaluation/v1/tests`          |
-| `agentscript_eval_get_failure` | Drill into one failure from a previous run by `(run_id, test_id)`          |
-| `agentscript_eval_trace`       | Fetch full planner trace for one `(session_id, plan_id)`                   |
-| `agentscript_eval_resolve`     | Resolve `$active_bot_id` / `$active_bot_version_id` / `$active_planner_id` |
-
-## Disk layout per run
-
-`<cwd>/.pi/state/sf-agentscript/runs/<run_id>/`:
+## Runtime Flow
 
 ```
-metadata.json        # spec, org, version, timing, totals, latency summary
-raw.json             # full HTML-decoded merged eval response
-transcript.jsonl     # one line per turn, sortable + diff-able
-failures.jsonl       # one line per failed test, LLM-shaped
-traces/<planId>.json # per-turn planner traces (failed tests by default)
+edit/write a .agent file ──▶ on-save hook ──▶ agentscript_compile (auto, ~10ms)
+                                                       │
+                                                       ▼
+agent loop (the four verbs):
+  CREATE → INSPECT → CORRECT (mutate) → SELF-RECOVER
+   │        │           │                      │
+   │        │           │                      ├─ preview {start,send,end,trace,cleanup}
+   │        │           │                      └─ eval {run,get_failure,trace,resolve_active}
+   │        │           └─ on-save compile re-runs after every mutate
+   │        └─ navigable graph: topics, subagents, variables, actions
+   └─ scaffolds .agent + bundle-meta.xml from a job spec
 ```
 
-The `failures.jsonl` shape is the LLM-debug contract — every line is a
-self-contained `FailureRecord` carrying utterance, agent response, topic,
-invokedActions, latency, llmEvents (prompt + literal LLM response),
-executionHistory (last 5), plugins, filtered stateVariables, step errors,
-and absolute paths to the per-turn planner trace files.
+Every API call goes through `@salesforce/core` `Connection.request` — same
+auth context as the `sf` CLI, automatic token refresh, no subprocess fork.
+SFAP host fallback (`api → test.api → dev.api` on 404) keeps sandbox
+routing safe. 5xx-only retry with jittered exponential backoff.
 
-## Eval module — what's in the box (full Python-v2 parity)
+## Behavior Matrix
 
-| Capability                  | Implementation                                                         |
-| --------------------------- | ---------------------------------------------------------------------- |
-| SFAP endpoint fallback      | `api -> test.api -> dev.api` on 404 (sandbox-safe)                     |
-| Retry policy                | 5xx-only with jittered exponential backoff (1s / 2s / 4s)              |
-| HTML entity decoding        | 30-entity table + numeric refs; typography preserved                   |
-| llmEvents surfacing         | Prompt content + literal LLM response per turn                         |
-| Per-turn latency            | p50/p95/p99/max footer                                                 |
-| `lastExecution.errors`      | Per-turn turn-error capture                                            |
-| `executionHistory` (last 5) | Which topics/actions the planner considered                            |
-| `sessionContext.plugins`    | Which plugins were in scope                                            |
-| Full planner trace fetch    | Parallel GETs, failed tests by default                                 |
-| Disk persistence            | metadata.json + raw.json + transcript.jsonl + failures.jsonl + traces/ |
-| Spec normalization          | camelCase + planner alias remap                                        |
-| `$active_*` placeholders    | Resolved from BotDefinition + Active BotVersion                        |
-| Threshold post-processing   | `_thrNN` id encoding for text_quality / text_alignment                 |
-| OR-group collapse           | `__optN` id pattern -> synthetic any-of evaluator                      |
+| Trigger                                | Result                                                                                                                                                      |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `session_start` / `session_shutdown`   | Reset assist state, drop cached `Connection`s                                                                                                               |
+| `tool_result` (write/edit on `.agent`) | Compile in-process, append `LSP feedback:` block                                                                                                            |
+| `agentscript_compile`                  | Same pipeline as on-save; quick fixes carry `apply_via`                                                                                                     |
+| `agentscript_create`                   | Validate template locally before writing; refuse to overwrite without `overwrite: true`                                                                     |
+| `agentscript_inspect`                  | One AST walk, JSON projection, line numbers 1-based                                                                                                         |
+| `agentscript_mutate`                   | AST primary (`set_field` / `rename` / `apply_quick_fix`); refuses to mutate files with severity-1 errors; auto-recompiles                                   |
+| `agentscript_preview start`            | Local-compile first; only hits `/authoring/scripts` on success                                                                                              |
+| `agentscript_preview send`             | POST message, fetch trace inline, write to session store                                                                                                    |
+| `agentscript_eval run`                 | Resolve `$active_*` if present → normalize (6 passes) → batch ≤ 5 tests → fan-out POST → HTML-decode → fetch traces (failed by default) → persist artifacts |
+| Any tool error                         | Returns `{ ok: false, error, suggestion?, recover_via? }` so the LLM can chain a follow-up tool call programmatically                                       |
 
-## Authentication
-
-All SFAP calls (eval API, trace API, oauth2/userinfo) shell through
-`sf api request rest` so the active org's auth context is reused. The
-extension never holds raw access tokens — token refresh, JWT, named-creds,
-all keep working without code changes here.
-
-## Coordination with sf-lsp
-
-sf-lsp checks `pi.getCommands()` for `sf-agentscript`. When this plugin is
-loaded, sf-lsp yields `.agent` files to us. Disabling sf-agentscript falls
-sf-lsp back to the subprocess `.agent` LSP path with no config required.
-
-## Migration from sf-agentscript-assist
-
-This plugin is the rename + scope expansion of `sf-agentscript-assist`. All
-existing on-save behavior is byte-equivalent. New surface: eval, compile-as-tool,
-trace-fetch, active-id resolution, and the lifecycle slash command tree.
-
-The slash command moved from `/sf-agentscript-assist` to `/sf-agentscript`.
-
-## File structure
+## File Structure
 
 <!-- GENERATED:file-structure:start -->
 
@@ -119,22 +96,21 @@ extensions/sf-agentscript/
     templates/
       agentforce-default.ts ← implementation module
       minimal.ts            ← implementation module
-    tools/
-      compile.ts            ← implementation module
-      create.ts             ← implementation module
-      eval.ts               ← implementation module
-      inspect.ts            ← implementation module
-      mutate.ts             ← implementation module
-      preview.ts            ← implementation module
     code-actions.ts         ← implementation module
+    compile-tool.ts         ← implementation module
     connection.ts           ← implementation module
+    create-tool.ts          ← implementation module
     create.ts               ← implementation module
     diagnostics.ts          ← implementation module
     doctor.ts               ← implementation module
+    eval-tool.ts            ← implementation module
     feedback.ts             ← implementation module
     file-classify.ts        ← implementation module
+    inspect-tool.ts         ← implementation module
     inspect.ts              ← implementation module
+    mutate-tool.ts          ← implementation module
     mutate.ts               ← implementation module
+    preview-tool.ts         ← implementation module
     sdk.ts                  ← implementation module
     tool-types.ts           ← implementation module
     types.ts                ← implementation module
@@ -161,7 +137,55 @@ extensions/sf-agentscript/
 
 <!-- GENERATED:file-structure:end -->
 
+`lib/eval/` is the eval runner (sfap transport + normalize + active-ids + orchestrator + render + persist). `lib/preview/` is the live-org preview client + session store. `lib/templates/` is the scaffold templates for `agentscript_create`. `lib/vendor/agentforce/` is the upstream SDK bundle, refreshed via `scripts/sync-agentforce-sdk.mjs`.
+
+## Testing Strategy
+
+Run targeted tests:
+
+```bash
+npm test -- extensions/sf-agentscript/tests
+```
+
+Suite coverage:
+
+- `tool-types.test.ts` — `ToolEnvelope` / `ToolError` / `recover_via` contract.
+- `connection.test.ts` — cached `Org` / `clearConnectionCache`.
+- `eval-sfap.test.ts` — SFAP host fallback + 5xx retry (mocked Connection, fake timers).
+- `eval-normalize.test.ts` — six normalizer passes individually + composition.
+- `compile.test.ts` (was `diagnostics.test.ts`) — local compile, severity filter, dialect.
+- `feedback.test.ts` — on-save `LSP feedback:` rendering contract.
+- `code-actions.test.ts` — coordinate-edit fallback fixes.
+- `inspect.test.ts` — AST walk on a real fixture.
+- `mutate.test.ts` — five ops × success / refuse-to-mutate paths.
+- `create.test.ts` — round-trip scaffold; both templates compile clean.
+- `preview-session-store.test.ts` — append-only transcript + `cleanup` (real + dry-run).
+- `self-recovery.test.ts` — end-to-end loop pin: `create → compile → inspect → mutate → compile clean`.
+
+## Authentication
+
+All Salesforce API calls use `@salesforce/core` `Connection` (jsforce under the hood)
+with the same auth files the `sf` CLI writes. Auto-refresh, JWT, named-creds all keep
+working. No tokens leave the org connection.
+
+## Coordination with sf-lsp
+
+sf-lsp checks `pi.getCommands()` for `sf-agentscript`. When this plugin is
+loaded, sf-lsp yields `.agent` files to us. Disabling sf-agentscript falls
+sf-lsp back to the subprocess `.agent` LSP path with no config required.
+
 ## Skill
 
-The contributed skill (`skills/sf-agentscript/SKILL.md`) carries
-progressive-disclosure guidance for the LLM in pi.
+The contributed skill (`skills/sf-agentscript/SKILL.md`) carries the
+progressive-disclosure guidance the LLM uses to pick the right tool for
+each verb of the loop.
+
+## Troubleshooting
+
+- **Agent Script SDK unavailable.** Run `/sf-agentscript doctor` to see the vendored bundle path and load error. Re-run `scripts/sync-agentforce-sdk.mjs` if the bundle is corrupt.
+- **`@salesforce/core` not resolvable.** Run `npm install` at the repo root; the dep was added in P0 of the rewrite.
+- **`.sfdx/agents/` is not writable.** Confirm sf-guardrail's carve-out is active (look for `.sfdx/agents/**` in `allowedPatterns` on the `sf-cli-state` rule).
+- **No Active BotVersion for `<agent>`.** Activate a version in Setup → Einstein → Agents → `<agent>`.
+- **All SFAP endpoints failed.** The user lacks `AIPlatformEvaluation` entitlement, or the BotVersion doesn't exist in the target org.
+- **Trace fetch returning null.** The session has been garbage-collected by the planner. Non-fatal; the failure record still has `llmEvents` inline.
+- **Mutate refuses to touch the file.** Run `agentscript_compile` first — mutate refuses to emit when the source has severity-1 parse errors.

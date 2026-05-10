@@ -8,8 +8,8 @@
 
 import { Type } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { createBundle, type AgentJobSpec } from "../create.ts";
-import { toolError, toolOk } from "../tool-types.ts";
+import { createBundle, type AgentJobSpec } from "./create.ts";
+import { toolError, toolOk } from "./tool-types.ts";
 
 export const CREATE_TOOL_NAME = "agentscript_create";
 

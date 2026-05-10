@@ -8,9 +8,9 @@
 
 import { Type } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { inspectFile } from "../inspect.ts";
-import { isAgentScriptFile, resolveToolPath } from "../file-classify.ts";
-import { toolError, toolOk } from "../tool-types.ts";
+import { inspectFile } from "./inspect.ts";
+import { isAgentScriptFile, resolveToolPath } from "./file-classify.ts";
+import { toolError, toolOk } from "./tool-types.ts";
 
 export const INSPECT_TOOL_NAME = "agentscript_inspect";
 

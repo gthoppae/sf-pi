@@ -11,17 +11,17 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { Type } from "typebox";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { connFromAlias } from "../connection.ts";
+import { connFromAlias } from "./connection.ts";
 import {
   cleanupSessions,
   endPreview,
   loadSession,
   sendMessage,
   startPreview,
-} from "../preview/client.ts";
-import { fetchTrace } from "../eval/trace-client.ts";
-import { isAgentScriptFile, resolveToolPath } from "../file-classify.ts";
-import { toolError, toolOk, type ToolError } from "../tool-types.ts";
+} from "./preview/client.ts";
+import { fetchTrace } from "./eval/trace-client.ts";
+import { isAgentScriptFile, resolveToolPath } from "./file-classify.ts";
+import { toolError, toolOk, type ToolError } from "./tool-types.ts";
 
 export const PREVIEW_TOOL_NAME = "agentscript_preview";
 
@@ -270,9 +270,7 @@ async function actionEnd(
 // action = trace
 // -------------------------------------------------------------------------------------------------
 
-async function actionTrace(
-  input: Extract<ParamsAny, { action: "trace" }>,
-): Promise<{
+async function actionTrace(input: Extract<ParamsAny, { action: "trace" }>): Promise<{
   content: { type: "text"; text: string }[];
   details: Record<string, unknown> | ToolError;
 }> {
