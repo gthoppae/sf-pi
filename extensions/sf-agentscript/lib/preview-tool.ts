@@ -26,86 +26,88 @@ import { toolError, toolOk, type ToolError } from "./tool-types.ts";
 
 export const PREVIEW_TOOL_NAME = "agentscript_preview";
 
-const Params = Type.Union([
-  // start — EITHER a local .agent file OR a published agent's api name.
-  Type.Object({
-    action: Type.Literal("start"),
-    target_org: Type.Optional(Type.String()),
-    agent_file: Type.Optional(
-      Type.String({
-        description:
-          "Path to a `.agent` file. Local-compiled before the server call. Use this OR agent_api_name.",
-      }),
-    ),
-    agent_api_name: Type.Optional(
-      Type.String({
-        description:
-          "Converse with a published, activated agent in the org. Use this OR agent_file. Skips local compile + server compile entirely.",
-      }),
-    ),
-    agent_name: Type.Optional(
-      Type.String({
-        description:
-          "Display name used as the on-disk session-store agent folder. Defaults to the basename of agent_file (or agent_api_name).",
-      }),
-    ),
-    mock_mode: Type.Optional(Type.Union([Type.Literal("Mock"), Type.Literal("Live Test")])),
-  }),
-  // send
-  Type.Object({
-    action: Type.Literal("send"),
-    target_org: Type.Optional(Type.String()),
-    agent_name: Type.String(),
-    session_id: Type.String(),
-    message: Type.String(),
-    apex_debug: Type.Optional(
-      Type.Boolean({
-        description:
-          "When true, capture the latest ApexLog produced during this turn and include it on the result.",
-      }),
-    ),
-  }),
-  // end
-  Type.Object({
-    action: Type.Literal("end"),
-    agent_name: Type.String(),
-    session_id: Type.String(),
-  }),
-  // trace
-  Type.Object({
-    action: Type.Literal("trace"),
-    target_org: Type.Optional(Type.String()),
-    session_id: Type.String(),
-    plan_id: Type.String(),
-  }),
-  // cleanup
-  Type.Object({
-    action: Type.Literal("cleanup"),
-    older_than_days: Type.Optional(Type.Number({ minimum: 0 })),
-    dry_run: Type.Optional(Type.Boolean()),
-  }),
-]);
+// Single Type.Object: emits root `type:"object"` so OpenAI's strict tool
+// validator accepts it. Per-action required-field checks happen in execute().
+const Params = Type.Object({
+  action: Type.Union(
+    [
+      Type.Literal("start"),
+      Type.Literal("send"),
+      Type.Literal("end"),
+      Type.Literal("trace"),
+      Type.Literal("cleanup"),
+    ],
+    {
+      description:
+        "start: open a preview session (agent_file OR agent_api_name). send: post one user utterance. end: finalize a session. trace: ad-hoc planner-trace fetch. cleanup: remove stale .sfdx/agents session dirs.",
+    },
+  ),
+  target_org: Type.Optional(Type.String({ description: "sf CLI alias / username." })),
+  agent_file: Type.Optional(
+    Type.String({
+      description:
+        "For action='start': path to a `.agent` file. Local-compiled before the server call. Use this OR agent_api_name.",
+    }),
+  ),
+  agent_api_name: Type.Optional(
+    Type.String({
+      description:
+        "For action='start': converse with a published, activated agent in the org. Use this OR agent_file. Skips local + server compile.",
+    }),
+  ),
+  agent_name: Type.Optional(
+    Type.String({
+      description:
+        "Required for send/end (the agent folder under .sfdx/agents/). Optional for start — defaults to the basename of agent_file or agent_api_name.",
+    }),
+  ),
+  mock_mode: Type.Optional(
+    Type.Union([Type.Literal("Mock"), Type.Literal("Live Test")], {
+      description: "Optional for action='start' with agent_file. Default 'Mock'.",
+    }),
+  ),
+  session_id: Type.Optional(
+    Type.String({ description: "Required for send/end/trace. Returned by action='start'." }),
+  ),
+  message: Type.Optional(
+    Type.String({ description: "Required for action='send'. The user utterance to send." }),
+  ),
+  apex_debug: Type.Optional(
+    Type.Boolean({
+      description:
+        "Optional for action='send'. When true, capture the latest ApexLog produced during this turn.",
+    }),
+  ),
+  plan_id: Type.Optional(
+    Type.String({ description: "Required for action='trace'. Plan id to fetch." }),
+  ),
+  older_than_days: Type.Optional(
+    Type.Number({
+      minimum: 0,
+      description: "Optional for action='cleanup'. Default 30.",
+    }),
+  ),
+  dry_run: Type.Optional(
+    Type.Boolean({
+      description: "Optional for action='cleanup'. Preview deletions without removing files.",
+    }),
+  ),
+});
 
-type ParamsAny =
-  | {
-      action: "start";
-      target_org?: string;
-      agent_file?: string;
-      agent_api_name?: string;
-      agent_name?: string;
-      mock_mode?: "Mock" | "Live Test";
-    }
-  | {
-      action: "send";
-      target_org?: string;
-      agent_name: string;
-      session_id: string;
-      message: string;
-      apex_debug?: boolean;
-    }
-  | { action: "end"; agent_name: string; session_id: string }
-  | { action: "trace"; target_org?: string; session_id: string; plan_id: string }
-  | { action: "cleanup"; older_than_days?: number; dry_run?: boolean };
+interface ParamsAny {
+  action: "start" | "send" | "end" | "trace" | "cleanup";
+  target_org?: string;
+  agent_file?: string;
+  agent_api_name?: string;
+  agent_name?: string;
+  mock_mode?: "Mock" | "Live Test";
+  session_id?: string;
+  message?: string;
+  apex_debug?: boolean;
+  plan_id?: string;
+  older_than_days?: number;
+  dry_run?: boolean;
+}
 
 type StreamPartial = { content: { type: "text"; text: string }[]; details: never };
 type OnUpdateFn = (partial: StreamPartial) => void;
@@ -128,6 +130,8 @@ export function registerPreviewTool(pi: ExtensionAPI): void {
     parameters: Params,
     async execute(_id, params, _signal, onUpdate, ctx) {
       const p = params as ParamsAny;
+      const reqOk = checkRequired(p);
+      if (reqOk.ok === false) return toolError("INVALID_PARAMS", reqOk.error);
       switch (p.action) {
         case "start":
           return await actionStart(ctx, p);
@@ -145,12 +149,40 @@ export function registerPreviewTool(pi: ExtensionAPI): void {
 }
 
 // -------------------------------------------------------------------------------------------------
+// Per-action required-field validator (the schema is intentionally permissive
+// for OpenAI strict-mode compatibility).
+// -------------------------------------------------------------------------------------------------
+
+function checkRequired(p: ParamsAny): { ok: true } | { ok: false; error: string } {
+  switch (p.action) {
+    case "start":
+      // exclusivity is enforced inside actionStart for richer messaging.
+      return { ok: true };
+    case "send":
+      if (!p.agent_name) return { ok: false, error: "action='send' requires agent_name." };
+      if (!p.session_id) return { ok: false, error: "action='send' requires session_id." };
+      if (!p.message) return { ok: false, error: "action='send' requires message." };
+      return { ok: true };
+    case "end":
+      if (!p.agent_name) return { ok: false, error: "action='end' requires agent_name." };
+      if (!p.session_id) return { ok: false, error: "action='end' requires session_id." };
+      return { ok: true };
+    case "trace":
+      if (!p.session_id) return { ok: false, error: "action='trace' requires session_id." };
+      if (!p.plan_id) return { ok: false, error: "action='trace' requires plan_id." };
+      return { ok: true };
+    case "cleanup":
+      return { ok: true };
+  }
+}
+
+// -------------------------------------------------------------------------------------------------
 // action = start
 // -------------------------------------------------------------------------------------------------
 
 async function actionStart(
   ctx: ExtensionContext,
-  input: Extract<ParamsAny, { action: "start" }>,
+  input: ParamsAny,
 ): Promise<{
   content: { type: "text"; text: string }[];
   details: Record<string, unknown> | ToolError;
@@ -257,7 +289,7 @@ async function actionStart(
 
 async function actionSend(
   ctx: ExtensionContext,
-  input: Extract<ParamsAny, { action: "send" }>,
+  input: ParamsAny,
   onUpdate?: OnUpdateFn,
 ): Promise<{
   content: { type: "text"; text: string }[];
@@ -317,7 +349,7 @@ async function actionSend(
 
 async function actionEnd(
   ctx: ExtensionContext,
-  input: Extract<ParamsAny, { action: "end" }>,
+  input: ParamsAny,
 ): Promise<{
   content: { type: "text"; text: string }[];
   details: Record<string, unknown> | ToolError;
@@ -346,7 +378,7 @@ async function actionEnd(
 // action = trace
 // -------------------------------------------------------------------------------------------------
 
-async function actionTrace(input: Extract<ParamsAny, { action: "trace" }>): Promise<{
+async function actionTrace(input: ParamsAny): Promise<{
   content: { type: "text"; text: string }[];
   details: Record<string, unknown> | ToolError;
 }> {
@@ -380,7 +412,7 @@ async function actionTrace(input: Extract<ParamsAny, { action: "trace" }>): Prom
 
 async function actionCleanup(
   ctx: ExtensionContext,
-  input: Extract<ParamsAny, { action: "cleanup" }>,
+  input: ParamsAny,
 ): Promise<{
   content: { type: "text"; text: string }[];
   details: Record<string, unknown> | ToolError;

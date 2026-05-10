@@ -18,34 +18,35 @@ import { toolError, toolOk, type ToolError } from "./tool-types.ts";
 
 export const INSPECT_TOOL_NAME = "agentscript_inspect";
 
-const Params = Type.Union([
-  Type.Object({
-    action: Type.Optional(Type.Literal("structure")),
-    path: Type.String({
-      description: "Absolute or workspace-relative path to a `.agent` file.",
-    }),
-  }),
-  Type.Object({
-    action: Type.Literal("find_references"),
-    path: Type.String(),
-    symbol: Type.String({
-      description: "Reference to find, e.g. '@actions.lookup_balance' or '@variables.is_verified'.",
-    }),
-  }),
-  Type.Object({
-    action: Type.Literal("definition"),
-    path: Type.String(),
-    symbol: Type.String({
+// Single Type.Object: emits root `type:"object"` with non-empty `properties`.
+// OpenAI strict tool-call validators reject anyOf-at-root (which the previous
+// Type.Union shape produced). Per-action required-field checks are enforced
+// inside execute().
+const Params = Type.Object({
+  action: Type.Union(
+    [Type.Literal("structure"), Type.Literal("find_references"), Type.Literal("definition")],
+    {
+      default: "structure",
       description:
-        "Reference to locate, e.g. '@topic.billing'. Returns the line where the named entry is declared.",
-    }),
+        "structure (default): navigable component graph + line numbers. find_references: every usage of an `@<ns>.<prop>` symbol including the declaration. definition: where a symbol is declared.",
+    },
+  ),
+  path: Type.String({
+    description: "Absolute or workspace-relative path to a `.agent` file.",
   }),
-]);
+  symbol: Type.Optional(
+    Type.String({
+      description:
+        "Required for find_references and definition. Format: `@<namespace>.<property>` — e.g. '@topic.billing', '@actions.lookup_balance'.",
+    }),
+  ),
+});
 
-type ParamsAny =
-  | { action?: "structure"; path: string }
-  | { action: "find_references"; path: string; symbol: string }
-  | { action: "definition"; path: string; symbol: string };
+interface ParamsAny {
+  action?: "structure" | "find_references" | "definition";
+  path: string;
+  symbol?: string;
+}
 
 export function registerInspectTool(pi: ExtensionAPI): void {
   pi.registerTool({
@@ -65,6 +66,7 @@ export function registerInspectTool(pi: ExtensionAPI): void {
     parameters: Params,
     async execute(_id, params, _signal, _onUpdate, ctx) {
       const p = params as ParamsAny;
+      if (!p.path) return toolError("INVALID_PARAMS", "`path` is required.");
       const filePath = resolveToolPath(p.path, ctx.cwd);
       if (!isAgentScriptFile(filePath)) {
         return toolError(
@@ -73,19 +75,26 @@ export function registerInspectTool(pi: ExtensionAPI): void {
         );
       }
       const action = p.action ?? "structure";
+      if (action === "find_references" || action === "definition") {
+        if (!p.symbol) {
+          return toolError(
+            "INVALID_PARAMS",
+            `\`symbol\` is required for action='${action}'. Format: '@<namespace>.<property>'.`,
+          );
+        }
+      } else if (p.symbol) {
+        return toolError(
+          "INVALID_PARAMS",
+          "`symbol` is only valid for action='find_references' or action='definition'.",
+        );
+      }
       switch (action) {
         case "structure":
           return await actionStructure(filePath);
         case "find_references":
-          return await actionFindReferences(
-            filePath,
-            (p as Extract<ParamsAny, { action: "find_references" }>).symbol,
-          );
+          return await actionFindReferences(filePath, p.symbol as string);
         case "definition":
-          return await actionDefinition(
-            filePath,
-            (p as Extract<ParamsAny, { action: "definition" }>).symbol,
-          );
+          return await actionDefinition(filePath, p.symbol as string);
       }
     },
   });

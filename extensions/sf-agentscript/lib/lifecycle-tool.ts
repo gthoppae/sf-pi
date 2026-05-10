@@ -28,55 +28,70 @@ import { toolError, toolOk, type ToolError } from "./tool-types.ts";
 
 export const LIFECYCLE_TOOL_NAME = "agentscript_lifecycle";
 
-const Params = Type.Union([
-  Type.Object({
-    action: Type.Literal("publish"),
-    agent_file: Type.String({
-      description: "Path to the `.agent` file to publish.",
+// Single Type.Object: emits root `type:"object"` so OpenAI's strict tool
+// validator accepts it. Per-action required-field checks happen in execute().
+const Params = Type.Object({
+  action: Type.Union(
+    [
+      Type.Literal("publish"),
+      Type.Literal("activate"),
+      Type.Literal("deactivate"),
+      Type.Literal("list_versions"),
+    ],
+    {
+      description:
+        "publish: ship a .agent file as a new agent or new version. activate / deactivate: toggle a BotVersion's Status (idempotent). list_versions: return every BotVersion on the agent.",
+    },
+  ),
+  target_org: Type.Optional(Type.String({ description: "sf CLI alias / username." })),
+  agent_file: Type.Optional(
+    Type.String({
+      description: "Required for action='publish'. Path to the `.agent` file.",
     }),
-    agent_api_name: Type.Optional(
-      Type.String({
-        description:
-          "Agent DeveloperName. Defaults to the basename of agent_file (without .agent).",
-      }),
-    ),
-    target_org: Type.Optional(Type.String()),
-    activate: Type.Optional(
-      Type.Boolean({
-        description: "Immediately activate the new version. Default false.",
-      }),
-    ),
-  }),
-  Type.Object({
-    action: Type.Literal("activate"),
-    agent_api_name: Type.String(),
-    version: Type.Optional(Type.Number({ minimum: 1 })),
-    target_org: Type.Optional(Type.String()),
-  }),
-  Type.Object({
-    action: Type.Literal("deactivate"),
-    agent_api_name: Type.String(),
-    version: Type.Optional(Type.Number({ minimum: 1 })),
-    target_org: Type.Optional(Type.String()),
-  }),
-  Type.Object({
-    action: Type.Literal("list_versions"),
-    agent_api_name: Type.String(),
-    target_org: Type.Optional(Type.String()),
-  }),
-]);
+  ),
+  agent_api_name: Type.Optional(
+    Type.String({
+      description:
+        "Required for activate/deactivate/list_versions. Optional for publish (defaults to basename of agent_file without .agent).",
+    }),
+  ),
+  activate: Type.Optional(
+    Type.Boolean({
+      description:
+        "Optional for action='publish'. Immediately activate the new version. Default false.",
+    }),
+  ),
+  version: Type.Optional(
+    Type.Number({
+      minimum: 1,
+      description:
+        "Optional for activate/deactivate. Defaults to the latest BotVersion on the agent.",
+    }),
+  ),
+});
 
-type ParamsAny =
-  | {
-      action: "publish";
-      agent_file: string;
-      agent_api_name?: string;
-      target_org?: string;
-      activate?: boolean;
-    }
-  | { action: "activate"; agent_api_name: string; version?: number; target_org?: string }
-  | { action: "deactivate"; agent_api_name: string; version?: number; target_org?: string }
-  | { action: "list_versions"; agent_api_name: string; target_org?: string };
+interface ParamsAny {
+  action: "publish" | "activate" | "deactivate" | "list_versions";
+  target_org?: string;
+  agent_file?: string;
+  agent_api_name?: string;
+  activate?: boolean;
+  version?: number;
+}
+
+function checkRequired(p: ParamsAny): { ok: true } | { ok: false; error: string } {
+  switch (p.action) {
+    case "publish":
+      if (!p.agent_file) return { ok: false, error: "action='publish' requires agent_file." };
+      return { ok: true };
+    case "activate":
+    case "deactivate":
+    case "list_versions":
+      if (!p.agent_api_name)
+        return { ok: false, error: `action='${p.action}' requires agent_api_name.` };
+      return { ok: true };
+  }
+}
 
 export function registerLifecycleTool(pi: ExtensionAPI): void {
   pi.registerTool({
@@ -104,6 +119,8 @@ export function registerLifecycleTool(pi: ExtensionAPI): void {
           /* best-effort */
         }
       };
+      const reqOk = checkRequired(p);
+      if (reqOk.ok === false) return toolError("INVALID_PARAMS", reqOk.error);
       switch (p.action) {
         case "publish":
           return await actionPublish(ctx, p, stream);
@@ -124,13 +141,13 @@ export function registerLifecycleTool(pi: ExtensionAPI): void {
 
 async function actionPublish(
   ctx: ExtensionContext,
-  input: Extract<ParamsAny, { action: "publish" }>,
+  input: ParamsAny,
   stream: (msg: string) => void,
 ): Promise<{
   content: { type: "text"; text: string }[];
   details: Record<string, unknown> | ToolError;
 }> {
-  const filePath = resolveToolPath(input.agent_file, ctx.cwd);
+  const filePath = resolveToolPath(input.agent_file as string, ctx.cwd);
   if (!isAgentScriptFile(filePath)) {
     return toolError(`Not an Agent Script file: ${filePath}`, "Pass a path ending in `.agent`.");
   }
@@ -188,55 +205,58 @@ async function actionPublish(
 // action = activate / deactivate
 // -------------------------------------------------------------------------------------------------
 
-async function actionActivate(input: Extract<ParamsAny, { action: "activate" }>): Promise<{
+async function actionActivate(input: ParamsAny): Promise<{
   content: { type: "text"; text: string }[];
   details: Record<string, unknown> | ToolError;
 }> {
+  // checkRequired guarantees agent_api_name is set for action='activate'.
+  const agentApiName = input.agent_api_name as string;
   try {
     const conn = await connFromAlias(input.target_org);
     const row = await activateVersion({
       conn,
-      agentApiName: input.agent_api_name,
+      agentApiName,
       version: input.version,
     });
     return toolOk(
       {
         ok: true as const,
-        agent_api_name: input.agent_api_name,
+        agent_api_name: agentApiName,
         bot_version_id: row.Id,
         version_number: row.VersionNumber,
         status: row.Status,
       },
-      `🟢 ${input.agent_api_name} v${row.VersionNumber} activated`,
+      `🟢 ${agentApiName} v${row.VersionNumber} activated`,
     );
   } catch (err) {
-    return classifyLifecycleError(err, input.agent_api_name, "activate");
+    return classifyLifecycleError(err, agentApiName, "activate");
   }
 }
 
-async function actionDeactivate(input: Extract<ParamsAny, { action: "deactivate" }>): Promise<{
+async function actionDeactivate(input: ParamsAny): Promise<{
   content: { type: "text"; text: string }[];
   details: Record<string, unknown> | ToolError;
 }> {
+  const agentApiName = input.agent_api_name as string;
   try {
     const conn = await connFromAlias(input.target_org);
     const row = await deactivateVersion({
       conn,
-      agentApiName: input.agent_api_name,
+      agentApiName,
       version: input.version,
     });
     return toolOk(
       {
         ok: true as const,
-        agent_api_name: input.agent_api_name,
+        agent_api_name: agentApiName,
         bot_version_id: row.Id,
         version_number: row.VersionNumber,
         status: row.Status,
       },
-      `⚫ ${input.agent_api_name} v${row.VersionNumber} deactivated`,
+      `⚫ ${agentApiName} v${row.VersionNumber} deactivated`,
     );
   } catch (err) {
-    return classifyLifecycleError(err, input.agent_api_name, "deactivate");
+    return classifyLifecycleError(err, agentApiName, "deactivate");
   }
 }
 
@@ -244,13 +264,14 @@ async function actionDeactivate(input: Extract<ParamsAny, { action: "deactivate"
 // action = list_versions
 // -------------------------------------------------------------------------------------------------
 
-async function actionListVersions(input: Extract<ParamsAny, { action: "list_versions" }>): Promise<{
+async function actionListVersions(input: ParamsAny): Promise<{
   content: { type: "text"; text: string }[];
   details: Record<string, unknown> | ToolError;
 }> {
+  const agentApiName = input.agent_api_name as string;
   try {
     const conn = await connFromAlias(input.target_org);
-    const result = await listVersions(conn, input.agent_api_name);
+    const result = await listVersions(conn, agentApiName);
     const lines = [
       `📋 Versions of ${result.agent_api_name} (bot_id ${result.bot_id})`,
       ...result.versions.map((v) => {
@@ -260,7 +281,7 @@ async function actionListVersions(input: Extract<ParamsAny, { action: "list_vers
     ];
     return toolOk({ ok: true as const, ...result }, lines.join("\n"));
   } catch (err) {
-    return classifyLifecycleError(err, input.agent_api_name, "list_versions");
+    return classifyLifecycleError(err, agentApiName, "list_versions");
   }
 }
 

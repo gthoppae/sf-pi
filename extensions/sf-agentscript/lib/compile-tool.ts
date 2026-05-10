@@ -27,33 +27,38 @@ import type { AgentScriptQuickFix } from "./types.ts";
 
 export const COMPILE_TOOL_NAME = "agentscript_compile";
 
-const Params = Type.Union([
-  Type.Object({
-    action: Type.Optional(Type.Literal("check")),
-    path: Type.String({
-      description: "Absolute or workspace-relative path to a `.agent` file.",
+// Schema is a single Type.Object so the emitted JSON Schema has
+// `type: "object"` at the root — OpenAI's strict tool validator rejects a
+// root anyOf (which Type.Union of objects produces). Per-action required
+// fields are enforced in execute() instead of at the schema layer.
+const Params = Type.Object({
+  action: Type.Union([Type.Literal("check"), Type.Literal("format")], {
+    default: "check",
+    description:
+      "check (default): parse + lint + compile via the vendored SDK. format: rewrite the file with canonical whitespace.",
+  }),
+  path: Type.String({
+    description: "Absolute or workspace-relative path to a `.agent` file.",
+  }),
+  fallback: Type.Optional(
+    Type.Union([Type.Literal("none"), Type.Literal("server")], {
+      description:
+        "Only used when action='check'. 'server' retries via /einstein/ai-agent/v1.1/authoring/scripts when local rejects. Requires target_org.",
     }),
-    fallback: Type.Optional(
-      Type.Union([Type.Literal("none"), Type.Literal("server")], {
-        description:
-          "Default 'none' (local-only). 'server' retries via /einstein/ai-agent/v1.1/authoring/scripts when local rejects something the server accepts. Requires target_org.",
-      }),
-    ),
-    target_org: Type.Optional(
-      Type.String({
-        description: "Required when fallback='server'. sf CLI alias / username.",
-      }),
-    ),
-  }),
-  Type.Object({
-    action: Type.Literal("format"),
-    path: Type.String(),
-  }),
-]);
+  ),
+  target_org: Type.Optional(
+    Type.String({
+      description: "Required when fallback='server'. sf CLI alias / username.",
+    }),
+  ),
+});
 
-type ParamsAny =
-  | { action?: "check"; path: string; fallback?: "none" | "server"; target_org?: string }
-  | { action: "format"; path: string };
+interface ParamsAny {
+  action?: "check" | "format";
+  path: string;
+  fallback?: "none" | "server";
+  target_org?: string;
+}
 
 interface QuickFixView extends AgentScriptQuickFix {
   apply_via: {
@@ -85,6 +90,7 @@ export function registerCompileTool(pi: ExtensionAPI): void {
     parameters: Params,
     async execute(_id, params, _signal, _onUpdate, ctx) {
       const p = params as ParamsAny;
+      if (!p.path) return toolError("INVALID_PARAMS", "`path` is required.");
       const filePath = resolveToolPath(p.path, ctx.cwd);
       if (!isAgentScriptFile(filePath)) {
         return toolError(
@@ -93,8 +99,16 @@ export function registerCompileTool(pi: ExtensionAPI): void {
         );
       }
       const action = p.action ?? "check";
-      if (action === "format") return await actionFormat(filePath);
-      return await actionCheck(filePath, p as Extract<ParamsAny, { action?: "check" }>);
+      if (action === "format") {
+        if (p.fallback || p.target_org) {
+          return toolError(
+            "INVALID_PARAMS",
+            "`fallback` and `target_org` are only valid with action='check'.",
+          );
+        }
+        return await actionFormat(filePath);
+      }
+      return await actionCheck(filePath, p);
     },
   });
 }
@@ -105,7 +119,7 @@ export function registerCompileTool(pi: ExtensionAPI): void {
 
 async function actionCheck(
   filePath: string,
-  input: Extract<ParamsAny, { action?: "check" }>,
+  input: ParamsAny,
 ): Promise<{
   content: { type: "text"; text: string }[];
   details: Record<string, unknown> | ToolError;

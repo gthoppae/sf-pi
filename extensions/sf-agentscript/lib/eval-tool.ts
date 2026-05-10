@@ -38,67 +38,130 @@ import type { EvalSpec, FailureRecord, RunMetadata } from "./eval/types.ts";
 export const EVAL_TOOL_NAME = "agentscript_eval";
 
 // -------------------------------------------------------------------------------------------------
-// Discriminated-union schema
+// Schema
+//
+// Single Type.Object: emits root `type:"object"` so OpenAI's strict tool
+// validator accepts it. Per-action required-field checks happen in execute().
 // -------------------------------------------------------------------------------------------------
 
-const Params = Type.Union([
-  // action = run
-  Type.Object({
-    action: Type.Literal("run"),
-    spec_path: Type.Optional(Type.String()),
-    spec: Type.Optional(Type.Any()),
-    target_org: Type.Optional(Type.String()),
-    agent_api_name: Type.Optional(Type.String()),
-    traces_mode: Type.Optional(
-      Type.Union([Type.Literal("failed"), Type.Literal("all"), Type.Literal("off")]),
-    ),
-    concurrency: Type.Optional(Type.Number({ minimum: 1, maximum: 32 })),
-    prompt_chars: Type.Optional(Type.Number({ minimum: 100, maximum: 4000 })),
-    inline_threshold: Type.Optional(Type.Number({ minimum: 0, maximum: 100 })),
-  }),
-  // action = get_failure
-  Type.Object({
-    action: Type.Literal("get_failure"),
-    run_id: Type.String(),
-    test_id: Type.Optional(Type.String()),
-  }),
-  // action = trace
-  Type.Object({
-    action: Type.Literal("trace"),
-    session_id: Type.String(),
-    plan_id: Type.String(),
-    target_org: Type.Optional(Type.String()),
-    timeout_ms: Type.Optional(Type.Number({ minimum: 1000 })),
-  }),
-  // action = resolve_active
-  Type.Object({
-    action: Type.Literal("resolve_active"),
-    agent_api_name: Type.String(),
-    target_org: Type.Optional(Type.String()),
-  }),
-]);
+const Params = Type.Object({
+  action: Type.Union(
+    [
+      Type.Literal("run"),
+      Type.Literal("get_failure"),
+      Type.Literal("trace"),
+      Type.Literal("resolve_active"),
+    ],
+    {
+      description:
+        "run: full multi-turn regression. get_failure: drill into a previous run's failure. trace: fetch a planner trace by (session_id, plan_id). resolve_active: look up Active BotVersion ids for $active_* placeholders.",
+    },
+  ),
+  target_org: Type.Optional(Type.String({ description: "sf CLI alias / username." })),
+  // run
+  spec_path: Type.Optional(
+    Type.String({
+      description: "For action='run'. Path to a JSON eval spec. Use this OR spec.",
+    }),
+  ),
+  spec: Type.Optional(
+    Type.Any({
+      description: "For action='run'. Inline spec object. Use this OR spec_path.",
+    }),
+  ),
+  agent_api_name: Type.Optional(
+    Type.String({
+      description:
+        "Required for resolve_active. For run, only required when the spec uses $active_* placeholders.",
+    }),
+  ),
+  traces_mode: Type.Optional(
+    Type.Union([Type.Literal("failed"), Type.Literal("all"), Type.Literal("off")], {
+      description: "Optional for action='run'. Default 'failed'.",
+    }),
+  ),
+  concurrency: Type.Optional(
+    Type.Number({
+      minimum: 1,
+      maximum: 32,
+      description: "Optional for action='run'. Default 8.",
+    }),
+  ),
+  prompt_chars: Type.Optional(
+    Type.Number({
+      minimum: 100,
+      maximum: 4000,
+      description: "Optional for action='run'. Max chars of llmEvents.prompt_content per turn.",
+    }),
+  ),
+  inline_threshold: Type.Optional(
+    Type.Number({
+      minimum: 0,
+      maximum: 100,
+      description:
+        "Optional for action='run'. Inline failure records when total <= threshold; otherwise summarize. Default 5.",
+    }),
+  ),
+  // get_failure
+  run_id: Type.Optional(
+    Type.String({
+      description:
+        "Required for action='get_failure'. Run id from a previous agentscript_eval run.",
+    }),
+  ),
+  test_id: Type.Optional(
+    Type.String({
+      description: "Optional for action='get_failure'. Restrict to one failure.",
+    }),
+  ),
+  // trace
+  session_id: Type.Optional(Type.String({ description: "Required for action='trace'." })),
+  plan_id: Type.Optional(Type.String({ description: "Required for action='trace'." })),
+  timeout_ms: Type.Optional(
+    Type.Number({ minimum: 1000, description: "Optional for action='trace'. Default 60000." }),
+  ),
+});
 
-type ParamsAny =
-  | {
-      action: "run";
-      spec_path?: string;
-      spec?: unknown;
-      target_org?: string;
-      agent_api_name?: string;
-      traces_mode?: "failed" | "all" | "off";
-      concurrency?: number;
-      prompt_chars?: number;
-      inline_threshold?: number;
-    }
-  | { action: "get_failure"; run_id: string; test_id?: string }
-  | {
-      action: "trace";
-      session_id: string;
-      plan_id: string;
-      target_org?: string;
-      timeout_ms?: number;
-    }
-  | { action: "resolve_active"; agent_api_name: string; target_org?: string };
+interface ParamsAny {
+  action: "run" | "get_failure" | "trace" | "resolve_active";
+  target_org?: string;
+  spec_path?: string;
+  spec?: unknown;
+  agent_api_name?: string;
+  traces_mode?: "failed" | "all" | "off";
+  concurrency?: number;
+  prompt_chars?: number;
+  inline_threshold?: number;
+  run_id?: string;
+  test_id?: string;
+  session_id?: string;
+  plan_id?: string;
+  timeout_ms?: number;
+}
+
+function checkRequired(p: ParamsAny): { ok: true } | { ok: false; error: string } {
+  switch (p.action) {
+    case "run":
+      if (!p.spec_path && !p.spec) {
+        return {
+          ok: false,
+          error: "action='run' requires either spec_path or spec.",
+        };
+      }
+      return { ok: true };
+    case "get_failure":
+      if (!p.run_id) return { ok: false, error: "action='get_failure' requires run_id." };
+      return { ok: true };
+    case "trace":
+      if (!p.session_id) return { ok: false, error: "action='trace' requires session_id." };
+      if (!p.plan_id) return { ok: false, error: "action='trace' requires plan_id." };
+      return { ok: true };
+    case "resolve_active":
+      if (!p.agent_api_name)
+        return { ok: false, error: "action='resolve_active' requires agent_api_name." };
+      return { ok: true };
+  }
+}
 
 // -------------------------------------------------------------------------------------------------
 // Registration
@@ -122,6 +185,8 @@ export function registerEvalTool(pi: ExtensionAPI): void {
     parameters: Params,
     async execute(_id, params, _signal, onUpdate, ctx) {
       const p = params as ParamsAny;
+      const reqOk = checkRequired(p);
+      if (reqOk.ok === false) return toolError("INVALID_PARAMS", reqOk.error);
       switch (p.action) {
         case "run":
           return await actionRun(ctx, p, onUpdate);
@@ -144,7 +209,7 @@ type OnUpdateFn = (partial: { content: { type: "text"; text: string }[]; details
 
 async function actionRun(
   ctx: ExtensionContext,
-  input: Extract<ParamsAny, { action: "run" }>,
+  input: ParamsAny,
   onUpdate?: OnUpdateFn,
 ): Promise<{
   content: { type: "text"; text: string }[];
@@ -241,7 +306,7 @@ async function actionRun(
 
 function classifyRunError(
   err: unknown,
-  input: Extract<ParamsAny, { action: "run" }>,
+  input: ParamsAny,
 ): { content: { type: "text"; text: string }[]; details: ToolError } {
   const msg = err instanceof Error ? err.message : String(err);
   // If the error is "spec uses $active_* but no agent_api_name", point the
@@ -278,10 +343,7 @@ function headline(result: RunEvalResult, passed: boolean): string {
   );
 }
 
-async function loadSpec(
-  input: Extract<ParamsAny, { action: "run" }>,
-  cwd: string,
-): Promise<EvalSpec | null> {
+async function loadSpec(input: ParamsAny, cwd: string): Promise<EvalSpec | null> {
   if (input.spec_path) {
     const path = await import("node:path");
     const abs = path.isAbsolute(input.spec_path)
@@ -302,7 +364,7 @@ async function loadSpec(
 
 async function actionGetFailure(
   ctx: ExtensionContext,
-  input: Extract<ParamsAny, { action: "get_failure" }>,
+  input: ParamsAny,
 ): Promise<{
   content: { type: "text"; text: string }[];
   details: Record<string, unknown> | ToolError;
@@ -347,7 +409,7 @@ async function actionGetFailure(
 // action = trace
 // -------------------------------------------------------------------------------------------------
 
-async function actionTrace(input: Extract<ParamsAny, { action: "trace" }>): Promise<{
+async function actionTrace(input: ParamsAny): Promise<{
   content: { type: "text"; text: string }[];
   details: Record<string, unknown> | ToolError;
 }> {
@@ -381,9 +443,7 @@ async function actionTrace(input: Extract<ParamsAny, { action: "trace" }>): Prom
 // action = resolve_active
 // -------------------------------------------------------------------------------------------------
 
-async function actionResolveActive(
-  input: Extract<ParamsAny, { action: "resolve_active" }>,
-): Promise<{
+async function actionResolveActive(input: ParamsAny): Promise<{
   content: { type: "text"; text: string }[];
   details: Record<string, unknown> | ToolError;
 }> {

@@ -18,70 +18,166 @@ import { toolError, toolOk } from "./tool-types.ts";
 
 export const MUTATE_TOOL_NAME = "agentscript_mutate";
 
-// Common dry_run schema fragment, applied to every variant.
-const DryRunField = Type.Optional(
-  Type.Boolean({
-    description:
-      "When true, return a unified diff + the proposed source without writing to disk. Use to preview a change before committing.",
+// Single Type.Object: emits root `type:"object"` so OpenAI's strict tool
+// validator accepts it. Per-op required-field checks are enforced in
+// execute() before delegating to applyMutation.
+const Params = Type.Object({
+  op: Type.Union(
+    [
+      Type.Literal("set_field"),
+      Type.Literal("rename"),
+      Type.Literal("insert"),
+      Type.Literal("delete"),
+      Type.Literal("apply_quick_fix"),
+    ],
+    {
+      description:
+        "set_field: set a singular block ('config'/'system') or a named entry's field. rename: AST-supported only for 'topic.X' → 'subagent.X'. insert / delete: return ast_unsupported today — use the `edit` tool. apply_quick_fix: apply a fix returned by agentscript_compile.",
+    },
+  ),
+  path: Type.String({
+    description: "Absolute or workspace-relative path to a `.agent` file.",
   }),
-);
+  // set_field
+  component: Type.Optional(
+    Type.String({
+      description:
+        "Required for op='set_field'. Component path. Singular: 'config' or 'system'. Named: 'topic.<name>', 'subagent.<name>', 'actions.<name>', 'variables.<name>'.",
+    }),
+  ),
+  field: Type.Optional(
+    Type.String({ description: "Required for op='set_field'. Field name on the component." }),
+  ),
+  value: Type.Optional(
+    Type.Any({
+      description: "Required for op='set_field'. The new value (string, number, boolean, etc.).",
+    }),
+  ),
+  // rename
+  from: Type.Optional(
+    Type.String({
+      description: "Required for op='rename'. Source component, e.g. 'topic.billing'.",
+    }),
+  ),
+  to: Type.Optional(
+    Type.String({
+      description:
+        "Required for op='rename'. Target component. Currently only 'topic.X' → 'subagent.X' is AST-supported.",
+    }),
+  ),
+  // insert
+  parent: Type.Optional(
+    Type.String({ description: "Required for op='insert'. Parent component path." }),
+  ),
+  child: Type.Optional(
+    Type.Any({ description: "Required for op='insert'. Child node to insert." }),
+  ),
+  // delete
+  target: Type.Optional(
+    Type.String({ description: "Required for op='delete'. Component path to remove." }),
+  ),
+  // apply_quick_fix
+  diagnostic_code: Type.Optional(
+    Type.String({
+      description:
+        "Required for op='apply_quick_fix'. Diagnostic code returned by agentscript_compile, e.g. 'deprecated-field'.",
+    }),
+  ),
+  line: Type.Optional(
+    Type.Number({
+      description:
+        "Required for op='apply_quick_fix'. 1-based line of the diagnostic (matches compile output).",
+    }),
+  ),
+  fix_index: Type.Optional(
+    Type.Number({
+      description:
+        "Optional for op='apply_quick_fix'. Pick a non-default fix when multiple are available. Default 0.",
+    }),
+  ),
+  // common
+  dry_run: Type.Optional(
+    Type.Boolean({
+      description:
+        "When true, return a unified diff + the proposed source without writing to disk. Use to preview a change before committing.",
+    }),
+  ),
+});
 
-// Discriminated-union parameter schema. Each variant pins the `op` literal and
-// the fields that op needs.
-const Params = Type.Union([
-  Type.Object({
-    op: Type.Literal("set_field"),
-    path: Type.String(),
-    component: Type.String({
-      description:
-        "Component path. Singular: 'config' or 'system'. Named: 'topic.<name>', 'subagent.<name>', 'actions.<name>', 'variables.<name>'.",
-    }),
-    field: Type.String(),
-    value: Type.Any(),
-    dry_run: DryRunField,
-  }),
-  Type.Object({
-    op: Type.Literal("rename"),
-    path: Type.String(),
-    from: Type.String({
-      description: "Source component path, e.g. 'topic.billing'.",
-    }),
-    to: Type.String({
-      description:
-        "Target component path. Currently only 'topic.X' → 'subagent.X' is AST-supported.",
-    }),
-    dry_run: DryRunField,
-  }),
-  Type.Object({
-    op: Type.Literal("insert"),
-    path: Type.String(),
-    parent: Type.String(),
-    child: Type.Any(),
-    dry_run: DryRunField,
-  }),
-  Type.Object({
-    op: Type.Literal("delete"),
-    path: Type.String(),
-    target: Type.String(),
-    dry_run: DryRunField,
-  }),
-  Type.Object({
-    op: Type.Literal("apply_quick_fix"),
-    path: Type.String(),
-    diagnostic_code: Type.String({
-      description: "Diagnostic code returned by agentscript_compile, e.g. 'deprecated-field'.",
-    }),
-    line: Type.Number({
-      description: "1-based line of the diagnostic (matches compile output).",
-    }),
-    fix_index: Type.Optional(
-      Type.Number({
-        description: "Pick a non-default fix when multiple are available. Default 0.",
-      }),
-    ),
-    dry_run: DryRunField,
-  }),
-]);
+interface ParamsAny {
+  op: "set_field" | "rename" | "insert" | "delete" | "apply_quick_fix";
+  path: string;
+  component?: string;
+  field?: string;
+  value?: unknown;
+  from?: string;
+  to?: string;
+  parent?: string;
+  child?: unknown;
+  target?: string;
+  diagnostic_code?: string;
+  line?: number;
+  fix_index?: number;
+  dry_run?: boolean;
+}
+
+function toMutateOp(p: ParamsAny): MutateOp | { ok: false; missing: string[] } {
+  const required: Record<ParamsAny["op"], string[]> = {
+    set_field: ["component", "field", "value"],
+    rename: ["from", "to"],
+    insert: ["parent", "child"],
+    delete: ["target"],
+    apply_quick_fix: ["diagnostic_code", "line"],
+  };
+  const bag = p as unknown as Record<string, unknown>;
+  const missing = required[p.op].filter((k) => bag[k] === undefined);
+  if (missing.length > 0) return { ok: false, missing };
+  // After the missing-fields check above, every required field is present;
+  // cast through `as` to satisfy MutateOp's per-variant required types.
+  switch (p.op) {
+    case "set_field":
+      return {
+        op: "set_field",
+        path: p.path,
+        component: p.component as string,
+        field: p.field as string,
+        value: p.value,
+        dry_run: p.dry_run,
+      };
+    case "rename":
+      return {
+        op: "rename",
+        path: p.path,
+        from: p.from as string,
+        to: p.to as string,
+        dry_run: p.dry_run,
+      };
+    case "insert":
+      return {
+        op: "insert",
+        path: p.path,
+        parent: p.parent as string,
+        child: p.child,
+        dry_run: p.dry_run,
+      };
+    case "delete":
+      return {
+        op: "delete",
+        path: p.path,
+        target: p.target as string,
+        dry_run: p.dry_run,
+      };
+    case "apply_quick_fix":
+      return {
+        op: "apply_quick_fix",
+        path: p.path,
+        diagnostic_code: p.diagnostic_code as string,
+        line: p.line as number,
+        fix_index: p.fix_index,
+        dry_run: p.dry_run,
+      };
+  }
+}
 
 export function registerMutateTool(pi: ExtensionAPI): void {
   pi.registerTool({
@@ -100,12 +196,19 @@ export function registerMutateTool(pi: ExtensionAPI): void {
     ],
     parameters: Params,
     async execute(_id, params, _signal, _onUpdate, ctx) {
-      const op = params as MutateOp;
-      const absPath = resolveToolPath(op.path, ctx.cwd);
+      const p = params as ParamsAny;
+      if (!p.op) return toolError("INVALID_PARAMS", "`op` is required.");
+      if (!p.path) return toolError("INVALID_PARAMS", "`path` is required.");
+      const absPath = resolveToolPath(p.path, ctx.cwd);
       if (!isAgentScriptFile(absPath)) {
         return toolError(`Not an Agent Script file: ${absPath}`, "Pass a path ending in `.agent`.");
       }
-      const opAbs: MutateOp = { ...op, path: absPath };
+      const built = toMutateOp({ ...p, path: absPath });
+      if ("missing" in built) {
+        return toolError("INVALID_PARAMS", `op='${p.op}' requires: ${built.missing.join(", ")}.`);
+      }
+      const opAbs = built;
+      const op = opAbs;
 
       const result = await applyMutation(opAbs);
       if (!result.ok) {
