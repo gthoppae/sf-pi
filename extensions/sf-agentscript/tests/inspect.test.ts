@@ -101,6 +101,56 @@ describe("inspectFile", () => {
     expect(typeof billing?.line).toBe("number");
   });
 
+  test("flags has_parse_errors when the file has severity-1 issues", async () => {
+    const filePath = await writeAgent(
+      "missing-required.agent",
+      [
+        "config:",
+        '    agent_name: "Bot"',
+        "",
+        "system:",
+        '    instructions: "x"',
+        "",
+        "topic foo:",
+        '    description: "ok"',
+        "",
+        // start_agent main is missing the required `description` — sev-1.
+        "start_agent main:",
+        "    transition to @topic.foo",
+        "",
+      ].join("\n"),
+    );
+    const result = await inspectFile(filePath);
+    expect(result.ok).toBe(true);
+    expect(result.has_parse_errors).toBe(true);
+    expect(result.parse_error_count ?? 0).toBeGreaterThanOrEqual(1);
+  });
+
+  test("clean files report has_parse_errors=false", async () => {
+    const filePath = await writeAgent(
+      "clean.agent",
+      [
+        "config:",
+        '    agent_name: "Clean"',
+        '    description: "clean"',
+        "",
+        "system:",
+        '    instructions: "x"',
+        "",
+        "topic foo:",
+        '    description: "ok"',
+        "",
+        "start_agent main:",
+        '    description: "entry"',
+        "    transition to @topic.foo",
+        "",
+      ].join("\n"),
+    );
+    const result = await inspectFile(filePath);
+    expect(result.ok).toBe(true);
+    expect(result.has_parse_errors).toBe(false);
+  });
+
   test("reports dialect when annotation is present", async () => {
     const filePath = await writeAgent(
       "annotated.agent",

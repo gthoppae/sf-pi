@@ -51,34 +51,76 @@ describe("applyMutation: apply_quick_fix", () => {
 });
 
 describe("applyMutation: set_field", () => {
-  test("rewrites a singular system field via AST and re-compiles", async () => {
-    const filePath = await writeAgent(
-      "bot.agent",
-      [
-        "system:",
-        '    instructions: "old text"',
-        "",
-        "topic billing:",
-        '    description: "Handle billing"',
-        "",
-      ].join("\n"),
-    );
+  // Canonical fixture used by every set_field success-path test below.
+  const FULL_FIXTURE = [
+    "config:",
+    '    agent_name: "Test_Bot"',
+    '    description: "Demo"',
+    "",
+    "system:",
+    "    instructions: |",
+    "        old instructions",
+    "",
+    "topic billing:",
+    '    description: "old billing description"',
+    "",
+    "topic faq:",
+    '    description: "old faq description"',
+    "",
+    "start_agent main:",
+    '    description: "entry"',
+    "    transition to @topic.billing",
+    "",
+  ].join("\n");
+
+  test("rewrites a nested topic.description (string) via AST and re-compiles", async () => {
+    const filePath = await writeAgent("bot.agent", FULL_FIXTURE);
     const result = await applyMutation({
       op: "set_field",
       path: filePath,
-      component: "system",
-      field: "instructions",
-      value: "fresh text",
+      component: "topic.faq",
+      field: "description",
+      value: "new faq description",
     });
     if (!result.ok) {
-      // The SDK may not expose 'instructions' as a directly-settable scalar
-      // on system. Acceptable outcome: noop with a clear reason.
-      expect(["noop", "ast_mutation_failed"]).toContain(result.reason);
-      return;
+      throw new Error(`Expected success, got ${result.reason}: ${result.reason_detail}`);
     }
     expect(result.applied_via).toBe("ast");
     const after = await readFile(filePath, "utf8");
-    expect(after).toContain("fresh text");
+    expect(after).toContain("new faq description");
+    expect(after).not.toContain("old faq description");
+    expect((result.diagnostics_after ?? []).filter((d) => d.severity === 1)).toHaveLength(0);
+  });
+
+  test("rewrites a config field (top-level scalar) via AST", async () => {
+    const filePath = await writeAgent("bot.agent", FULL_FIXTURE);
+    const result = await applyMutation({
+      op: "set_field",
+      path: filePath,
+      component: "config",
+      field: "description",
+      value: "updated demo description",
+    });
+    if (!result.ok) {
+      throw new Error(`Expected success, got ${result.reason}: ${result.reason_detail}`);
+    }
+    expect(result.applied_via).toBe("ast");
+    const after = await readFile(filePath, "utf8");
+    expect(after).toContain("updated demo description");
+  });
+
+  test("set_field rejects array values with a clear unsupported_value_type reason", async () => {
+    const filePath = await writeAgent("bot.agent", FULL_FIXTURE);
+    const result = await applyMutation({
+      op: "set_field",
+      path: filePath,
+      component: "topic.faq",
+      field: "description",
+      value: ["a", "b"],
+    });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("unsupported_value_type");
+    expect(result.reason_detail).toMatch(/list values are not yet supported/i);
   });
 
   test("returns bad_component when the path is malformed", async () => {

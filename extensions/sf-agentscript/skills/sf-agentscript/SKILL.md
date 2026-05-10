@@ -43,6 +43,121 @@ LLM: agentscript_eval {action: "run", spec_path: "specs/billing.json"}
   ← 12/12 passed
 ```
 
+## How to succeed first time (read this before calling any tool)
+
+This section captures the patterns that **avoid** the common error paths.
+The goal is success on the first call, not graceful recovery from a fixable
+mistake.
+
+### Before any read or mutate, run `agentscript_compile`
+
+`agentscript_mutate` refuses to touch a file with severity-1 parse errors
+(it would emit a corrupt file). Always start with:
+
+```
+agentscript_compile path=<file>      → verify clean / get fresh quick fixes
+```
+
+If you intend to apply a quick fix, **use the `apply_via` field on the
+compile result** — it carries the exact `agentscript_mutate apply_quick_fix`
+call. Don't reconstruct it from the diagnostic message.
+
+### Use `agentscript_inspect` for navigation, not `read`
+
+The LLM is tempted to read the file to find a topic. Don't. `inspect`
+returns:
+
+- 1-based `line` numbers (match compile output exactly)
+- `action_refs` / `subagent_refs` / `variable_refs` per topic/subagent
+- `stats` so you know how big the surface is before drilling in
+
+The inspect result is ~200 tokens. A `read` of a real `.agent` is
+~3000+ tokens.
+
+### `agentscript_mutate set_field` — value type matters
+
+`set_field` wraps your value as a Literal node before writing. **Supported
+value types: string, number, boolean, null.** List and object values are
+rejected with `reason: "unsupported_value_type"` because the literal
+shapes for `[a, b]` / `{k: v}` haven't been wired yet — use the generic
+`edit` tool for those.
+
+Multi-line strings work: pass a string with `\n` and the wrapper emits
+the pipe-block form.
+
+### `agentscript_inspect` may report partial results on broken files
+
+`inspect` returns `ok: true` even on a malformed file because the SDK is
+error-tolerant. **Always check `has_parse_errors` and `parse_error_count`
+on the result.** If `has_parse_errors === true`, the structural surface
+may be incomplete — run `agentscript_compile` first to see the errors
+and fix them before navigating.
+
+```
+inspect.has_parse_errors === true
+  → don't trust stats / topics. compile first, fix sev-1, then re-inspect.
+```
+
+### `agentscript_mutate apply_quick_fix` — always pass fresh `line`
+
+The `line` parameter is 1-based and **must match a current diagnostic**.
+If you applied a previous fix and lines shifted, run `agentscript_compile`
+again to get the new line numbers before calling apply_quick_fix.
+
+The coord-fallback path verifies the diagnostic still exists at
+`(line, code)` and refuses with `reason: "no_matching_diagnostic"` if it
+doesn't — that's a stale-line problem, not a missing fix.
+
+### `agentscript_create` — default location matches Salesforce
+
+Without `output_dir`, files land at
+`<defaultPackageDir>/main/default/aiAuthoringBundles/<bundle_name>/`.
+The SDK reads `sfdx-project.json` for the default package; falls back to
+`force-app` if missing.
+
+`overwrite: false` (default) refuses to clobber. The error returns
+`recover_via` with `overwrite: true` set so you can retry intentionally.
+
+### `agentscript_preview start` — know your org's SFAP routing
+
+Not every org routes to `api.salesforce.com/einstein/ai-agent/...`.
+Works: production orgs, sandboxes derived from production, Agentforce-
+enabled enterprise orgs. **Dev-edition orgs typically do NOT** — they
+return HTML 404 pages even when the Connection auth is fine.
+
+If preview fails with 404 across all SFAP host variants, the org isn't
+SFAP-enabled. There's no tool fix — use a different org.
+
+### Diagnostics with no quick_fixes
+
+Not every diagnostic ships with a fix. The SDK ships fixes for:
+`deprecated-field`, `unused-variable`, `invalid-version`,
+`unknown-dialect`, `invalid-modifier`, `unknown-type`.
+
+For anything else (especially `missing-required-field` — e.g. a
+start_agent missing its description), **`apply_quick_fix` won't help**.
+Use `agentscript_mutate set_field` to add the missing scalar, or fall
+back to the generic `edit` tool.
+
+### `agentscript_eval action=run` — placeholder ergonomics
+
+When the spec contains `$active_*`:
+
+- Pass `agent_api_name` on every call. Without it the run errors out
+  with a `recover_via` pointing at `resolve_active`.
+- The Active version is what runs, not the latest — if you just
+  deployed a new version and didn't activate it, runs target the
+  previous Active version.
+- Run `action=resolve_active` first when in doubt; it returns the
+  `bot_version_id` and `version_number` so you can confirm.
+
+### Connection caching
+
+The `Connection` is cached per `target_org` per session. If you re-auth
+the org outside pi (e.g. `sf org login web`), restart pi or run
+`/sf-agentscript doctor` — the cache invalidates on session lifecycle
+events but not on out-of-band auth changes.
+
 ## Tool ordering — when to use which
 
 | When…                                                 | Use                                                                              |

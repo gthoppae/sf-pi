@@ -203,6 +203,21 @@ async function applyAstSetField(
   if (parsed.ok === false) return parsed.error;
   const { doc } = parsed;
 
+  // The vendored SDK wraps scalar field values in nodes (StringLiteral,
+  // NumberLiteral, BooleanLiteral, etc.) that carry an `__emit()` method.
+  // Assigning a raw JS string to `entry.description` corrupts emit() because
+  // the value loses its node identity. Wrap the LLM-supplied scalar via
+  // parseComponent('...', 'expression') so it lands as a real Literal node.
+  const wrappedValue = wrapScalarForAst(op.value, sdk);
+  if (wrappedValue.ok === false) {
+    return {
+      ok: false,
+      reason: "unsupported_value_type",
+      reason_detail: wrappedValue.reason,
+    };
+  }
+  const valueNode = wrappedValue.node;
+
   const componentParts = op.component.split(".");
   const head = componentParts[0];
 
@@ -211,7 +226,7 @@ async function applyAstSetField(
       // Singular blocks. Set a top-level field via doc.mutate.
       doc.mutate((ast: Record<string, unknown>) => {
         const block = ast[head] as Record<string, unknown> | undefined;
-        if (block) (block as Record<string, unknown>)[op.field] = op.value;
+        if (block) (block as Record<string, unknown>)[op.field] = valueNode;
       });
     } else if (
       head === "topic" ||
@@ -233,7 +248,7 @@ async function applyAstSetField(
         const entry = (map as { get: (n: string) => Record<string, unknown> | undefined }).get(
           entryName,
         );
-        if (entry) entry[op.field] = op.value;
+        if (entry) entry[op.field] = valueNode;
       });
     } else {
       return {
@@ -336,6 +351,90 @@ async function applyAstRename(
       reason_detail: err instanceof Error ? err.message : String(err),
     };
   }
+}
+
+// -------------------------------------------------------------------------------------------------
+// Scalar value wrapping
+// -------------------------------------------------------------------------------------------------
+
+/**
+ * Wrap a raw LLM-supplied value (string / number / boolean / null) into a
+ * properly-shaped AST node so the SDK's emit() round-trips correctly.
+ *
+ * We avoid `new StringLiteral(...)` — that constructor stores the wrapper
+ * object as `.value`, which double-wraps. Instead we use
+ * `parseComponent(<source>, 'expression')` which produces a real Literal
+ * with the right CST metadata + `__emit`.
+ */
+function wrapScalarForAst(
+  value: unknown,
+  sdk: unknown,
+): { ok: true; node: unknown } | { ok: false; reason: string } {
+  const sdkParseComponent = (sdk as { parseComponent?: (s: string, kind: "expression") => unknown })
+    .parseComponent;
+  if (typeof sdkParseComponent !== "function") {
+    return { ok: false, reason: "SDK does not expose parseComponent" };
+  }
+
+  let exprSource: string;
+  if (value === null) {
+    exprSource = "None";
+  } else if (typeof value === "string") {
+    // Literal-quote the string. Multi-line strings (with newlines) use the
+    // pipe-block form so the SDK round-trips them via their canonical shape.
+    exprSource = value.includes("\n")
+      ? `|\n${indentLines(value, "    ")}`
+      : `"${escapeStringForLiteral(value)}"`;
+  } else if (typeof value === "boolean") {
+    exprSource = value ? "True" : "False";
+  } else if (typeof value === "number") {
+    if (!Number.isFinite(value)) {
+      return { ok: false, reason: `Number value ${value} is not finite.` };
+    }
+    exprSource = String(value);
+  } else if (Array.isArray(value)) {
+    return {
+      ok: false,
+      reason:
+        "List values are not yet supported by op=set_field. Use the generic edit tool, or open a follow-up to add list-literal wrapping.",
+    };
+  } else if (value && typeof value === "object") {
+    return {
+      ok: false,
+      reason:
+        "Object/dict values are not yet supported by op=set_field. Use the generic edit tool, or open a follow-up to add dict-literal wrapping.",
+    };
+  } else {
+    return { ok: false, reason: `Unsupported value type: ${typeof value}` };
+  }
+
+  let node: unknown;
+  try {
+    node = sdkParseComponent(exprSource, "expression");
+  } catch (err) {
+    return {
+      ok: false,
+      reason: `parseComponent failed for '${exprSource.slice(0, 60)}': ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+  if (!node) {
+    return {
+      ok: false,
+      reason: `parseComponent returned no node for '${exprSource.slice(0, 60)}'`,
+    };
+  }
+  return { ok: true, node };
+}
+
+function escapeStringForLiteral(s: string): string {
+  return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
+}
+
+function indentLines(source: string, indent: string): string {
+  return source
+    .split("\n")
+    .map((l) => `${indent}${l}`)
+    .join("\n");
 }
 
 // -------------------------------------------------------------------------------------------------

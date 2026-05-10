@@ -140,6 +140,7 @@ export async function checkAgentScriptFile(filePath: string): Promise<AgentScrip
       ok: false,
       diagnostics: [],
       quickFixes: [],
+      failureKind: "sdk_unavailable",
       unavailableReason:
         getSdkLoadError() ?? "The vendored @agentscript/agentforce SDK failed to load.",
     };
@@ -153,6 +154,7 @@ export async function checkAgentScriptFile(filePath: string): Promise<AgentScrip
       ok: false,
       diagnostics: [],
       quickFixes: [],
+      failureKind: "read_failed",
       unavailableReason: `Failed to read ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
     };
   }
@@ -172,6 +174,7 @@ export async function checkAgentScriptFile(filePath: string): Promise<AgentScrip
       diagnostics: [],
       quickFixes: [],
       dialect,
+      failureKind: "compile_threw",
       unavailableReason: `Agent Script SDK threw during compileSource(): ${error instanceof Error ? error.message : String(error)}`,
     };
   }

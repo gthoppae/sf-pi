@@ -83,4 +83,11 @@ export interface AgentScriptCheckResult {
   quickFixes: AgentScriptQuickFix[];
   /** When the SDK couldn't load, this contains the reason. */
   unavailableReason?: string;
+  /**
+   * Why ok=false, in a tool-routable enum.
+   * - 'sdk_unavailable' — vendored SDK failed to load. Recover via doctor.
+   * - 'read_failed'     — filesystem read of `filePath` failed (ENOENT, EACCES).
+   * - 'compile_threw'   — the SDK threw during compileSource(). Likely an SDK bug.
+   */
+  failureKind?: "sdk_unavailable" | "read_failed" | "compile_threw";
 }

@@ -33,6 +33,13 @@ export interface InspectResult {
     actions: ComponentSummary[];
   };
   stats?: { topics: number; subagents: number; variables: number; actions: number };
+  /**
+   * True when `parse()` produced severity-1 diagnostics. The structural
+   * surface may be incomplete — always run `agentscript_compile` first to
+   * decide whether the result is trustworthy for further mutations.
+   */
+  has_parse_errors?: boolean;
+  parse_error_count?: number;
 }
 
 export interface ComponentSummary {
@@ -214,6 +221,14 @@ export async function inspectFile(filePath: string): Promise<InspectResult> {
     };
   }
 
+  // Count severity-1 diagnostics so the LLM knows whether the structural
+  // result is trustworthy. Don't fail — the SDK is error-tolerant on purpose.
+  let sev1Count = 0;
+  for (const diag of doc.diagnostics ?? []) {
+    if (((diag as { severity?: number })?.severity ?? 0) === 1) sev1Count += 1;
+  }
+  const hasParseErrors = sev1Count > 0;
+
   const dialect = resolveDialectInfo(source, sdk);
   const ast = (doc.ast ?? {}) as Record<string, unknown>;
 
@@ -246,6 +261,8 @@ export async function inspectFile(filePath: string): Promise<InspectResult> {
       variables: variables.length,
       actions: actions.length,
     },
+    has_parse_errors: hasParseErrors,
+    parse_error_count: sev1Count,
   };
 }
 

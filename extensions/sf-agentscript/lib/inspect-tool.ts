@@ -69,6 +69,8 @@ export function registerInspectTool(pi: ExtensionAPI): void {
           dialect: result.dialect,
           components: result.components,
           stats: result.stats,
+          has_parse_errors: result.has_parse_errors ?? false,
+          parse_error_count: result.parse_error_count ?? 0,
         },
         summaryText,
       );
@@ -78,16 +80,28 @@ export function registerInspectTool(pi: ExtensionAPI): void {
 
 function renderSummary(
   filePath: string,
-  result: { dialect?: { name: string; version?: string }; stats?: Record<string, number> },
+  result: {
+    dialect?: { name: string; version?: string };
+    stats?: Record<string, number>;
+    has_parse_errors?: boolean;
+    parse_error_count?: number;
+  },
 ): string {
   const stats = result.stats ?? {};
   const dialect = result.dialect
     ? `${result.dialect.name}${result.dialect.version ? ` ${result.dialect.version}` : ""}`
     : "unknown";
-  return [
+  const lines = [
     `📋 Inspected ${filePath}`,
     `Dialect: ${dialect}`,
     `Stats: ${stats.topics ?? 0} topics · ${stats.subagents ?? 0} subagents · ` +
       `${stats.variables ?? 0} variables · ${stats.actions ?? 0} actions`,
-  ].join("\n");
+  ];
+  if (result.has_parse_errors) {
+    lines.push(
+      `⚠️ File has ${result.parse_error_count ?? 1} severity-1 parse error(s) — ` +
+        `run agentscript_compile first; the structural surface may be incomplete.`,
+    );
+  }
+  return lines.join("\n");
 }

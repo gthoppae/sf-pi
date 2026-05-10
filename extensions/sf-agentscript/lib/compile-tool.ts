@@ -81,11 +81,27 @@ export function registerCompileTool(pi: ExtensionAPI): void {
       }
       const result = await checkAgentScriptFile(filePath);
       if (!result.ok) {
-        return toolError(
-          `Agent Script SDK unavailable: ${result.unavailableReason ?? "unknown reason"}.`,
-          "Run /sf-agentscript doctor to diagnose the vendored bundle.",
-          { tool: "sf-agentscript", params: { action: "doctor" } },
-        );
+        const reason = result.unavailableReason ?? "unknown reason";
+        switch (result.failureKind) {
+          case "read_failed":
+            return toolError(
+              `Cannot read ${filePath}: ${reason}`,
+              "Verify the path exists. Use the `find` or `ls` tool to confirm.",
+            );
+          case "compile_threw":
+            return toolError(
+              `Agent Script SDK threw during compile: ${reason}`,
+              "This is most likely a vendored SDK bug. Run /sf-agentscript doctor.",
+              { tool: "sf-agentscript", params: { action: "doctor" } },
+            );
+          case "sdk_unavailable":
+          default:
+            return toolError(
+              `Agent Script SDK unavailable: ${reason}`,
+              "Run /sf-agentscript doctor to diagnose the vendored bundle.",
+              { tool: "sf-agentscript", params: { action: "doctor" } },
+            );
+        }
       }
 
       // Index quick fixes by (line, code) so we can compute fix_index per
