@@ -23,7 +23,6 @@ import { mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
 import type {
   EvalApiResponse,
-  EvalOutput,
   EvalSpec,
   FailureRecord,
   LastExecution,
@@ -92,14 +91,34 @@ export async function writeRun(input: PersistInput): Promise<void> {
   for (const test of merged.results ?? []) {
     const tid = test.id ?? "?";
     const outputs = test.outputs ?? [];
-    const byId = new Map<string, EvalOutput>();
-    for (const o of outputs) if (o.id) byId.set(o.id, o);
 
-    for (const o of outputs) {
+    // Pair agent.send_message outputs with the *next* agent.get_state output
+    // by execution order. Earlier we keyed on a hardcoded `turn<n>` ↔ `state<n>`
+    // naming convention which silently dropped topic + state_variables for any
+    // spec using a different naming scheme (e.g. `t1`, `sm`).
+    const stateAfter = new Map<number, number>(); // sendIndex → stateIndex
+    {
+      let lastSendIndex = -1;
+      for (let i = 0; i < outputs.length; i++) {
+        const out = outputs[i];
+        if (out.type === "agent.send_message") {
+          lastSendIndex = i;
+        } else if (
+          out.type === "agent.get_state" &&
+          lastSendIndex !== -1 &&
+          !stateAfter.has(lastSendIndex)
+        ) {
+          stateAfter.set(lastSendIndex, i);
+        }
+      }
+    }
+
+    for (let i = 0; i < outputs.length; i++) {
+      const o = outputs[i];
       if (o.type !== "agent.send_message") continue;
       const turnId = o.id ?? "";
-      const stateId = turnId.startsWith("turn") ? turnId.replace("turn", "state") : undefined;
-      const stateOut = stateId ? byId.get(stateId) : undefined;
+      const stateIndex = stateAfter.get(i);
+      const stateOut = stateIndex !== undefined ? outputs[stateIndex] : undefined;
       const pr = (stateOut?.response as { planner_response?: PlannerResponse } | undefined)
         ?.planner_response;
       const le: LastExecution = pr?.lastExecution ?? {};

@@ -176,16 +176,36 @@ export function buildFailureRecord(
   opts: BuildOptions = {},
 ): FailureRecord {
   const outputs = test.outputs ?? [];
-  const byId = new Map<string, EvalOutput>();
-  for (const o of outputs) if (o.id) byId.set(o.id, o);
+
+  // Pair each agent.send_message with the *next* agent.get_state by execution
+  // order. The previous implementation keyed on the `turn<n>` ↔ `state<n>`
+  // naming convention, which silently produced empty turn summaries for specs
+  // that used a different scheme (e.g. `t1` ↔ `s1`).
+  const stateAfter = new Map<number, number>();
+  {
+    let lastSendIndex = -1;
+    for (let i = 0; i < outputs.length; i++) {
+      const out = outputs[i];
+      if (out.type === "agent.send_message") {
+        lastSendIndex = i;
+      } else if (
+        out.type === "agent.get_state" &&
+        lastSendIndex !== -1 &&
+        !stateAfter.has(lastSendIndex)
+      ) {
+        stateAfter.set(lastSendIndex, i);
+      }
+    }
+  }
 
   const tid = String(test.id ?? "?");
   const turns: TurnSummary[] = [];
-  for (const o of outputs) {
+  for (let i = 0; i < outputs.length; i++) {
+    const o = outputs[i];
     if (o.type !== "agent.send_message") continue;
     const turnId = o.id ?? "";
-    const stateId = turnId.startsWith("turn") ? turnId.replace("turn", "state") : undefined;
-    const stateOut = stateId ? byId.get(stateId) : undefined;
+    const stateIndex = stateAfter.get(i);
+    const stateOut = stateIndex !== undefined ? outputs[stateIndex] : undefined;
     const utteranceFromSpec = opts.utteranceIndex?.get(`${tid}::${turnId}`);
     turns.push(buildTurnSummary(turnId, o, stateOut, opts, utteranceFromSpec));
   }
