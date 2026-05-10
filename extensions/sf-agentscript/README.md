@@ -124,6 +124,7 @@ extensions/sf-agentscript/
     preview/
       client.ts             ← implementation module
       session-store.ts      ← implementation module
+      trace-digest.ts       ← implementation module
     templates/
       agentforce-default.ts ← implementation module
       minimal.ts            ← implementation module
@@ -175,6 +176,7 @@ extensions/sf-agentscript/
     template-scaffold-vars.test.ts← unit / smoke test
     tool-schema-openai-strict.test.ts← unit / smoke test
     tool-types.test.ts      ← unit / smoke test
+    trace-digest.test.ts    ← unit / smoke test
   CREDITS.md                ← extension attribution
   index.ts                  ← Pi extension entry point
   manifest.json             ← source-of-truth extension metadata

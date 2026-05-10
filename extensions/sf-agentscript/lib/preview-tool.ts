@@ -122,7 +122,7 @@ export function registerPreviewTool(pi: ExtensionAPI): void {
       "Run a single .agent conversation against the live org with full trace capture per turn.",
     promptGuidelines: [
       "action='start' — local-compiles the .agent file first; only hits /authoring/scripts on success. Returns session_id and the initial agent message.",
-      "action='send' — POSTs one user utterance, fetches the planner trace per turn, returns topic + invoked_actions when available, and writes everything to the session store.",
+      "action='send' — POSTs one user utterance, fetches the planner trace per turn, returns a compact `digest` of every planner step (topic transitions, LLM calls, variable updates, tool invocations, errors), and writes everything to the session store. Full trace JSON lives at `trace_file` for deep dives.",
       "action='end' — finalizes metadata (sets endTime).",
       "action='trace' — ad-hoc trace fetch by (session_id, plan_id) when you need to revisit a specific turn.",
       "action='cleanup' — removes session dirs older than older_than_days (default 30). Use dry_run=true to see what would be deleted.",
@@ -329,13 +329,16 @@ async function actionSend(
         latency_ms: result.latencyMs,
         plan_id: result.planId,
         trace_file: result.traceFile,
+        digest: result.digest,
         ...(result.apexDebugLog ? { apex_debug_log: result.apexDebugLog } : {}),
       },
       [
         `🤖 ${result.agentResponse}`,
-        result.topic ? `topic: ${result.topic}` : null,
-        result.invokedActions?.length ? `actions: ${result.invokedActions.join(", ")}` : null,
-        `latency=${result.latencyMs}ms · plan=${result.planId.slice(0, 8)}…`,
+        result.digest?.summary_line ? `→ ${result.digest.summary_line}` : null,
+        result.digest && result.digest.errors.length > 0
+          ? `⚠️ errors: ${result.digest.errors.length}`
+          : null,
+        `plan=${result.planId.slice(0, 8)}… trace_file=${result.traceFile ?? "<none>"}`,
       ]
         .filter(Boolean)
         .join("\n"),
@@ -407,14 +410,17 @@ async function actionTrace(input: ParamsAny): Promise<{
         "Confirm both ids and that the session is still resident on the planner.",
       );
     }
+    const { summarizeTrace } = await import("./preview/trace-digest.ts");
+    const digest = summarizeTrace(trace, {
+      planId: input.plan_id,
+    });
     return toolOk({
       ok: true as const,
       session_id: input.session_id,
       plan_id: input.plan_id,
+      digest,
       trace_hint:
-        "PlannerResponse with steps[]: UserInputStep, UpdateTopicStep, " +
-        "LLMExecutionStep (promptContent, promptResponse, executionLatency), " +
-        "FunctionCallStep, ValidationPromptStep, EventStep.",
+        "`digest.timeline[]` keeps every step type the runtime emitted (UserInputStep, LLMStep, UpdateTopicStep, TransitionStep, VariableUpdateStep, FunctionStep, NodeEntryStateStep, EnabledToolsStep, BeforeReasoningIterationStep, AfterReasoningStep, PlannerResponseStep, OutputEvaluationStep, PlatformNotificationStep, ReasoningStep, etc.). Heavy fields (full prompts, full variable maps) are clipped — the full trace JSON is in `trace`.",
       trace,
     });
   } catch (err) {

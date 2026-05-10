@@ -171,6 +171,15 @@ export interface TurnSummary {
     prompt_response?: string;
     execution_latency_ms?: number;
   }>;
+  /**
+   * Compact LLM-friendly digest of this turn synthesized from the eval
+   * API's `lastExecution` (the eval API does not expose a step-level
+   * timeline, so the digest's `timeline` is reconstructed from the LLM
+   * events plus a synthesized PlannerResponseStep). See
+   * lib/preview/trace-digest.ts for the schema and the same shape used
+   * by `agentscript_preview send`.
+   */
+  digest?: import("../preview/trace-digest.ts").TraceDigest;
 }
 
 export interface RunTotals {

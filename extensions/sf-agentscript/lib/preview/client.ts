@@ -20,6 +20,7 @@ import { randomUUID } from "node:crypto";
 import type { Connection } from "@salesforce/core";
 import { isSfapRoutingFailure, sfapRequest } from "../eval/sfap.ts";
 import { fetchTrace } from "../eval/trace-client.ts";
+import { summarizeTrace, type TraceDigest } from "./trace-digest.ts";
 import {
   endSession as endSessionStore,
   getSessionDir,
@@ -110,6 +111,16 @@ export interface PreviewSendResult {
   planId: string;
   traceFile?: string;
   apexDebugLog?: string;
+  /**
+   * Compact, LLM-friendly digest of the planner trace. One row per planner
+   * step (every step type is preserved verbatim). Heavy fields are clipped;
+   * the full trace JSON lives at `traceFile` for deep dives.
+   *
+   * Empty timeline + `notes` are populated when the digest could not be
+   * built (e.g. eval-spawned session whose plan is not addressable through
+   * the preview-trace API).
+   */
+  digest?: TraceDigest;
 }
 
 export interface PreviewStartByApiNameOptions {
@@ -317,6 +328,7 @@ export async function sendMessage(opts: PreviewSendOptions): Promise<PreviewSend
   let traceFile: string | undefined;
   let topic: string | undefined;
   let invokedActions: string[] | undefined;
+  let digest: TraceDigest | undefined;
   if (planId && metadata.sessionKind !== "api_name") {
     try {
       const trace = await fetchTrace(opts.conn, opts.sessionId, planId, { timeoutMs: 60_000 });
@@ -324,7 +336,19 @@ export async function sendMessage(opts: PreviewSendOptions): Promise<PreviewSend
         await logTrace(sessionDir, planId, trace);
         const tracePath = `${sessionDir}/traces/${planId}.json`;
         traceFile = tracePath;
-        ({ topic, invokedActions } = extractTopicAndActions(trace));
+        digest = summarizeTrace(trace, {
+          planId,
+          traceFile: tracePath,
+          userInput: opts.message,
+          agentResponse,
+          latencyMs,
+        });
+        topic = digest.turn.topic;
+        invokedActions = digest.timeline
+          .filter((r) => r.t === "FunctionStep" || r.t === "FunctionCallStep")
+          .map((r) => (r.fn as string | undefined) ?? undefined)
+          .filter((s): s is string => typeof s === "string");
+        if (invokedActions.length === 0) invokedActions = undefined;
       }
     } catch {
       /* trace fetch is non-fatal */
@@ -342,7 +366,16 @@ export async function sendMessage(opts: PreviewSendOptions): Promise<PreviewSend
     }
   }
 
-  return { agentResponse, topic, invokedActions, latencyMs, planId, traceFile, apexDebugLog };
+  return {
+    agentResponse,
+    topic,
+    invokedActions,
+    latencyMs,
+    planId,
+    traceFile,
+    apexDebugLog,
+    digest,
+  };
 }
 
 /**
@@ -433,22 +466,12 @@ function isInvalidUserIdStartFailure(resp: { status: number; body: unknown }): b
   return /Invalid user ID provided on start session/i.test(text);
 }
 
-function extractTopicAndActions(trace: unknown): { topic?: string; invokedActions?: string[] } {
-  if (!trace || typeof trace !== "object") return {};
-  const t = trace as { steps?: Array<Record<string, unknown>> };
-  const steps = t.steps ?? [];
-  let topic: string | undefined;
-  const actions: string[] = [];
-  for (const step of steps) {
-    const type = String(step.type ?? "");
-    if (type === "UpdateTopicStep" && typeof step.topic === "string") {
-      topic = step.topic;
-    } else if (type === "FunctionCallStep" && typeof step.functionName === "string") {
-      actions.push(step.functionName);
-    }
-  }
-  return { topic, invokedActions: actions.length ? actions : undefined };
-}
+// Note: the previous `extractTopicAndActions()` helper read the wrong field
+// names (`steps` vs the runtime's `plan`, `FunctionCallStep` vs the
+// runtime's `FunctionStep`) and only surfaced two fields to the LLM. It
+// was replaced by `summarizeTrace()` in `./trace-digest.ts`, which keeps
+// every step type and emits a compact one-row-per-step digest. Topic +
+// invokedActions are still derived from the digest for back-compat.
 
 // -------------------------------------------------------------------------------------------------
 // startPreviewByApiName — converse with a published, activated agent

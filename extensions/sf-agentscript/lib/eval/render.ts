@@ -28,6 +28,7 @@ import type {
   TurnSummary,
 } from "./types.ts";
 import { groupEvaluators } from "./threshold.ts";
+import { summarizeLastExecution } from "../preview/trace-digest.ts";
 
 /**
  * State variable keys that carry signal for the Vivint AVA V2 agent. Add to
@@ -151,12 +152,22 @@ export function buildTurnSummary(
     execution_latency_ms: ev.executionLatency,
   }));
 
+  const digestUtterance =
+    typeof sendOut.utterance === "string" && sendOut.utterance.length > 0
+      ? sendOut.utterance
+      : utteranceFromSpec;
+  // Re-shape the per-turn snapshot into the same digest format we use for
+  // `agentscript_preview send`. The eval API doesn't expose a fine-grained
+  // step timeline, so the digest's timeline is reconstructed from
+  // lastExecution.llmEvents + invokedActions + agentResponse.
+  const digest = summarizeLastExecution(le, {
+    userInput: digestUtterance,
+    planId: le.message?.planId,
+  });
+
   return {
     turn_id: turnId,
-    utterance:
-      typeof sendOut.utterance === "string" && sendOut.utterance.length > 0
-        ? sendOut.utterance
-        : utteranceFromSpec,
+    utterance: digestUtterance,
     agent_response: agentResponse,
     topic: le.topic,
     invoked_actions: le.invokedActions,
@@ -167,6 +178,7 @@ export function buildTurnSummary(
     execution_history_last5: executionHistoryLast5(sc),
     plugins: pluginNames(sc),
     llm_events,
+    digest,
   };
 }
 
