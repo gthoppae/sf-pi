@@ -59,8 +59,12 @@ export interface DigestStats {
 }
 
 export interface TraceDigest {
-  /** "preview" → built from full plan timeline. "eval" → built from lastExecution snapshot. */
-  source: "preview" | "eval";
+  /**
+   * "preview"        — built from a full v1.1 preview plan timeline (rich, every step type).
+   * "eval"           — built from the Evaluation API's lastExecution snapshot (no timeline; LLM events reconstructed).
+   * "production-v1"  — built from the production-agent v1 send response (surface-only; no timeline because v1 has no trace endpoint).
+   */
+  source: "preview" | "eval" | "production-v1";
   turn: {
     user_input?: string;
     agent_response?: string;
@@ -547,6 +551,166 @@ function formatSummaryLine(p: {
       : "no fn calls",
   );
   return parts.join(" · ");
+}
+
+// -------------------------------------------------------------------------------------------------
+// Public: summarize a production-agent v1 send response
+// -------------------------------------------------------------------------------------------------
+
+/**
+ * Production-agent send response shape (verified live against
+ * api.salesforce.com/einstein/ai-agent/v1/sessions/{sid}/messages):
+ *   messages: [{
+ *     type: "Inform" | "Question" | "Escalate" | "EndConversation" | …,
+ *     planId, isContentSafe, feedbackId,
+ *     metrics: {},
+ *     result: [],            // populated when actions fire
+ *     citedReferences: [],   // populated when knowledge is invoked
+ *     message: "..."         // the user-visible reply
+ *   }]
+ */
+interface ProductionMessage {
+  type?: string;
+  planId?: string;
+  isContentSafe?: boolean;
+  feedbackId?: string;
+  message?: string;
+  result?: unknown[];
+  citedReferences?: unknown[];
+  metrics?: Record<string, unknown>;
+}
+
+export interface ProductionDigestContext {
+  /** What the user just sent. Optional for the initial start turn (no user input yet). */
+  userInput?: string;
+  /** Client-measured latency for the round trip. */
+  latencyMs?: number;
+  /** Echoed back so failure-record consumers can correlate. */
+  planId?: string;
+}
+
+/**
+ * Build a digest from a production-agent v1 send response.
+ *
+ * Production v1 does NOT expose a per-step trace endpoint (verified via
+ * eight URL probes against api.salesforce.com). The response itself still
+ * carries useful surface signals — response type, safety flag, action
+ * results, RAG citations — so we synthesize a small timeline:
+ *
+ *   UserInputStep         (when ctx.userInput is set)
+ *   PlannerResponseStep   (always; carries response_type, is_content_safe, response_chars, plan_id, feedback_id)
+ *   FunctionStep          (one per result[] entry)
+ *   CitedReferenceStep    (one per citedReferences[] entry)
+ *
+ * `notes` always explains the limitation so the LLM doesn't expect richer
+ * data and doesn't treat missing fields as a tool bug.
+ */
+export function summarizeProductionResponse(
+  messages: ProductionMessage[] | undefined | null,
+  ctx: ProductionDigestContext = {},
+): TraceDigest {
+  const msg = (messages ?? [])[0] ?? {};
+  const timeline: DigestRow[] = [];
+  const errors: TraceDigest["errors"] = [];
+  let i = 0;
+  let functionCalls = 0;
+
+  if (typeof ctx.userInput === "string" && ctx.userInput.length > 0) {
+    timeline.push({ i: i++, t: "UserInputStep", user: clip(ctx.userInput, MAX_USER_CHARS) });
+  }
+
+  const plannerRow: DigestRow = {
+    i: i++,
+    t: "PlannerResponseStep",
+  };
+  if (typeof msg.message === "string") plannerRow.response_chars = msg.message.length;
+  if (typeof msg.type === "string") plannerRow.response_type = msg.type;
+  if (typeof msg.isContentSafe === "boolean") plannerRow.is_content_safe = msg.isContentSafe;
+  if (typeof msg.feedbackId === "string" && msg.feedbackId.length > 0)
+    plannerRow.feedback_id = msg.feedbackId;
+  if (typeof msg.planId === "string" && msg.planId.length > 0) plannerRow.plan_id = msg.planId;
+  if (typeof ctx.latencyMs === "number") plannerRow.ms = ctx.latencyMs;
+  timeline.push(plannerRow);
+
+  // Each entry in result[] represents an action that fired. The shape
+  // varies by action type; we surface the most common keys verbatim and
+  // clip large outputs to keep the digest small.
+  for (const r of msg.result ?? []) {
+    if (!r || typeof r !== "object") continue;
+    const obj = r as Record<string, unknown>;
+    functionCalls++;
+    const fn =
+      asString(obj.name) ??
+      asString(obj.functionName) ??
+      asString((obj.function as { name?: string } | undefined)?.name);
+    const outputPreview = clip(JSON.stringify(obj.output ?? obj.result ?? null), MAX_HINT_CHARS);
+    const row: DigestRow = { i: i++, t: "FunctionStep" };
+    if (fn) row.fn = fn;
+    if (outputPreview && outputPreview !== "null" && outputPreview !== '"null"') {
+      row.output_preview = outputPreview;
+    }
+    timeline.push(row);
+  }
+
+  // Citations are surfaced as their own synthetic step type. The runtime
+  // taxonomy doesn't have one, but for the LLM "this answer cited X" is
+  // a self-contained signal and naming it consistently keeps the schema
+  // grep-friendly.
+  for (const c of msg.citedReferences ?? []) {
+    if (!c || typeof c !== "object") continue;
+    const obj = c as Record<string, unknown>;
+    const row: DigestRow = { i: i++, t: "CitedReferenceStep" };
+    const title = asString(obj.title) ?? asString(obj.name);
+    if (title) row.title = clip(title, 120);
+    const url = asString(obj.url) ?? asString(obj.link);
+    if (url) row.url = url;
+    const score = asNumber(obj.relevanceScore) ?? asNumber(obj.score);
+    if (score !== undefined) row.score = score;
+    timeline.push(row);
+  }
+
+  if (msg.isContentSafe === false) {
+    errors.push({
+      type: "PlannerResponseStep",
+      message: "is_content_safe=false on production-agent response",
+    });
+  }
+
+  const stats: DigestStats = {
+    step_count: timeline.length,
+    llm_calls: 0, // production-v1 does not expose LLM call counts
+    vars_updated: 0,
+    topic_changes: 0,
+    function_calls: functionCalls,
+    errors: errors.length,
+  };
+
+  const summaryParts: string[] = [];
+  if (typeof msg.type === "string") summaryParts.push(msg.type);
+  if (typeof ctx.latencyMs === "number") summaryParts.push(`${(ctx.latencyMs / 1000).toFixed(1)}s`);
+  if (msg.isContentSafe === false) summaryParts.push("⚠ unsafe");
+  else if (msg.isContentSafe === true) summaryParts.push("safe");
+  if (functionCalls > 0)
+    summaryParts.push(`${functionCalls} action${functionCalls === 1 ? "" : "s"}`);
+  const summary_line = summaryParts.length > 0 ? summaryParts.join(" · ") : "production-agent turn";
+
+  return {
+    source: "production-v1",
+    turn: {
+      user_input: ctx.userInput,
+      agent_response: typeof msg.message === "string" ? msg.message : undefined,
+      latency_ms: ctx.latencyMs,
+      plan_id: ctx.planId ?? msg.planId,
+      // No trace_file: production-v1 has no fetchable per-plan trace.
+    },
+    timeline,
+    errors,
+    stats,
+    summary_line,
+    notes: [
+      "source=production-v1 — the production agent v1 endpoint does not expose a per-step plan timeline; this digest is a surface summary derived from the send response. For step-by-step traces (LLM events, transitions, variable updates, etc.), use the local `.agent` preview path.",
+    ],
+  };
 }
 
 // Re-export the types we touch so callers don't need to dig.

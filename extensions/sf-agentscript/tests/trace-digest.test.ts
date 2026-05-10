@@ -7,7 +7,11 @@
  */
 
 import { describe, expect, test } from "vitest";
-import { summarizeLastExecution, summarizeTrace } from "../lib/preview/trace-digest.ts";
+import {
+  summarizeLastExecution,
+  summarizeProductionResponse,
+  summarizeTrace,
+} from "../lib/preview/trace-digest.ts";
 import type { LastExecution } from "../lib/eval/types.ts";
 
 const FAKE_PLAN = [
@@ -257,5 +261,126 @@ describe("summarizeLastExecution (eval source)", () => {
     expect(d.timeline).toEqual([]);
     expect(d.stats.step_count).toBe(0);
     expect(d.stats.llm_calls).toBe(0);
+  });
+});
+
+describe("summarizeProductionResponse (production-agent v1 source)", () => {
+  test("surface-only digest: UserInputStep + PlannerResponseStep with response_type / safety / planId", () => {
+    const d = summarizeProductionResponse(
+      [
+        {
+          type: "Inform",
+          planId: "plan-1",
+          isContentSafe: true,
+          feedbackId: "fb-1",
+          message: "Which system do you need to reset your password for?",
+          metrics: {},
+          result: [],
+          citedReferences: [],
+        },
+      ],
+      { userInput: "I forgot my password", latencyMs: 1234 },
+    );
+    expect(d.source).toBe("production-v1");
+    expect(d.turn.user_input).toBe("I forgot my password");
+    expect(d.turn.agent_response).toContain("Which system");
+    expect(d.turn.plan_id).toBe("plan-1");
+    expect(d.turn.latency_ms).toBe(1234);
+    expect(d.timeline).toHaveLength(2);
+    const planner = d.timeline.find((r) => r.t === "PlannerResponseStep");
+    expect(planner?.response_type).toBe("Inform");
+    expect(planner?.is_content_safe).toBe(true);
+    expect(planner?.feedback_id).toBe("fb-1");
+    expect(planner?.plan_id).toBe("plan-1");
+    expect(typeof planner?.response_chars).toBe("number");
+    expect(d.notes?.[0]).toMatch(/production-v1/);
+  });
+
+  test("populates FunctionStep rows when result[] carries action outputs", () => {
+    const d = summarizeProductionResponse(
+      [
+        {
+          type: "Inform",
+          message: "Created case 12345.",
+          isContentSafe: true,
+          result: [
+            { name: "create_case", output: { caseId: "12345", priority: "P2" } },
+            { functionName: "notify_user", result: { sent: true } },
+          ],
+          citedReferences: [],
+        },
+      ],
+      { userInput: "Open a ticket for me", latencyMs: 800 },
+    );
+    const fnRows = d.timeline.filter((r) => r.t === "FunctionStep");
+    expect(fnRows).toHaveLength(2);
+    expect(fnRows[0].fn).toBe("create_case");
+    expect(fnRows[1].fn).toBe("notify_user");
+    expect(d.stats.function_calls).toBe(2);
+    expect(d.summary_line).toContain("2 actions");
+  });
+
+  test("populates CitedReferenceStep rows when citedReferences[] is non-empty", () => {
+    const d = summarizeProductionResponse(
+      [
+        {
+          type: "Inform",
+          message: "Per the policy, vacation accrues at 1.5 days/month.",
+          isContentSafe: true,
+          result: [],
+          citedReferences: [
+            { title: "PTO Policy", url: "https://kb/pto", relevanceScore: 0.94 },
+            { title: "Holiday Calendar", url: "https://kb/holidays" },
+          ],
+        },
+      ],
+      { userInput: "how does PTO work", latencyMs: 1500 },
+    );
+    const cites = d.timeline.filter((r) => r.t === "CitedReferenceStep");
+    expect(cites).toHaveLength(2);
+    expect(cites[0].title).toBe("PTO Policy");
+    expect(cites[0].url).toBe("https://kb/pto");
+    expect(cites[0].score).toBe(0.94);
+    expect(cites[1].title).toBe("Holiday Calendar");
+  });
+
+  test("unsafe content surfaces as an error and decorates the summary line", () => {
+    const d = summarizeProductionResponse(
+      [
+        {
+          type: "Inform",
+          message: "...",
+          isContentSafe: false,
+          result: [],
+          citedReferences: [],
+        },
+      ],
+      { userInput: "...", latencyMs: 100 },
+    );
+    expect(d.errors).toHaveLength(1);
+    expect(d.errors[0].message).toMatch(/is_content_safe=false/);
+    expect(d.summary_line).toContain("⚠");
+  });
+
+  test("start-turn (no userInput) emits PlannerResponseStep only", () => {
+    const d = summarizeProductionResponse([
+      {
+        type: "Inform",
+        message: "Hi! I'm the IT Help Desk bot.",
+        isContentSafe: true,
+        planId: "",
+        result: [],
+        citedReferences: [],
+      },
+    ]);
+    expect(d.timeline).toHaveLength(1);
+    expect(d.timeline[0].t).toBe("PlannerResponseStep");
+  });
+
+  test("empty / missing messages produces a single planner row + notes", () => {
+    const d = summarizeProductionResponse([], { userInput: "hi" });
+    expect(d.source).toBe("production-v1");
+    expect(d.timeline.length).toBeGreaterThanOrEqual(2); // UserInput + PlannerResponse
+    expect(d.notes?.[0]).toMatch(/production-v1/);
   });
 });

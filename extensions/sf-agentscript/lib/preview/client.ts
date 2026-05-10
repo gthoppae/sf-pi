@@ -20,7 +20,7 @@ import { randomUUID } from "node:crypto";
 import type { Connection } from "@salesforce/core";
 import { isSfapRoutingFailure, sfapRequest } from "../eval/sfap.ts";
 import { fetchTrace } from "../eval/trace-client.ts";
-import { summarizeTrace, type TraceDigest } from "./trace-digest.ts";
+import { summarizeProductionResponse, summarizeTrace, type TraceDigest } from "./trace-digest.ts";
 import {
   endSession as endSessionStore,
   getSessionDir,
@@ -91,6 +91,13 @@ export interface PreviewStartResult {
   agentResponse: string;
   startedAt: string;
   sessionDir: string;
+  /**
+   * Surface digest for the initial agent message. Only populated for
+   * production-agent (`api_name`) sessions — local `.agent` preview start
+   * doesn't run the planner yet, so its first digest comes from the first
+   * `sendMessage`.
+   */
+  digest?: TraceDigest;
 }
 
 export interface PreviewSendOptions {
@@ -324,7 +331,8 @@ export async function sendMessage(opts: PreviewSendOptions): Promise<PreviewSend
     planId,
   });
 
-  // Fetch + persist the trace if available.
+  // Fetch + persist the trace if available; otherwise (production-v1) build
+  // a surface digest directly from the send response.
   let traceFile: string | undefined;
   let topic: string | undefined;
   let invokedActions: string[] | undefined;
@@ -353,6 +361,19 @@ export async function sendMessage(opts: PreviewSendOptions): Promise<PreviewSend
     } catch {
       /* trace fetch is non-fatal */
     }
+  } else if (metadata.sessionKind === "api_name") {
+    // Production-agent v1 has no trace endpoint; build a surface digest
+    // from the response itself so the LLM still sees response type, safety
+    // flag, action results, and citations.
+    digest = summarizeProductionResponse(
+      resp.body.messages as Parameters<typeof summarizeProductionResponse>[0],
+      { userInput: opts.message, latencyMs, planId: planId || undefined },
+    );
+    invokedActions = digest.timeline
+      .filter((r) => r.t === "FunctionStep")
+      .map((r) => (r.fn as string | undefined) ?? undefined)
+      .filter((s): s is string => typeof s === "string");
+    if (invokedActions.length === 0) invokedActions = undefined;
   }
 
   // When apex_debug is requested, fetch the latest debug log captured during
@@ -551,7 +572,13 @@ export async function startPreviewByApiName(
     text: initialMsg,
     raw: sessionResp.body.messages,
   });
-  return { sessionId, agentResponse: initialMsg, startedAt: startTime, sessionDir };
+  // Build a surface digest from the welcome message. The user input is
+  // intentionally absent (the start call has no utterance) — the LLM
+  // sees a digest with response_type / safety / planId only.
+  const digest = summarizeProductionResponse(
+    sessionResp.body.messages as Parameters<typeof summarizeProductionResponse>[0],
+  );
+  return { sessionId, agentResponse: initialMsg, startedAt: startTime, sessionDir, digest };
 }
 
 // Re-export read-side helpers for the preview tool.
