@@ -7,7 +7,13 @@
   "defaultEnabled": true,
   "configurable": false,
   "commands": ["/sf-agentscript"],
-  "tools": ["agentscript_compile", "agentscript_inspect", "agentscript_mutate", "agentscript_eval"],
+  "tools": [
+    "agentscript_compile",
+    "agentscript_inspect",
+    "agentscript_mutate",
+    "agentscript_preview",
+    "agentscript_eval"
+  ],
   "events": ["session_start", "session_shutdown", "tool_result"],
   "docs": {
     "summary": "Owns the entire Agent Script lifecycle: authoring assist (compile-on-save), first-class compile tool, multi-turn eval against /einstein/evaluation/v1/tests with planner-trace fetching, and progressive-disclosure skill for the LLM.",
@@ -16,23 +22,34 @@
       "lib/diagnostics.ts",
       "lib/feedback.ts",
       "lib/sdk.ts",
-      "lib/code-actions.ts",
-      "lib/file-classify.ts",
+      "lib/inspect.ts",
+      "lib/mutate.ts",
+      "lib/connection.ts",
+      "lib/tool-types.ts",
+      "lib/eval/sfap.ts",
+      "lib/eval/normalize.ts",
+      "lib/eval/active-ids.ts",
       "lib/eval/orchestrator.ts",
       "lib/eval/eval-client.ts",
       "lib/eval/trace-client.ts",
-      "lib/eval/http.ts",
       "lib/eval/render.ts",
       "lib/eval/persist.ts",
-      "lib/tools/eval-run.ts",
+      "lib/preview/client.ts",
+      "lib/preview/session-store.ts",
       "lib/tools/compile.ts",
+      "lib/tools/inspect.ts",
+      "lib/tools/mutate.ts",
+      "lib/tools/preview.ts",
+      "lib/tools/eval.ts",
       "skills/sf-agentscript/SKILL.md"
     ],
     "safety": [
       "Compile-on-save stays silent on unsupported files and on failed write/edit results.",
-      "Eval API calls go through `sf api request rest` so the active org's auth context is reused without exposing access tokens to extension code.",
+      "Eval, trace, and preview API calls go through @salesforce/core Connection so the active org's auth context is reused; no token leaves jsforce.",
+      "Local-first: compile and validate run via the vendored SDK before any network call.",
       "Trace fetches are idempotent GETs; failures are logged and never fail an eval run.",
-      "5xx-only retry on POST avoids amplifying server-side overload (no Retry-After contract on the Eval API)."
+      "5xx-only retry on POST avoids amplifying server-side overload (no Retry-After contract on the Eval API).",
+      "Preview sessions land under .sfdx/agents/** (sf-guardrail carve-out); rest of .sfdx/** stays blocked."
     ]
   }
 }

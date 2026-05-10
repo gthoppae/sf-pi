@@ -113,11 +113,15 @@ extensions/sf-agentscript/
       threshold.ts          ← implementation module
       trace-client.ts       ← implementation module
       types.ts              ← implementation module
+    preview/
+      client.ts             ← implementation module
+      session-store.ts      ← implementation module
     tools/
       compile.ts            ← implementation module
       eval.ts               ← implementation module
       inspect.ts            ← implementation module
       mutate.ts             ← implementation module
+      preview.ts            ← implementation module
     code-actions.ts         ← implementation module
     connection.ts           ← implementation module
     diagnostics.ts          ← implementation module
@@ -139,6 +143,7 @@ extensions/sf-agentscript/
     file-classify.test.ts   ← unit / smoke test
     inspect.test.ts         ← unit / smoke test
     mutate.test.ts          ← unit / smoke test
+    preview-session-store.test.ts← unit / smoke test
     smoke.test.ts           ← unit / smoke test
     tool-types.test.ts      ← unit / smoke test
   CREDITS.md                ← extension attribution
