@@ -17,7 +17,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { Type } from "typebox";
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
-import { connFromAlias } from "./connection.ts";
+import { connForAgentApi } from "./agent-api-auth.ts";
 import { checkAgentScriptFile } from "./diagnostics.ts";
 import { isAgentScriptFile, resolveToolPath } from "./file-classify.ts";
 import { loadAgentforceSDK } from "./sdk.ts";
@@ -160,7 +160,7 @@ async function actionCheck(
       );
     }
     try {
-      const conn = await connFromAlias(input.target_org);
+      const { conn } = await connForAgentApi(input.target_org);
       const source = await readFile(filePath, "utf8");
       const serverResult = await serverCompile(conn, source);
       if (serverResult.ok) {

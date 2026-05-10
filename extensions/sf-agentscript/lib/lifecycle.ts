@@ -130,7 +130,10 @@ export async function serverCompile(
 // -------------------------------------------------------------------------------------------------
 
 export interface PublishOptions {
+  /** Normal org connection for SOQL / Connect API operations. */
   conn: Connection;
+  /** Named-user JWT connection for `/einstein/ai-agent/*` SFAP routes. Defaults to conn for tests/back-compat. */
+  agentApiConn?: Connection;
   agentSource: string;
   /** AAB / agent DeveloperName. Used for the SOQL existence check + return value. */
   agentApiName: string;
@@ -164,8 +167,10 @@ export async function publishAgent(opts: PublishOptions): Promise<PublishResult>
     }
   }
 
+  const agentApiConn = opts.agentApiConn ?? opts.conn;
+
   log("Server-compiling…");
-  const compileResult = await serverCompile(opts.conn, opts.agentSource);
+  const compileResult = await serverCompile(agentApiConn, opts.agentSource);
   if (compileResult.ok === false) {
     if (
       isSfapRoutingFailure({ status: compileResult.status, body: compileResult.body, endpoint: "" })
@@ -190,7 +195,7 @@ export async function publishAgent(opts: PublishOptions): Promise<PublishResult>
       : `Publishing new agent ${opts.agentApiName}…`,
   );
 
-  const publishResp = await sfapRequest<PublishResponseBody>(opts.conn, {
+  const publishResp = await sfapRequest<PublishResponseBody>(agentApiConn, {
     url,
     method: "POST",
     headers: { "x-client-name": "sf-pi", "content-type": "application/json" },

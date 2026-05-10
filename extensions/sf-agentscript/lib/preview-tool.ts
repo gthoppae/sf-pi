@@ -11,7 +11,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { Type } from "typebox";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { connFromAlias } from "./connection.ts";
+import { connForAgentApi } from "./agent-api-auth.ts";
 import {
   cleanupSessions,
   endPreview,
@@ -205,7 +205,7 @@ async function actionStart(
   if (input.agent_api_name) {
     const agentName = input.agent_name ?? input.agent_api_name;
     try {
-      const conn = await connFromAlias(input.target_org);
+      const { conn } = await connForAgentApi(input.target_org);
       const result = await startPreviewByApiName({
         conn,
         cwd: ctx.cwd,
@@ -251,7 +251,7 @@ async function actionStart(
   const agentName = input.agent_name ?? path.basename(filePath, ".agent");
 
   try {
-    const conn = await connFromAlias(input.target_org);
+    const { conn } = await connForAgentApi(input.target_org);
     const result = await startPreview({
       conn,
       cwd: ctx.cwd,
@@ -308,7 +308,7 @@ async function actionSend(
   stream("Sending message…");
 
   try {
-    const conn = await connFromAlias(input.target_org);
+    const { conn } = await connForAgentApi(input.target_org);
     const result = await sendMessage({
       conn,
       cwd: ctx.cwd,
@@ -355,7 +355,14 @@ async function actionEnd(
   details: Record<string, unknown> | ToolError;
 }> {
   try {
+    let conn;
+    try {
+      ({ conn } = await connForAgentApi(input.target_org));
+    } catch {
+      // Local metadata end should still work if remote auth/bootstrap is unavailable.
+    }
     const result = await endPreview({
+      conn,
       cwd: ctx.cwd,
       agentName: input.agent_name,
       sessionId: input.session_id,
@@ -366,8 +373,15 @@ async function actionEnd(
         ended_at: result.endedAt,
         summary: result.summary,
         metadata: result.metadata,
+        remote_ended: result.remoteEnded,
+        remote_end_error: result.remoteEndError,
       },
-      `🏁 session ${input.session_id.slice(0, 8)}… ended (${result.summary.turns} turns, ${result.summary.plans} plans)`,
+      [
+        `🏁 session ${input.session_id.slice(0, 8)}… ended (${result.summary.turns} turns, ${result.summary.plans} plans)`,
+        result.remoteEnded === false ? `⚠️ ${result.remoteEndError}` : null,
+      ]
+        .filter(Boolean)
+        .join("\n"),
     );
   } catch (err) {
     return toolError(err instanceof Error ? err.message : String(err));
@@ -383,7 +397,7 @@ async function actionTrace(input: ParamsAny): Promise<{
   details: Record<string, unknown> | ToolError;
 }> {
   try {
-    const conn = await connFromAlias(input.target_org);
+    const { conn } = await connForAgentApi(input.target_org);
     const trace = await fetchTrace(conn, input.session_id, input.plan_id);
     if (trace == null) {
       return toolError(

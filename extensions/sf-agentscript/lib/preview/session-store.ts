@@ -30,6 +30,8 @@ export interface PreviewMetadata {
   startTime: string;
   endTime?: string;
   mockMode: "Mock" | "Live Test";
+  /** agent_file = v1.1 preview session; api_name = published-agent v1 session. */
+  sessionKind?: "agent_file" | "api_name";
   planIds: string[];
 }
 
@@ -101,6 +103,7 @@ export async function initSession(
     agentName: meta.agentName,
     startTime: meta.startTime,
     mockMode: meta.mockMode,
+    sessionKind: meta.sessionKind,
     planIds: meta.planIds ?? [],
   };
   await writeFile(path.join(dir, "metadata.json"), JSON.stringify(full, null, 2), "utf8");

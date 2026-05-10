@@ -22,6 +22,7 @@
 import { readFile } from "node:fs/promises";
 import { Type } from "typebox";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { connForAgentApi } from "./agent-api-auth.ts";
 import { connFromAlias } from "./connection.ts";
 import {
   runEval,
@@ -237,8 +238,18 @@ async function actionRun(
   let result: RunEvalResult;
   try {
     const conn = await connFromAlias(input.target_org);
+    let traceConn;
+    if ((input.traces_mode ?? "failed") !== "off") {
+      try {
+        ({ conn: traceConn } = await connForAgentApi(input.target_org));
+      } catch {
+        // Trace fetches are a debugging aid and already non-fatal; run eval even
+        // when the named-user JWT bootstrap is unavailable.
+      }
+    }
     result = await runEval({
       conn,
+      traceConn,
       targetOrg: input.target_org ?? conn.getUsername() ?? "<default>",
       spec,
       agentApiName: input.agent_api_name,
@@ -414,7 +425,7 @@ async function actionTrace(input: ParamsAny): Promise<{
   details: Record<string, unknown> | ToolError;
 }> {
   try {
-    const conn = await connFromAlias(input.target_org);
+    const { conn } = await connForAgentApi(input.target_org);
     const trace = await fetchTrace(conn, input.session_id, input.plan_id, {
       timeoutMs: input.timeout_ms ?? 60_000,
     });

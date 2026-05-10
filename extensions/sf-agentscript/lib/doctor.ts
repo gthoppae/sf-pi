@@ -11,6 +11,7 @@ import { existsSync } from "node:fs";
 import { access, constants } from "node:fs/promises";
 import type { ExtensionDoctorReport } from "../../../lib/common/doctor/registry.ts";
 import { loadAgentforceSDK, VENDORED_SDK_PATH } from "./sdk.ts";
+import { probeSfapReadiness, type SfapReadinessReport } from "./sfap-readiness.ts";
 
 // -------------------------------------------------------------------------------------------------
 // Status shape
@@ -27,13 +28,14 @@ export interface DoctorStatus {
   salesforceCoreVersion?: string;
   sfdxAgentsWritable: boolean;
   sfdxAgentsPath: string;
+  sfapReadiness?: SfapReadinessReport;
 }
 
 // -------------------------------------------------------------------------------------------------
 // Probe
 // -------------------------------------------------------------------------------------------------
 
-export async function probeDoctor(cwd: string): Promise<DoctorStatus> {
+export async function probeDoctor(cwd: string, targetOrg?: string): Promise<DoctorStatus> {
   const sdk = await loadAgentforceSDK();
 
   const dialectsProbed: string[] = [];
@@ -107,6 +109,15 @@ export async function probeDoctor(cwd: string): Promise<DoctorStatus> {
     sfdxAgentsWritable = false;
   }
 
+  let sfapReadiness: SfapReadinessReport | undefined;
+  if (targetOrg) {
+    try {
+      sfapReadiness = await probeSfapReadiness(targetOrg);
+    } catch {
+      // Keep the core doctor useful even when the org readiness probe fails.
+    }
+  }
+
   return {
     sdkLoaded,
     vendoredSdkPath: VENDORED_SDK_PATH,
@@ -117,6 +128,7 @@ export async function probeDoctor(cwd: string): Promise<DoctorStatus> {
     salesforceCoreVersion,
     sfdxAgentsWritable,
     sfdxAgentsPath,
+    sfapReadiness,
   };
 }
 
@@ -229,5 +241,31 @@ export function renderDoctorReport(status: DoctorStatus): string {
       : `⚠️  .sfdx/agents/: not writable (preview sessions will fail) — ${status.sfdxAgentsPath}`,
   );
 
+  if (status.sfapReadiness) {
+    const r = status.sfapReadiness;
+    lines.push("", `SFAP readiness (${r.target_org}):`);
+    lines.push(renderSfapProbe("Named-user JWT", r.named_user_jwt));
+    lines.push(renderSfapProbe("Evaluation API", r.eval_api));
+    lines.push(renderSfapProbe("AI Agent authoring", r.authoring_api));
+    lines.push(renderSfapProbe("AI Agent preview", r.preview_api));
+    lines.push(
+      "   note: /einstein/evaluation/* and /einstein/ai-agent/* are separately gated route families.",
+    );
+  }
+
   return lines.join("\n");
+}
+
+function renderSfapProbe(
+  label: string,
+  probe: { status: string; detail: string; http_status?: number },
+): string {
+  const icon =
+    probe.status === "ok" || probe.status === "reachable"
+      ? "✅"
+      : probe.status === "skipped"
+        ? "⏭️"
+        : "⚠️";
+  const http = probe.http_status ? ` HTTP ${probe.http_status}` : "";
+  return `${icon} ${label}:${http} ${probe.detail}`;
 }

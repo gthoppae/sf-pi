@@ -45,6 +45,9 @@ const MESSAGES_URL = (sid: string): string =>
 // startPreviewByApiName when the LLM wants to converse with a live agent.
 const PROD_AGENT_SESSION_URL = (botId: string): string =>
   `https://api.salesforce.com/einstein/ai-agent/v1/agents/${botId}/sessions`;
+const PROD_SESSION_URL = (sid: string): string =>
+  `https://api.salesforce.com/einstein/ai-agent/v1/sessions/${sid}`;
+const PROD_MESSAGES_URL = (sid: string): string => `${PROD_SESSION_URL(sid)}/messages`;
 
 interface CompileResponseBody {
   status?: string;
@@ -116,6 +119,7 @@ export interface PreviewStartByApiNameOptions {
 }
 
 export interface PreviewEndOptions {
+  conn?: Connection;
   cwd: string;
   agentName: string;
   sessionId: string;
@@ -125,6 +129,8 @@ export interface PreviewEndResult {
   endedAt: string;
   metadata: PreviewMetadata;
   summary: { turns: number; plans: number };
+  remoteEnded?: boolean;
+  remoteEndError?: string;
 }
 
 // -------------------------------------------------------------------------------------------------
@@ -239,6 +245,7 @@ export async function startPreview(opts: PreviewStartOptions): Promise<PreviewSt
     agentName: opts.agentName,
     startTime,
     mockMode: opts.mockMode,
+    sessionKind: "agent_file",
   });
   const initialMsg = (sessionResp.body.messages ?? []).map((m) => m.message ?? "").join("\n");
   await logTurn(sessionDir, {
@@ -259,6 +266,11 @@ export async function startPreview(opts: PreviewStartOptions): Promise<PreviewSt
 
 export async function sendMessage(opts: PreviewSendOptions): Promise<PreviewSendResult> {
   const sessionDir = getSessionDir(opts.cwd, opts.agentName, opts.sessionId);
+  const { metadata } = await loadSession(opts.cwd, opts.agentName, opts.sessionId);
+  const messageUrl =
+    metadata.sessionKind === "api_name"
+      ? PROD_MESSAGES_URL(opts.sessionId)
+      : MESSAGES_URL(opts.sessionId);
 
   // Log the user turn first so transcripts are append-only and crash-safe.
   await logTurn(sessionDir, {
@@ -271,7 +283,7 @@ export async function sendMessage(opts: PreviewSendOptions): Promise<PreviewSend
 
   const start = Date.now();
   const resp = await sfapRequest<SessionMessageBody>(opts.conn, {
-    url: MESSAGES_URL(opts.sessionId),
+    url: messageUrl,
     method: "POST",
     headers: { "x-client-name": "sf-pi", "content-type": "application/json" },
     body: {
@@ -305,7 +317,7 @@ export async function sendMessage(opts: PreviewSendOptions): Promise<PreviewSend
   let traceFile: string | undefined;
   let topic: string | undefined;
   let invokedActions: string[] | undefined;
-  if (planId) {
+  if (planId && metadata.sessionKind !== "api_name") {
     try {
       const trace = await fetchTrace(opts.conn, opts.sessionId, planId, { timeoutMs: 60_000 });
       if (trace) {
@@ -364,9 +376,29 @@ async function fetchLatestApexDebugLog(
 
 export async function endPreview(opts: PreviewEndOptions): Promise<PreviewEndResult> {
   const sessionDir = getSessionDir(opts.cwd, opts.agentName, opts.sessionId);
+  const { metadata: beforeEnd, transcript } = await loadSession(
+    opts.cwd,
+    opts.agentName,
+    opts.sessionId,
+  );
+
+  let remoteEnded: boolean | undefined;
+  let remoteEndError: string | undefined;
+  if (opts.conn && beforeEnd.sessionKind === "api_name") {
+    const endResp = await sfapRequest<unknown>(opts.conn, {
+      url: PROD_SESSION_URL(opts.sessionId),
+      method: "DELETE",
+      headers: { "x-session-end-reason": "UserRequest" },
+      timeoutMs: 30_000,
+    });
+    remoteEnded = endResp.status >= 200 && endResp.status < 300;
+    if (!remoteEnded) {
+      remoteEndError = `Remote session end failed (HTTP ${endResp.status}): ${JSON.stringify(endResp.body).slice(0, 300)}`;
+    }
+  }
+
   const endedAt = new Date().toISOString();
   const metadata = await endSessionStore(sessionDir, endedAt);
-  const { transcript } = await loadSession(opts.cwd, opts.agentName, opts.sessionId);
   return {
     endedAt,
     metadata,
@@ -374,6 +406,8 @@ export async function endPreview(opts: PreviewEndOptions): Promise<PreviewEndRes
       turns: transcript.filter((t) => t.role === "user").length,
       plans: metadata.planIds.length,
     },
+    remoteEnded,
+    remoteEndError,
   };
 }
 
@@ -383,6 +417,20 @@ export async function endPreview(opts: PreviewEndOptions): Promise<PreviewEndRes
 
 function soqlEscape(s: string): string {
   return s.replace(/'/g, "''");
+}
+
+export function computePublishedBypassUser(bot?: {
+  AgentType?: string;
+  BotUserId?: string | null;
+}): boolean {
+  if (bot?.AgentType === "AgentforceEmployeeAgent") return false;
+  return Boolean(bot?.BotUserId);
+}
+
+function isInvalidUserIdStartFailure(resp: { status: number; body: unknown }): boolean {
+  if (resp.status < 400) return false;
+  const text = typeof resp.body === "string" ? resp.body : JSON.stringify(resp.body ?? {});
+  return /Invalid user ID provided on start session/i.test(text);
 }
 
 function extractTopicAndActions(trace: unknown): { topic?: string; invokedActions?: string[] } {
@@ -411,27 +459,42 @@ export async function startPreviewByApiName(
 ): Promise<PreviewStartResult> {
   // Resolve BotDefinition.Id by api name. We don't try to validate Active here;
   // the server endpoint will fail clearly if it can't route.
-  const r = await opts.conn.query<{ Id: string }>(
-    `SELECT Id FROM BotDefinition WHERE DeveloperName='${soqlEscape(opts.agentApiName)}'`,
+  const r = await opts.conn.query<{
+    Id: string;
+    AgentType?: string;
+    BotUserId?: string | null;
+  }>(
+    `SELECT Id, AgentType, BotUserId FROM BotDefinition WHERE DeveloperName='${soqlEscape(opts.agentApiName)}'`,
   );
-  const botId = r.records[0]?.Id;
+  const bot = r.records[0];
+  const botId = bot?.Id;
   if (!botId) {
     throw new Error(
       `Agent '${opts.agentApiName}' not found in the org. Use agentscript_lifecycle action='list_versions' to discover agents.`,
     );
   }
 
-  const sessionResp = await sfapRequest<SessionStartBody>(opts.conn, {
+  const startBody = (bypassUser: boolean): Record<string, unknown> => ({
+    externalSessionKey: randomUUID(),
+    instanceConfig: { endpoint: opts.conn.instanceUrl },
+    streamingCapabilities: { chunkTypes: ["Text"] },
+    bypassUser,
+  });
+  const bypassUser = computePublishedBypassUser(bot);
+  let sessionResp = await sfapRequest<SessionStartBody>(opts.conn, {
     url: PROD_AGENT_SESSION_URL(botId),
     method: "POST",
     headers: { "x-client-name": "sf-pi", "content-type": "application/json" },
-    body: {
-      externalSessionKey: randomUUID(),
-      instanceConfig: { endpoint: opts.conn.instanceUrl },
-      streamingCapabilities: { chunkTypes: ["Text"] },
-      bypassUser: true,
-    },
+    body: startBody(bypassUser),
   });
+  if (bypassUser && isInvalidUserIdStartFailure(sessionResp)) {
+    sessionResp = await sfapRequest<SessionStartBody>(opts.conn, {
+      url: PROD_AGENT_SESSION_URL(botId),
+      method: "POST",
+      headers: { "x-client-name": "sf-pi", "content-type": "application/json" },
+      body: startBody(false),
+    });
+  }
   if (sessionResp.status < 200 || sessionResp.status >= 300) {
     if (isSfapRoutingFailure(sessionResp)) {
       throw new Error(
@@ -454,6 +517,7 @@ export async function startPreviewByApiName(
     agentName: opts.agentApiName,
     startTime,
     mockMode: "Live Test",
+    sessionKind: "api_name",
   });
   const initialMsg = (sessionResp.body.messages ?? []).map((m) => m.message ?? "").join("\n");
   await logTurn(sessionDir, {

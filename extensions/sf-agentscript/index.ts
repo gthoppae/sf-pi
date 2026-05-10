@@ -216,7 +216,8 @@ async function handleAgentScriptCommand(
     return;
   }
   if (subcommand === "doctor") {
-    const status = await probeDoctor(ctx.cwd);
+    const targetOrg = parseDoctorTargetOrg(args);
+    const status = await probeDoctor(ctx.cwd, targetOrg);
     await emitOutput(
       ctx,
       "Agent Script doctor",
@@ -274,13 +275,25 @@ async function emitOutput(
   }
 }
 
+function parseDoctorTargetOrg(args: string[]): string | undefined {
+  for (let i = 0; i < args.length; i++) {
+    const arg = args[i];
+    if ((arg === "--org" || arg === "--target-org" || arg === "-o") && args[i + 1]) {
+      return args[i + 1];
+    }
+    if (arg.startsWith("--org=")) return arg.slice("--org=".length);
+    if (arg.startsWith("--target-org=")) return arg.slice("--target-org=".length);
+  }
+  return undefined;
+}
+
 function renderHelp(): string {
   return [
     "sf-agentscript — Agent Script lifecycle (authoring + compile + eval)",
     "",
     "Commands:",
     "  /sf-agentscript                  Open status & controls panel",
-    "  /sf-agentscript doctor           Show SDK status + vendored bundle path",
+    "  /sf-agentscript doctor [--org A] Show SDK status + optional SFAP readiness for org A",
     "  /sf-agentscript check <file>     Run one manual compile diagnostic pass",
     "  /sf-agentscript eval <spec.json> [--org A] [--agent N] [--traces failed|all|off]",
     "                                   [--concurrency N] [--prompt-chars N] [--verbose]",

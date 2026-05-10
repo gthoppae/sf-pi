@@ -50,8 +50,10 @@ import type {
 // -------------------------------------------------------------------------------------------------
 
 export interface RunEvalOptions {
-  /** Caller-resolved Connection. Required. */
+  /** Caller-resolved Connection for Evaluation API + SOQL. Required. */
   conn: Connection;
+  /** Optional named-user JWT connection for `/einstein/ai-agent/*` trace fetches. */
+  traceConn?: Connection;
   /** sf CLI alias / username. Recorded in metadata. Required. */
   targetOrg: string;
   spec: EvalSpec;
@@ -177,7 +179,10 @@ export async function runEval(opts: RunEvalOptions): Promise<RunEvalResult> {
       log(
         `Fetching ${unique} planner trace(s) (mode=${tracesMode}, concurrency=${Math.min(unique, concurrency)})…`,
       );
-      traces = await fetchTracesConcurrent(opts.conn, planKeys, { concurrency, log });
+      traces = await fetchTracesConcurrent(opts.traceConn ?? opts.conn, planKeys, {
+        concurrency,
+        log,
+      });
       const ok = Array.from(traces.values()).filter((v) => v != null).length;
       if (ok !== unique) {
         log(`  trace fetch: ${ok}/${unique} succeeded (missing planner data is non-fatal)`);

@@ -21,6 +21,7 @@ import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { Type } from "typebox";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
+import { connForAgentApi } from "./agent-api-auth.ts";
 import { connFromAlias } from "./connection.ts";
 import { isAgentScriptFile, resolveToolPath } from "./file-classify.ts";
 import { activateVersion, deactivateVersion, listVersions, publishAgent } from "./lifecycle.ts";
@@ -165,8 +166,10 @@ async function actionPublish(
 
   try {
     const conn = await connFromAlias(input.target_org);
+    const { conn: agentApiConn } = await connForAgentApi(input.target_org);
     const result = await publishAgent({
       conn,
+      agentApiConn,
       agentSource: source,
       agentApiName,
       activate: input.activate ?? false,

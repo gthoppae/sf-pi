@@ -96,6 +96,7 @@ extensions/sf-agentscript/
     templates/
       agentforce-default.ts ← implementation module
       minimal.ts            ← implementation module
+    agent-api-auth.ts       ← implementation module
     code-actions.ts         ← implementation module
     compile-tool.ts         ← implementation module
     connection.ts           ← implementation module
@@ -114,9 +115,11 @@ extensions/sf-agentscript/
     mutate.ts               ← implementation module
     preview-tool.ts         ← implementation module
     sdk.ts                  ← implementation module
+    sfap-readiness.ts       ← implementation module
     tool-types.ts           ← implementation module
     types.ts                ← implementation module
   tests/
+    agent-api-auth.test.ts  ← unit / smoke test
     code-actions.test.ts    ← unit / smoke test
     connection.test.ts      ← unit / smoke test
     create.test.ts          ← unit / smoke test
@@ -131,6 +134,7 @@ extensions/sf-agentscript/
     inspect.test.ts         ← unit / smoke test
     mutate-dry-run.test.ts  ← unit / smoke test
     mutate.test.ts          ← unit / smoke test
+    preview-agent-api.test.ts← unit / smoke test
     preview-session-store.test.ts← unit / smoke test
     self-recovery.test.ts   ← unit / smoke test
     smoke.test.ts           ← unit / smoke test

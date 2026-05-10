@@ -23,7 +23,7 @@ import type { Connection } from "@salesforce/core";
 // Public types
 // -------------------------------------------------------------------------------------------------
 
-export type HttpMethod = "GET" | "POST";
+export type HttpMethod = "GET" | "POST" | "DELETE";
 
 export interface SfapRequest {
   /** Absolute URL on api.salesforce.com — the host gets rewritten on fallback. */
