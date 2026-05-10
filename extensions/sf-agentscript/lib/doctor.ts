@@ -7,6 +7,8 @@
  */
 
 import path from "node:path";
+import { existsSync } from "node:fs";
+import { access, constants } from "node:fs/promises";
 import type { ExtensionDoctorReport } from "../../../lib/common/doctor/registry.ts";
 import { loadAgentforceSDK, VENDORED_SDK_PATH } from "./sdk.ts";
 
@@ -20,13 +22,18 @@ export interface DoctorStatus {
   dialectsProbed: string[];
   loadError?: string;
   upstreamNote: string;
+  /** P7 additions — health checks beyond "SDK loaded". */
+  salesforceCoreResolved: boolean;
+  salesforceCoreVersion?: string;
+  sfdxAgentsWritable: boolean;
+  sfdxAgentsPath: string;
 }
 
 // -------------------------------------------------------------------------------------------------
 // Probe
 // -------------------------------------------------------------------------------------------------
 
-export async function probeDoctor(_cwd: string): Promise<DoctorStatus> {
+export async function probeDoctor(cwd: string): Promise<DoctorStatus> {
   const sdk = await loadAgentforceSDK();
 
   const dialectsProbed: string[] = [];
@@ -36,8 +43,6 @@ export async function probeDoctor(_cwd: string): Promise<DoctorStatus> {
   if (sdk) {
     sdkLoaded = true;
     try {
-      // The vendored agentforce bundle exposes the agentforce dialect; probe
-      // it so the doctor report confirms basic SDK health, not just a load.
       const resolved = sdk.resolveDialect("", { dialects: [sdk.agentforceDialect] });
       dialectsProbed.push(resolved.dialect.name);
     } catch (error) {
@@ -64,12 +69,54 @@ export async function probeDoctor(_cwd: string): Promise<DoctorStatus> {
     // Ignore — we just fall back to the default note.
   }
 
+  // P7: @salesforce/core resolves?
+  let salesforceCoreResolved = false;
+  let salesforceCoreVersion: string | undefined;
+  try {
+    // Use a dynamic import so a missing dep doesn't fail the whole probe.
+    const core = await import("@salesforce/core");
+    salesforceCoreResolved = typeof core.Org?.create === "function";
+    try {
+      const fs = await import("node:fs/promises");
+      const pkgPath = await import.meta.resolve?.("@salesforce/core/package.json");
+      if (pkgPath) {
+        const url = new URL(pkgPath);
+        const raw = await fs.readFile(url.pathname, "utf8");
+        const parsed = JSON.parse(raw) as { version?: string };
+        salesforceCoreVersion = parsed.version;
+      }
+    } catch {
+      /* version is best-effort */
+    }
+  } catch {
+    /* dep missing */
+  }
+
+  // P7: .sfdx/agents/ writable? Create the dir if missing (it's our session
+  // store target). sf-guardrail allows it via the carve-out.
+  const sfdxAgentsPath = path.join(cwd, ".sfdx", "agents");
+  let sfdxAgentsWritable: boolean;
+  try {
+    const fs = await import("node:fs/promises");
+    if (!existsSync(sfdxAgentsPath)) {
+      await fs.mkdir(sfdxAgentsPath, { recursive: true });
+    }
+    await access(sfdxAgentsPath, constants.W_OK);
+    sfdxAgentsWritable = true;
+  } catch {
+    sfdxAgentsWritable = false;
+  }
+
   return {
     sdkLoaded,
     vendoredSdkPath: VENDORED_SDK_PATH,
     dialectsProbed,
     loadError,
     upstreamNote,
+    salesforceCoreResolved,
+    salesforceCoreVersion,
+    sfdxAgentsWritable,
+    sfdxAgentsPath,
   };
 }
 
@@ -112,12 +159,44 @@ export async function runExtensionDoctor(cwd: string): Promise<ExtensionDoctorRe
     });
   }
 
-  return {
-    extensionId: "sf-agentscript",
-    title: "SF Agent Script",
-    checks,
-    summary: status.sdkLoaded ? "\u2713 SDK loaded" : "\u2717 SDK failed to load",
-  };
+  if (status.salesforceCoreResolved) {
+    checks.push({
+      id: "agentscript.salesforce-core",
+      severity: "ok",
+      title: `@salesforce/core resolved${status.salesforceCoreVersion ? ` (v${status.salesforceCoreVersion})` : ""}`,
+      detail: "Connection.request transport active.",
+    });
+  } else {
+    checks.push({
+      id: "agentscript.salesforce-core",
+      severity: "error",
+      title: "@salesforce/core not resolvable",
+      detail: "Eval, trace, and preview tools require @salesforce/core.",
+      fix: "Run `npm install` at the repo root.",
+    });
+  }
+
+  if (status.sfdxAgentsWritable) {
+    checks.push({
+      id: "agentscript.sfdx-agents-writable",
+      severity: "ok",
+      title: ".sfdx/agents/ is writable",
+      detail: status.sfdxAgentsPath,
+    });
+  } else {
+    checks.push({
+      id: "agentscript.sfdx-agents-writable",
+      severity: "warn",
+      title: ".sfdx/agents/ is not writable",
+      detail: status.sfdxAgentsPath,
+      fix: "Confirm sf-guardrail allows .sfdx/agents/** (carve-out) and the directory is not read-only.",
+    });
+  }
+
+  const errorCount = checks.filter((c) => c.severity === "error").length;
+  const summary = errorCount === 0 ? "\u2713 Healthy" : `\u2717 ${errorCount} issue(s)`;
+
+  return { extensionId: "sf-agentscript", title: "SF Agent Script", checks, summary };
 }
 
 export function renderDoctorReport(status: DoctorStatus): string {
@@ -135,6 +214,20 @@ export function renderDoctorReport(status: DoctorStatus): string {
     if (status.loadError) lines.push(`   reason: ${status.loadError}`);
     lines.push(`   tip: re-run scripts/sync-agentforce-sdk.mjs or reinstall sf-pi.`);
   }
+
+  if (status.salesforceCoreResolved) {
+    lines.push(
+      `✅ @salesforce/core: resolved${status.salesforceCoreVersion ? ` (v${status.salesforceCoreVersion})` : ""}`,
+    );
+  } else {
+    lines.push(`❌ @salesforce/core: not resolvable — run \`npm install\``);
+  }
+
+  lines.push(
+    status.sfdxAgentsWritable
+      ? `✅ .sfdx/agents/: writable`
+      : `⚠️  .sfdx/agents/: not writable (preview sessions will fail) — ${status.sfdxAgentsPath}`,
+  );
 
   return lines.join("\n");
 }

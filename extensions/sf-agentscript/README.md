@@ -150,6 +150,7 @@ extensions/sf-agentscript/
     inspect.test.ts         ← unit / smoke test
     mutate.test.ts          ← unit / smoke test
     preview-session-store.test.ts← unit / smoke test
+    self-recovery.test.ts   ← unit / smoke test
     smoke.test.ts           ← unit / smoke test
     tool-types.test.ts      ← unit / smoke test
   CREDITS.md                ← extension attribution

@@ -1,117 +1,172 @@
 ---
 name: sf-agentscript
-description: Agent Script lifecycle — author, compile, and regression-test `.agent` files. Use for in-process compile-on-save, multi-turn eval against the Salesforce Evaluation API, planner-trace fetching, and Active BotVersion resolution.
+description: Agent Script lifecycle — create, inspect, correct, and self-recover when authoring `.agent` files. Six tools for the four-verb loop, all running on the local vendored SDK with a thin @salesforce/core Connection layer for live-org operations.
 ---
 
 # SF Agent Script
 
-Single plugin owning the entire Agent Script developer loop: authoring
-assist, compile, and multi-turn regression testing. Use this skill when
-the user is editing `.agent` files, debugging an Agentforce agent, or
-running regression suites against the Salesforce Evaluation API.
+Single plugin that owns the entire `.agent` developer loop:
+**create → inspect → correct (mutate) → self-recover** (preview + eval).
+Use this skill whenever the user is editing `.agent` files, debugging an
+Agentforce agent, or running regression suites against the Salesforce
+Evaluation API.
 
-## Tool ordering
+## The six tools
 
-| When…                                                | Use                                                                           |
-| ---------------------------------------------------- | ----------------------------------------------------------------------------- |
-| User edited a `.agent` file and wants quick feedback | `agentscript_compile` (or just save — the on-save hook runs it automatically) |
-| User wants to run a regression suite                 | `agentscript_eval_run`                                                        |
-| Previous run returned a summary + run_id (large run) | `agentscript_eval_get_failure`                                                |
-| Need deeper context than llmEvents inline            | `agentscript_eval_trace`                                                      |
-| Authoring a spec and need concrete ids               | `agentscript_eval_resolve`                                                    |
+| Tool                  | Action(s)                                                        | What it does                                                                                                                                                                                  |
+| --------------------- | ---------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agentscript_compile` | (single)                                                         | Local-first compile via the vendored SDK. ~10ms. Returns diagnostics + `quick_fixes` with `apply_via` hints pointing at `agentscript_mutate`.                                                 |
+| `agentscript_inspect` | (single)                                                         | Walks the parsed AST and returns a navigable graph (topics, subagents, variables, actions, line numbers, `@`-references). Use this **instead of re-reading** the file — ~200 tokens vs ~3000. |
+| `agentscript_create`  | (single)                                                         | Scaffolds a new `.agent` + `bundle-meta.xml`. Local-validates before writing. Returns `next_steps` you can chain.                                                                             |
+| `agentscript_mutate`  | `set_field` / `rename` / `insert` / `delete` / `apply_quick_fix` | AST-safe edits via `Document.mutateComponent`; coordinate fallback for `apply_quick_fix`. Always re-compiles after writing — `diagnostics_after` is in the same turn.                         |
+| `agentscript_preview` | `start` / `send` / `end` / `trace` / `cleanup`                   | Live preview against the org. Local-compiles before each `start`. Sessions land at `.sfdx/agents/<id>/sessions/<sid>/`. Streams progress on `send`.                                           |
+| `agentscript_eval`    | `run` / `get_failure` / `trace` / `resolve_active`               | Multi-turn regression spec runner. Streams progress mid-flight. Hybrid result (inline failures small / `run_id` pointer big).                                                                 |
 
-## Default workflow
+## The self-recovery loop
 
-1. **Edit `.agent`** → on-save hook compiles in-process and posts `LSP feedback:` if anything is off.
-2. **Run regression** → `agentscript_eval_run` with the spec path.
-3. **Triage failures** → for each failed test the inline `failures` array carries
-   the LLM-debug context (utterance, agent reply, topic, llmEvents, executionHistory,
-   plugins, state) plus paths to per-turn planner traces.
-4. **Fix the `.agent`** → compile-on-save validates the change.
-5. **Re-run** → ideally a green eval.
+```
+USER: "Fix the billing topic so it always verifies before pulling balance."
 
-## How the eval API run actually works
+LLM: agentscript_inspect path=...Billing_Bot.agent
+  ← topics[billing] action_refs missing verify_customer; structure tells the
+    LLM exactly where to mutate without re-reading the file.
 
-- POST `/einstein/evaluation/v1/tests` (5 tests / batch hard limit).
-- All batches fan out concurrently (default `concurrency: 8`).
-- Endpoint fallback: `api → test.api → dev.api` on 404 (sandbox-safe).
-- 5xx-only retry with jittered exponential backoff (1s / 2s / 4s).
-- HTML entity decoding on every response string (typography preserved).
-- Planner trace GET `/einstein/ai-agent/v1.1/preview/sessions/{sid}/plans/{pid}`
-  fans out for failed tests by default.
+LLM: agentscript_mutate {op: "set_field", path: ..., component: "topic.billing",
+                          field: "actions", value: ["verify_customer", "pull_balance"]}
+  ← applied_via:"ast", diagnostics_after:[]   (same turn)
+
+LLM: agentscript_preview {action: "start", agent_file: ..., mock_mode: "Live Test"}
+LLM: agentscript_preview {action: "send", session_id, message: "what's my balance?"}
+  ← topic:"billing", invoked_actions:["verify_customer", "pull_balance"]   ✓
+
+LLM: agentscript_eval {action: "run", spec_path: "specs/billing.json"}
+  ← 12/12 passed
+```
+
+## Tool ordering — when to use which
+
+| When…                                                 | Use                                                                              |
+| ----------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Need the structure of a `.agent` file                 | `agentscript_inspect` (NOT `read`)                                               |
+| Compile-on-save reported diagnostics                  | `agentscript_compile` (auto-runs on save anyway)                                 |
+| Want to fix a diagnostic                              | Use the `apply_via` hint on the quick fix → `agentscript_mutate apply_quick_fix` |
+| Want to change a topic description / variable default | `agentscript_mutate set_field`                                                   |
+| Want to migrate `topic.X` → `subagent.X`              | `agentscript_mutate rename`                                                      |
+| Want a new agent from scratch                         | `agentscript_create`                                                             |
+| Want to verify one utterance against the org          | `agentscript_preview send`                                                       |
+| Want a full regression run                            | `agentscript_eval action=run`                                                    |
+| Run was big, drilling into one failure                | `agentscript_eval action=get_failure`                                            |
+| Need deeper context than llmEvents                    | `agentscript_eval action=trace`                                                  |
+| Spec needs concrete ids                               | `agentscript_eval action=resolve_active`                                         |
+
+## Local-first execution policy
+
+Compile, inspect, mutate, validate, normalize — all run **locally** via the
+vendored `@agentscript/agentforce` SDK. No auth, no network, ~10ms per check.
+
+The only network calls happen on:
+
+- `agentscript_preview start` (server compile + session start) — local-validated first
+- `agentscript_preview send` (send message) — sandbox-routed via SFAP host fallback
+- `agentscript_preview trace` and `agentscript_eval` — same SFAP transport
+- SOQL via `Connection.query` for `resolve_active` and the `bypassUser` check
+
+`agentscript_eval action=run` does a synchronous local pre-flight (compile +
+normalize + ref resolution) before the first network call — saves a
+30-second eval round trip when a typo could have been caught in 10ms.
+
+## Programmatic error recovery
+
+Every tool error returns:
+
+```ts
+{ ok: false, error: string, suggestion?: string,
+  recover_via?: { tool: string, params: Record<string, unknown> } }
+```
+
+When `recover_via` is set, dispatch that tool call directly — no prose
+parsing required. Common cases:
+
+| Error                                          | recover_via                                      |
+| ---------------------------------------------- | ------------------------------------------------ |
+| `eval action=run` says "Agent X not found"     | `eval action=resolve_active agent_api_name=X`    |
+| `eval action=run` says "spec uses $active\_\*" | `eval action=resolve_active`                     |
+| Any tool says "SDK unavailable"                | `sf-agentscript` (open `/sf-agentscript doctor`) |
+| `mutate` says "has parse errors"               | `agentscript_compile` to see the errors first    |
+| `create` says "exists"                         | same `create` call with `overwrite: true`        |
+| `preview start` says "Local compile rejected"  | `agentscript_compile` on the file                |
 
 ## Disk artifacts
 
-Every run writes to `<cwd>/.pi/state/sf-agentscript/runs/<run_id>/`:
+### Eval runs
+
+`<cwd>/.pi/state/sf-agentscript/runs/<run_id>/`:
 
 ```
-<run_dir>/
-├── metadata.json        # spec, org, version, timing, totals, latency
-├── raw.json             # full HTML-decoded merged eval response
-├── transcript.jsonl     # one entry per turn, sortable + diff-able
-├── failures.jsonl       # one entry per failed test, LLM-shaped
-└── traces/<planId>.json # per-turn planner traces (failed tests by default)
+metadata.json        # spec, org, version, timing, totals, latency summary
+raw.json             # full HTML-decoded merged eval response
+transcript.jsonl     # one line per turn, sortable + diff-able
+failures.jsonl       # one line per failed test, LLM-shaped
+traces/<planId>.json # per-turn planner traces (failed tests by default)
 ```
 
-`failures.jsonl` is the LLM-debug contract. Each line is a self-contained
-`FailureRecord` with utterance, agent response, topic, invokedActions,
-latency, llmEvents (prompt + literal LLM response), executionHistory
-(last 5), plugins, filtered stateVariables, and absolute paths to the
-trace files.
+`failures.jsonl` is the LLM-debug contract — every line is a self-contained
+`FailureRecord` with utterance, agent_response, topic, llmEvents (prompt +
+literal LLM response), executionHistory (last 5), plugins, filtered
+stateVariables, plan_id, and absolute paths to the per-turn planner trace
+files. Each record carries a `trace_hint` describing the trace JSON shape so
+you know what's inside before opening it.
 
-## Spec format
+### Preview sessions
 
-The eval module accepts the raw `/einstein/evaluation/v1/tests` payload
-plus three placeholder strings auto-resolved against the live org's
-**Active** BotVersion (not the latest):
+`<cwd>/.sfdx/agents/<agentName>/sessions/<sessionId>/` (Salesforce-standard
+layout; sf-guardrail allows `.sfdx/agents/**` specifically):
 
-- `$active_bot_id` → `BotDefinition.Id` for the agent
-- `$active_bot_version_id` → `BotVersion.Id` of the Active version
-- `$active_planner_id` → `GenAiPlannerDefinition.Id` matching `<agent>_v<n>`
+```
+metadata.json        # sessionId, agentName, startTime, endTime?, mockMode, planIds[]
+transcript.jsonl     # append-only turn log
+traces/<planId>.json # full PlannerResponse per turn (auto-fetched on send)
+```
 
-Pass `agent_api_name` to `agentscript_eval_run` whenever the spec uses
-any placeholder.
+`agentscript_preview cleanup older_than_days=N` removes session dirs older
+than N days. Use `dry_run=true` to preview the deletion.
 
 ## Mutable seeds and the 2026-04 workaround
 
 Pass mutable seeds via `context_variables` on `agent.send_message`
 **not** at session creation. The platform regression that landed
-2026-04 silently drops session-level state seeds; per-message seeding
-is the live workaround. The eval module preserves this field during
-spec normalization (does not strip it like the upstream SDK whitelist).
-
-## When to dial things down
-
-- `traces_mode: "off"` — fast smoke runs where you only care about pass/fail.
-- `traces_mode: "all"` — exhaustive debug, expects extra round-trips.
-- `prompt_chars: 200` — keep llmEvents.prompt_content short on context-tight LLM
-  loops (default 600 is tuned for Claude/GPT-class context windows).
-- `inline_threshold: 1` — force the summary-and-pointer shape even on
-  small runs (useful when chaining many runs in one LLM turn).
+2026-04 silently drops session-level state seeds; per-message seeding is
+the live workaround. Our normalizer preserves this field (no
+`stripUnrecognizedFields`).
 
 ## Compile-on-save
 
-- Runs after every successful `write`/`edit` on `.agent` files.
+Runs after every successful `write` / `edit` on a `.agent` file. Same
+filter as `agentscript_compile`:
+
 - Severity 1 (Error) — always surfaced.
 - Severity 2 (Warning) — surfaced only for actionable codes:
   `deprecated-field`, `unused-variable`, `invalid-version`,
   `unknown-dialect`, `invalid-modifier`, `unknown-type`.
-- Severity 3+ (Info/Hint) — always dropped to keep feedback focused.
+- Severity 3+ (Info/Hint) — always dropped.
 - First feedback per file per session includes a one-line dialect banner.
 
 ## Coordination with sf-lsp
 
-- sf-lsp checks `pi.getCommands()` for `sf-agentscript`. When this plugin
-  is loaded, sf-lsp yields `.agent` files to us.
-- Disabling sf-agentscript falls sf-lsp back to the subprocess `.agent`
-  LSP path with no configuration required.
+sf-lsp checks `pi.getCommands()` for `sf-agentscript`. When this plugin is
+loaded, sf-lsp yields `.agent` files to us. Disabling sf-agentscript falls
+sf-lsp back to the subprocess `.agent` LSP path with no config required.
 
 ## Troubleshooting
 
-- "Agent Script SDK unavailable" → `/sf-agentscript doctor` shows the
-  vendored bundle path. The SDK is `lib/vendor/agentforce/browser.js`.
-- "No Active BotVersion" → activate a version in Setup → Einstein → Agents.
-- "All SFAP endpoints failed" → the user lacks AIPlatformEvaluation
+- **"Agent Script SDK unavailable"** — `/sf-agentscript doctor` shows the
+  vendored bundle path and any load error. The SDK is
+  `lib/vendor/agentforce/browser.js`.
+- **"@salesforce/core not resolvable"** — run `npm install` at the repo root.
+- **".sfdx/agents/ is not writable"** — confirm sf-guardrail's carve-out is
+  active (`/sf-guardrail` → look for the `.sfdx/agents/**` allowedPattern).
+- **"No Active BotVersion"** — activate a version in Setup → Einstein → Agents.
+- **"All SFAP endpoints failed"** — the user lacks AIPlatformEvaluation
   entitlement, or the BotVersion doesn't exist in the target org.
-- Trace fetch returning null → the session has been garbage-collected by
+- **Trace fetch returning null** — the session has been garbage-collected by
   the planner. Non-fatal; the failure record still has llmEvents inline.
