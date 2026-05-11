@@ -15,6 +15,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { applyMutation, type MutateOp } from "./mutate.ts";
 import { isAgentScriptFile } from "./file-classify.ts";
 import { safeResolveToolPath, toolError, toolOk } from "./tool-types.ts";
+import { renderMutateCall, renderMutateResult } from "./render/mutate.ts";
 
 export const MUTATE_TOOL_NAME = "agentscript_mutate";
 
@@ -185,6 +186,8 @@ export function registerMutateTool(pi: ExtensionAPI): void {
     label: "Agent Script — mutate",
     description:
       "Apply a structural mutation to a `.agent` file. AST-safe via the vendored SDK's Document.mutate when supported (set_field, rename topic→subagent); coordinate fallback for apply_quick_fix; insert/delete return ast_unsupported. Always re-compiles after writing — `diagnostics_after` shows the result of the change in the same turn.",
+    renderCall: renderMutateCall,
+    renderResult: renderMutateResult,
     promptSnippet:
       "Edit a .agent file structurally with AST safety; auto-recompiles and returns post-mutation diagnostics.",
     promptGuidelines: [

@@ -24,6 +24,7 @@ import { loadAgentforceSDK } from "./sdk.ts";
 import { serverCompile } from "./lifecycle.ts";
 import { safeResolveToolPath, toolError, toolOk, type ToolError } from "./tool-types.ts";
 import type { AgentScriptQuickFix } from "./types.ts";
+import { renderCompileCall, renderCompileResult } from "./render/compile.ts";
 
 export const COMPILE_TOOL_NAME = "agentscript_compile";
 
@@ -81,6 +82,8 @@ export function registerCompileTool(pi: ExtensionAPI): void {
     label: "Agent Script — compile",
     description:
       "Local-first compile of a `.agent` file via the vendored Agentforce SDK. action='check' (default) returns diagnostics + apply_via-ready quick fixes; action='format' canonicalizes whitespace via emit() (refuses on parse errors). fallback='server' (check only) retries via the authoring/scripts endpoint when local rejects.",
+    renderCall: renderCompileCall,
+    renderResult: renderCompileResult,
     promptSnippet:
       "Parse + compile a .agent file locally; optionally retry server-side. Or canonicalize formatting.",
     promptGuidelines: [

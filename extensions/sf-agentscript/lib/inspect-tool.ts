@@ -15,6 +15,7 @@ import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { findDefinition, findReferences, inspectFile } from "./inspect.ts";
 import { isAgentScriptFile } from "./file-classify.ts";
 import { safeResolveToolPath, toolError, toolOk, type ToolError } from "./tool-types.ts";
+import { renderInspectCall, renderInspectResult } from "./render/inspect.ts";
 
 export const INSPECT_TOOL_NAME = "agentscript_inspect";
 
@@ -56,6 +57,8 @@ export function registerInspectTool(pi: ExtensionAPI): void {
     label: "Agent Script — inspect",
     description:
       "Multi-action structural query on a `.agent` file. action='structure' (default) returns a navigable component graph with line numbers and `@`-references per topic. action='find_references' returns every usage of an `@<ns>.<prop>` symbol including the declaration site. action='definition' returns the line where the symbol is declared. All local, ~10ms.",
+    renderCall: renderInspectCall,
+    renderResult: renderInspectResult,
     promptSnippet:
       "Query a .agent file's structure, references, or definitions. No re-read needed.",
     promptGuidelines: [

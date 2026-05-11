@@ -36,6 +36,8 @@ import { fetchTrace } from "./eval/trace-client.ts";
 import { toolError, toolOk, type ToolError } from "./tool-types.ts";
 import type { EvalSpec, FailureRecord, RunMetadata } from "./eval/types.ts";
 
+import { renderEvalCall, renderEvalRunResult, renderEvalGetFailureResult } from "./render/eval.ts";
+
 export const EVAL_TOOL_NAME = "agentscript_eval";
 
 // -------------------------------------------------------------------------------------------------
@@ -174,6 +176,27 @@ export function registerEvalTool(pi: ExtensionAPI): void {
     label: "Agent Script eval",
     description:
       "Multi-action eval surface: run a regression spec, drill into a failure, fetch a planner trace, or resolve $active_* placeholders. Single Connection-based transport, sandbox-safe SFAP fallback, streamed progress on long runs.",
+    renderCall: renderEvalCall,
+    renderResult: (result, opts, theme) => {
+      // Dispatch on action recovered from the parameters slot. The pi-tui
+      // renderResult signature receives the merged tool row but not the
+      // call args directly; we use the embedded `details.action` (which we
+      // set in actionRun/actionGetFailure) for routing.
+      const details =
+        (result as { details?: { action?: string; run_id?: string; failure?: unknown } }).details ??
+        {};
+      // Run results carry run_id at the top level; failure results carry
+      // either a single `failure` or a `failures[]` array.
+      if (details.failure || (details as { failures?: unknown[] }).failures) {
+        return renderEvalGetFailureResult(result, opts, theme);
+      }
+      if (details.run_id) {
+        return renderEvalRunResult(result, opts, theme);
+      }
+      // resolve_active / trace fall through to the default text rendering
+      // (their single-line summaries already read well).
+      return renderEvalRunResult(result, opts, theme);
+    },
     promptSnippet:
       "Run / debug / introspect Agent Script regression specs against the Salesforce Evaluation API.",
     promptGuidelines: [

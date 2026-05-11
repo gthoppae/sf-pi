@@ -126,6 +126,11 @@ extensions/sf-agentscript/
       session-store.ts      ← implementation module
       trace-digest.ts       ← implementation module
     render/
+      compile.ts            ← implementation module
+      eval.ts               ← implementation module
+      inspect.ts            ← implementation module
+      lifecycle.ts          ← implementation module
+      mutate.ts             ← implementation module
       shared.ts             ← implementation module
       timeline.ts           ← implementation module
     templates/
@@ -176,6 +181,11 @@ extensions/sf-agentscript/
     preview-agent-api.test.ts← unit / smoke test
     preview-session-store.test.ts← unit / smoke test
     publish-authoring-bundle.test.ts← unit / smoke test
+    render-compile.test.ts  ← unit / smoke test
+    render-eval.test.ts     ← unit / smoke test
+    render-inspect.test.ts  ← unit / smoke test
+    render-lifecycle.test.ts← unit / smoke test
+    render-mutate.test.ts   ← unit / smoke test
     render-timeline.test.ts ← unit / smoke test
     self-recovery.test.ts   ← unit / smoke test
     smoke.test.ts           ← unit / smoke test

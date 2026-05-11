@@ -26,6 +26,7 @@ import { connFromAlias } from "./connection.ts";
 import { isAgentScriptFile } from "./file-classify.ts";
 import { activateVersion, deactivateVersion, listVersions, publishAgent } from "./lifecycle.ts";
 import { safeResolveToolPath, toolError, toolOk, type ToolError } from "./tool-types.ts";
+import { renderLifecycleCall, renderLifecycleResult } from "./render/lifecycle.ts";
 
 export const LIFECYCLE_TOOL_NAME = "agentscript_lifecycle";
 
@@ -100,6 +101,8 @@ export function registerLifecycleTool(pi: ExtensionAPI): void {
     label: "Agent Script lifecycle",
     description:
       "Multi-action publish lifecycle: publish a `.agent` (creates new agent or new version), activate / deactivate a specific version, or list every version on an agent in the org. Local pre-flight before server publish; SOQL-backed list_versions; idempotent activate.",
+    renderCall: renderLifecycleCall,
+    renderResult: renderLifecycleResult,
     promptSnippet: "Ship a .agent file to the org and toggle version activation.",
     promptGuidelines: [
       "action='publish' — pass agent_file (the .agent path). Auto-detects new-agent vs new-version. Set activate=true to chain publish+activate in one call.",
