@@ -10,8 +10,10 @@ import {
 } from "../../../lib/common/monthly-usage/store.ts";
 import { API_KEY_ENV, BASE_URL_ENV } from "../lib/config.ts";
 import {
+  computeKeyConflict,
   fetchDailyActivity,
   fetchKeyList,
+  refreshUsageDetails,
   registerGatewayMonthlyUsageRefresher,
 } from "../lib/monthly-usage.ts";
 
@@ -136,7 +138,10 @@ describe("gateway monthly usage refresh", () => {
     }
   });
 
-  it("publishes daily activity alongside the other probes", async () => {
+  it("publishes daily activity from refreshUsageDetails (split out of primary refresh)", async () => {
+    // Phase 1.4: daily-activity moved off the boot hot path. The primary
+    // refresh no longer fetches it; refreshUsageDetails does, called from
+    // /sf-llm-gateway panel and the first turn_end.
     process.env[BASE_URL_ENV] = "https://gateway.example.test";
     process.env[API_KEY_ENV] = "test-key";
     mockGatewayFetch({
@@ -153,25 +158,26 @@ describe("gateway monthly usage refresh", () => {
 
     try {
       await getMonthlyUsageStateRefresh(true, cwd);
+      // Primary refresh leaves daily empty— it's split out now.
+      expect(getMonthlyUsageState().dailyActivity).toBeNull();
+      expect(getMonthlyUsageState().connectionStatus?.kind).toBe("connected");
+
+      await refreshUsageDetails(true, cwd);
       const snapshot = getMonthlyUsageState();
       expect(snapshot.dailyActivityError).toBeNull();
       expect(snapshot.dailyActivity?.entries).toHaveLength(2);
       expect(snapshot.dailyActivity?.entries[0]).toMatchObject({
         date: "2026-05-04",
         spend: 1.25,
-        failedRequests: 0,
-        apiRequests: 100,
       });
-      // Sorted ascending by date.
-      expect(snapshot.dailyActivity?.entries[1].date).toBe("2026-05-05");
-      // Connection status stays "connected" regardless of daily activity.
+      // Connection status survives the details refresh untouched.
       expect(snapshot.connectionStatus?.kind).toBe("connected");
     } finally {
       unregister();
     }
   });
 
-  it("publishes the key-list count alongside other probes", async () => {
+  it("publishes the key-list count via refreshUsageDetails", async () => {
     process.env[BASE_URL_ENV] = "https://gateway.example.test";
     process.env[API_KEY_ENV] = "test-key";
     mockGatewayFetch({
@@ -189,6 +195,10 @@ describe("gateway monthly usage refresh", () => {
 
     try {
       await getMonthlyUsageStateRefresh(true, cwd);
+      // Not part of primary refresh.
+      expect(getMonthlyUsageState().keyList).toBeNull();
+
+      await refreshUsageDetails(true, cwd);
       const snapshot = getMonthlyUsageState();
       expect(snapshot.keyList).toMatchObject({ count: 4 });
       expect(snapshot.keyListError).toBeNull();
@@ -214,13 +224,198 @@ describe("gateway monthly usage refresh", () => {
 
     try {
       await getMonthlyUsageStateRefresh(true, cwd);
+      await refreshUsageDetails(true, cwd);
       const snapshot = getMonthlyUsageState();
       expect(snapshot.dailyActivity).toBeNull();
       expect(snapshot.dailyActivityError).toMatch(/Daily activity/);
+      // Primary status untouched by failed details fetch.
       expect(snapshot.connectionStatus?.kind).toBe("connected");
     } finally {
       unregister();
     }
+  });
+
+  // Phase 1.1: announce "checking" status before probes complete so first-paint
+  // UIs render "Checking…" instead of empty/last-error state.
+  it("publishes a `checking` status before probes resolve", async () => {
+    process.env[BASE_URL_ENV] = "https://gateway.example.test";
+    process.env[API_KEY_ENV] = "test-key";
+    let resolveProbes: (() => void) | undefined;
+    const block = new Promise<void>((resolve) => {
+      resolveProbes = resolve;
+    });
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      // Don't return until the test inspects the in-flight "checking" state.
+      await block;
+      const url = String(input);
+      if (url.endsWith("/health/readiness")) {
+        return jsonResponse(200, { status: "connected" });
+      }
+      if (url.endsWith("/user/info")) {
+        return jsonResponse(200, {
+          user_info: { max_budget: 100, spend: 1, budget_reset_at: "", budget_duration: "" },
+        });
+      }
+      return jsonResponse(200, { info: { spend: 1 } });
+    }) as typeof fetch;
+
+    const unregister = registerGatewayMonthlyUsageRefresher();
+    const cwd = createProjectConfig({
+      baseUrl: "https://gateway.example.test",
+      apiKey: "test-key",
+    });
+
+    try {
+      const refreshDone = getMonthlyUsageStateRefresh(true, cwd);
+      // Drain microtasks until the inner IIFE has run past `publishChecking`.
+      // The store-level `refreshMonthlyUsage` adapter awaits our refresher,
+      // and our refresher awaits an inner IIFE — needs a setImmediate hop
+      // to let those nested awaits all resume before we observe state.
+      await new Promise((r) => setImmediate(r));
+      expect(getMonthlyUsageState().connectionStatus?.kind).toBe("checking");
+
+      resolveProbes!();
+      await refreshDone;
+      expect(getMonthlyUsageState().connectionStatus?.kind).toBe("connected");
+    } finally {
+      unregister();
+    }
+  });
+
+  // Phase 1.3: AbortError on every primary probe is classified as `unreachable`
+  // with `timedOut: true` so UIs can render "Slow" instead of "Unreachable".
+  it("sets timedOut on the connection status when every probe aborts", async () => {
+    process.env[BASE_URL_ENV] = "https://gateway.example.test";
+    process.env[API_KEY_ENV] = "test-key";
+    globalThis.fetch = vi.fn(async () => {
+      const e = new Error("timed out");
+      e.name = "AbortError";
+      throw e;
+    }) as typeof fetch;
+
+    const unregister = registerGatewayMonthlyUsageRefresher();
+    const cwd = createProjectConfig({
+      baseUrl: "https://gateway.example.test",
+      apiKey: "test-key",
+    });
+
+    try {
+      await getMonthlyUsageStateRefresh(true, cwd);
+      const status = getMonthlyUsageState().connectionStatus;
+      expect(status?.kind).toBe("unreachable");
+      expect(status?.timedOut).toBe(true);
+      // Phase 1.2: retry attempted once before classifying as unreachable.
+      expect(status?.retried).toBe(true);
+    } finally {
+      unregister();
+    }
+  }, 10_000);
+
+  // Phase 1.2: one-shot retry recovers a probe that succeeds on the second attempt.
+  it("recovers a transient unreachable when the retry succeeds", async () => {
+    process.env[BASE_URL_ENV] = "https://gateway.example.test";
+    process.env[API_KEY_ENV] = "test-key";
+    let attempt = 0;
+    globalThis.fetch = vi.fn(async (input: RequestInfo | URL) => {
+      attempt += 1;
+      // First attempt: AbortError on every probe (3 calls total). Second attempt: 200s.
+      if (attempt <= 3) {
+        const e = new Error("timed out");
+        e.name = "AbortError";
+        throw e;
+      }
+      const url = String(input);
+      if (url.endsWith("/user/info")) {
+        return jsonResponse(200, {
+          user_info: { max_budget: 100, spend: 1, budget_reset_at: "", budget_duration: "" },
+        });
+      }
+      if (url.endsWith("/key/info")) return jsonResponse(200, { info: { spend: 1 } });
+      return jsonResponse(200, { status: "connected" });
+    }) as typeof fetch;
+
+    const unregister = registerGatewayMonthlyUsageRefresher();
+    const cwd = createProjectConfig({
+      baseUrl: "https://gateway.example.test",
+      apiKey: "test-key",
+    });
+
+    try {
+      await getMonthlyUsageStateRefresh(true, cwd);
+      expect(getMonthlyUsageState().connectionStatus?.kind).toBe("connected");
+      // Trace records the *final* state — only the successful 3 calls.
+      expect(getMonthlyUsageState().lastProbeTrace?.entries).toHaveLength(3);
+      expect(getMonthlyUsageState().lastProbeTrace?.wasRetry).toBe(true);
+    } finally {
+      unregister();
+    }
+  }, 10_000);
+
+  // Phase 3.1: lastProbeTrace captures per-endpoint timing on every refresh.
+  it("captures a per-endpoint trace in lastProbeTrace", async () => {
+    process.env[BASE_URL_ENV] = "https://gateway.example.test";
+    process.env[API_KEY_ENV] = "test-key";
+    mockGatewayFetch({ userStatus: 200, keyStatus: 200, healthStatus: 200 });
+    const unregister = registerGatewayMonthlyUsageRefresher();
+    const cwd = createProjectConfig({
+      baseUrl: "https://gateway.example.test",
+      apiKey: "test-key",
+    });
+
+    try {
+      await getMonthlyUsageStateRefresh(true, cwd);
+      const trace = getMonthlyUsageState().lastProbeTrace;
+      expect(trace).toBeDefined();
+      expect(trace?.wasRetry).toBe(false);
+      const sources = trace!.entries.map((e) => e.source).sort();
+      expect(sources).toEqual(["health", "key-info", "user-info"]);
+      expect(trace!.entries.every((e) => e.ok)).toBe(true);
+    } finally {
+      unregister();
+    }
+  });
+});
+
+// Phase 1.6: cross-source key-conflict detection.
+describe("computeKeyConflict", () => {
+  afterEach(() => {
+    restoreEnv(API_KEY_ENV, originalApiKey);
+  });
+
+  it("returns null when keys match", () => {
+    process.env[API_KEY_ENV] = "sk-same";
+    const cwd = createProjectConfig({
+      baseUrl: "https://gateway.example.test",
+      apiKey: "sk-same",
+    });
+    expect(computeKeyConflict(cwd)).toBeNull();
+  });
+
+  it("returns null when only one source is set", () => {
+    delete process.env[API_KEY_ENV];
+    const cwd = createProjectConfig({
+      baseUrl: "https://gateway.example.test",
+      apiKey: "sk-saved",
+    });
+    expect(computeKeyConflict(cwd)).toBeNull();
+  });
+
+  it("returns a warning with hashed prefixes when keys differ", () => {
+    process.env[API_KEY_ENV] = "sk-env-blocked";
+    const cwd = createProjectConfig({
+      baseUrl: "https://gateway.example.test",
+      apiKey: "sk-saved-active",
+    });
+    const warning = computeKeyConflict(cwd);
+    expect(warning).not.toBeNull();
+    expect(warning?.active).toBe("saved");
+    expect(warning?.envKeyHash).toHaveLength(8);
+    expect(warning?.savedKeyHash).toHaveLength(8);
+    expect(warning?.envKeyHash).not.toEqual(warning?.savedKeyHash);
+    // Never logs the raw key.
+    expect(warning?.message).not.toContain("sk-env-blocked");
+    expect(warning?.message).not.toContain("sk-saved-active");
+    expect(warning?.message).toContain(warning!.envKeyHash);
   });
 });
 

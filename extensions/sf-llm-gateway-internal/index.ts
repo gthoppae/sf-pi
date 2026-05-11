@@ -51,7 +51,7 @@
  * - /sf-llm-gateway-internal beta                  show beta header state
  * - /sf-llm-gateway-internal beta <name> on|off    toggle a beta header at runtime
  * - /sf-llm-gateway-internal models                list discovered models
- * - /sf-llm-gateway-internal usage-probe           classify user/key usage scope
+ * - /sf-llm-gateway-internal usage-probe [--trace] classify user/key usage scope (--trace prints per-endpoint timings)
  * - /sf-llm-gateway-internal tokens <modelId> [prompt]
  * - /sf-llm-gateway-internal onboard
  * - /sf-llm-gateway-internal debug <modelId> [reasoning=<level>] [tool] [adaptive]
@@ -62,8 +62,8 @@
  *   ----------------------------|------------------------------------|-------------------------------
  *   Extension load              | enabled + has credentials          | Register static catalog, fire-and-forget discovery
  *   Extension load              | disabled                           | Unregister provider
- *   session_start               | —                                  | Re-discover models, sync session defaults
- *   turn_end                    | model is gateway model             | Update footer (context + monthly usage)
+ *   session_start               | —                                  | Sync defaults (sync), fire-and-forget discovery, one-time key-conflict notify
+ *   turn_end                    | model is gateway model             | Update footer (context + monthly usage); first turn_end also kicks refreshUsageDetails
  *   turn_end                    | model is NOT gateway model         | Clear footer status
  *   model_select                | selected model is gateway          | Set thinking to xhigh
  *   after_provider_response     | model is gateway model + 2xx       | Clear any live throttle/upstream warning
@@ -210,8 +210,10 @@ import { registerExtensionDoctor } from "../../lib/common/doctor/registry.ts";
 import { runExtensionDoctor as runGatewayExtensionDoctor } from "./lib/doctor.ts";
 import { openGatewayPanel } from "./lib/command-panel.ts";
 import {
+  computeKeyConflict,
   getMonthlyUsageState,
   refreshMonthlyUsage,
+  refreshUsageDetails,
   registerGatewayMonthlyUsageRefresher,
 } from "./lib/monthly-usage.ts";
 import { clearProviderSignal, recordProviderResponse } from "./lib/provider-telemetry.ts";
@@ -223,6 +225,7 @@ import {
 } from "./lib/retry-telemetry.ts";
 import { installWireTrace, isWireTraceEnabled } from "./lib/wire-trace.ts";
 import { requirePiVersion } from "../../lib/common/pi-compat.ts";
+import { markBootStep } from "../../lib/common/boot-timing.ts";
 
 // -------------------------------------------------------------------------------------------------
 // Extension-only types
@@ -383,17 +386,39 @@ export default function sfLlmGatewayInternalExtension(pi: ExtensionAPI) {
     // files. Idempotent via a per-file sentinel under `sfPi`. See
     // lib/migrate-unify-provider.ts for details. Runs before the legacy
     // settings repair below so downstream repair never sees ghost ids.
-    migrateGatewaySettings(ctx.cwd);
+    await markBootStep("sf-llm-gateway.settings-migrate", () => migrateGatewaySettings(ctx.cwd));
 
     // Repair legacy settings using the session's cwd (previously done at
     // factory time with process.cwd(), moved here for 0.68.0 compliance).
-    repairGatewayEnabledModelSettings(ctx.cwd);
-    repairGatewayDefaultModelSettings(ctx.cwd, DEFAULT_MODEL_ID);
+    await markBootStep("sf-llm-gateway.settings-repair", () => {
+      repairGatewayEnabledModelSettings(ctx.cwd);
+      repairGatewayDefaultModelSettings(ctx.cwd, DEFAULT_MODEL_ID);
+    });
 
-    await discoverAndRegister(pi, getBetaOverrides(), getBetaExtras(), ctx.cwd);
-    await syncGatewaySessionDefaults(pi, ctx, false);
+    // Phase 2.1: don't await `discoverAndRegister`. The bootstrap catalog
+    // is registered synchronously in the factory, so models work immediately
+    // even before live discovery completes. Awaiting here was the single
+    // biggest contributor to slow `session_start` (~2-4s on cold network).
+    // syncGatewaySessionDefaults is local-only — keep it awaited so settings
+    // are correct when the splash paints.
+    await markBootStep("sf-llm-gateway.sync-defaults", () =>
+      syncGatewaySessionDefaults(pi, ctx, false),
+    );
+    void markBootStep("sf-llm-gateway.discover", () =>
+      discoverAndRegister(pi, getBetaOverrides(), getBetaExtras(), ctx.cwd),
+    ).catch(() => undefined);
+
+    // Phase 1.6: surface a key-conflict warning once per session. Computed
+    // outside the async refresher so it fires even when the gateway is
+    // unreachable. notify() is best-effort — in headless / no-UI flows it's
+    // a no-op.
+    notifyKeyConflictOnce(ctx);
   });
 
+  // Track whether we've already kicked off the cold-start details fetch
+  // for this session. We delay it past first turn_end so cold session_start
+  // stays fast (Phase 1.4 + 2.1).
+  let detailsKickedOff = false;
   pi.on("turn_end", async (_event, ctx) => {
     // Refresh the `💰 $N/∞` pill right after every assistant turn so the
     // cost figure tracks the session closely. The refresh is throttled by
@@ -401,6 +426,14 @@ export default function sfLlmGatewayInternalExtension(pi: ExtensionAPI) {
     // turns do not hammer the gateway — the network call only fires once
     // per TTL window.
     await updateFooterStatus(ctx, false);
+
+    // Phase 1.4: details (daily activity, key list) are not on the splash
+    // hot path. Kick them off after the first turn_end so they land before
+    // the user opens /sf-llm-gateway, but never delay session_start.
+    if (!detailsKickedOff) {
+      detailsKickedOff = true;
+      void refreshUsageDetails(false, ctx.cwd).catch(() => undefined);
+    }
   });
 
   pi.on("model_select", async (event, ctx) => {
@@ -440,12 +473,34 @@ export default function sfLlmGatewayInternalExtension(pi: ExtensionAPI) {
     clearProviderSignal();
     clearRetryEventListener();
     lastAppliedThinkingLevel = undefined;
+    detailsKickedOff = false;
     ctx.ui.setStatus(STATUS_KEY, undefined);
     if (unregisterMonthlyUsage) {
       unregisterMonthlyUsage();
       unregisterMonthlyUsage = null;
     }
   });
+}
+
+// ---------------------------------------------------------------------------
+// Phase 1.6: one-time key-conflict notify
+//
+// Fires at most once per session. The check is cheap (two file reads + an
+// env-var lookup) and bypasses the refresh path so a misconfigured base URL
+// or missing API key doesn't suppress the warning.
+// ---------------------------------------------------------------------------
+let keyConflictNotifiedThisSession = false;
+function notifyKeyConflictOnce(ctx: ExtensionContext): void {
+  if (keyConflictNotifiedThisSession) return;
+  keyConflictNotifiedThisSession = true;
+  try {
+    const conflict = computeKeyConflict(ctx.cwd);
+    if (conflict) {
+      ctx.ui.notify(conflict.message, "warning");
+    }
+  } catch {
+    // Best-effort — nothing here should ever break session_start.
+  }
 }
 
 /**
@@ -510,7 +565,7 @@ async function handleCommand(
     case "doctor":
       return handleDoctorCommand(pi, ctx);
     case "usage-probe":
-      return handleUsageProbeCommand(pi, ctx);
+      return handleUsageProbeCommand(pi, ctx, parsed.positional ?? []);
     case "tokens":
       return handleTokensCommand(pi, ctx, parsed.positional ?? []);
     case "onboard":
@@ -586,7 +641,7 @@ async function handlePanelAction(
     case "doctor":
       return handleDoctorCommand(pi, ctx);
     case "usage-probe":
-      return handleUsageProbeCommand(pi, ctx);
+      return handleUsageProbeCommand(pi, ctx, []);
     case "tokens":
       return handleTokensCommand(pi, ctx, [getPanelDefaultModelId(ctx)]);
     case "onboard":
@@ -677,8 +732,19 @@ async function handleDoctorCommand(pi: ExtensionAPI, ctx: ExtensionCommandContex
 async function handleUsageProbeCommand(
   pi: ExtensionAPI,
   ctx: ExtensionCommandContext,
+  positional: string[],
 ): Promise<void> {
+  // Phase 3.1: --trace renders the per-endpoint timings captured by the
+  // last refresh. Useful for diagnosing "splash says Unreachable but chat
+  // works" without re-running the probes via curl.
+  const traceFlag = positional.some((arg) => arg === "--trace" || arg === "-t" || arg === "trace");
+
   await refreshMonthlyUsage(true, ctx.cwd);
+  // Also pull daily-activity + key-list so the existing report below has
+  // numbers to render. Phase 1.4 split these out of the primary refresh
+  // for boot performance, but the usage-probe view wants the full picture.
+  await refreshUsageDetails(true, ctx.cwd);
+
   const {
     monthlyUsage,
     monthlyUsageError,
@@ -687,7 +753,20 @@ async function handleUsageProbeCommand(
     connectionStatus,
     dailyActivity,
     dailyActivityError,
+    keyConflict,
+    lastProbeTrace,
   } = getMonthlyUsageState();
+
+  if (traceFlag) {
+    await emitCommandOutput(
+      pi,
+      ctx,
+      "SF LLM Gateway Internal usage probe — trace.",
+      formatProbeTraceReport(connectionStatus, lastProbeTrace, keyConflict),
+      connectionStatus?.kind === "connected" ? "info" : "warning",
+    );
+    return;
+  }
 
   const lines: string[] = [
     "Gateway usage probe",
@@ -730,6 +809,67 @@ async function handleUsageProbeCommand(
     lines.join("\n"),
     connectionStatus?.kind === "connected" ? "info" : "warning",
   );
+}
+
+/**
+ * Render the per-endpoint trace produced by the last refresh as a compact
+ * table. Renders OK / FAIL with HTTP status or AbortError name plus per-probe
+ * duration so users can answer:
+ *   - which endpoint was slow?
+ *   - which endpoint failed?
+ *   - was the failure HTTP or transport-level?
+ * without re-running curl by hand. Mirrors the offline test format used in
+ * the original investigation.
+ */
+function formatProbeTraceReport(
+  connectionStatus: import("./lib/monthly-usage.ts").GatewayConnectionStatus | undefined | null,
+  trace: import("./lib/monthly-usage.ts").GatewayProbeTrace | undefined | null,
+  keyConflict: import("./lib/monthly-usage.ts").KeyConflictWarning | undefined | null,
+): string {
+  const lines: string[] = ["Gateway probe trace", ""];
+  lines.push(
+    `Connection: ${connectionStatus?.kind ?? "not checked"}${
+      connectionStatus?.source ? ` via ${connectionStatus.source}` : ""
+    }${connectionStatus?.timedOut ? " (timed out)" : ""}${
+      connectionStatus?.retried ? " (retried)" : ""
+    }`,
+  );
+  if (connectionStatus?.detail) lines.push(`Detail: ${connectionStatus.detail}`);
+  if (connectionStatus?.checkedAt) lines.push(`Checked at: ${connectionStatus.checkedAt}`);
+  lines.push("");
+
+  if (!trace) {
+    lines.push("No trace recorded yet — run /sf-llm-gateway refresh and rerun.");
+  } else {
+    lines.push(
+      `Last probe: total ${trace.totalMs} ms${trace.wasRetry ? " (after one-shot retry)" : ""}, started ${trace.startedAt}`,
+    );
+    lines.push("");
+    lines.push("  source           path                      result");
+    lines.push("  ---------------- ------------------------- ------");
+    for (const entry of trace.entries) {
+      const result = entry.ok
+        ? `OK in ${entry.durationMs}ms`
+        : entry.status
+          ? `HTTP ${entry.status} in ${entry.durationMs}ms`
+          : `${entry.errorName ?? "error"} after ${entry.durationMs}ms`;
+      lines.push(`  ${pad(entry.source, 16)} ${pad(entry.path, 25)} ${result}`);
+      if (!entry.ok && entry.errorMessage) {
+        lines.push(`    → ${entry.errorMessage.slice(0, 200)}`);
+      }
+    }
+  }
+
+  if (keyConflict) {
+    lines.push("", "Key conflict warning:", `  ${keyConflict.message}`);
+  }
+
+  return lines.join("\n");
+}
+
+function pad(value: string, width: number): string {
+  if (value.length >= width) return value;
+  return value + " ".repeat(width - value.length);
 }
 
 /**
@@ -1153,7 +1293,7 @@ export function parseCommandArgs(args: string): CommandArgs {
     return { subcommand: "doctor", scope };
   }
   if (sub === "usage-probe" || sub === "usage") {
-    return { subcommand: "usage-probe", scope };
+    return { subcommand: "usage-probe", scope, positional: tokens.slice(1) };
   }
   if (sub === "debug") {
     return { subcommand: "debug", scope, positional: tokens.slice(1) };

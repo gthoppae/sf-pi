@@ -312,7 +312,15 @@ function formatGatewayStatusValue(data: SplashData, mode: GlyphMode): string {
     case "url-invalid":
       return `${SF_ORANGE("!")} ${SF_ORANGE("URL issue")}`;
     case "unreachable":
-      return `${SF_ORANGE("!")} ${SF_ORANGE("Unreachable")}`;
+      // Phase 1.3: distinguish a real unreachable network from a slow probe
+      // that timed out. The gateway is probably fine — the cold-start link
+      // is just sluggish. Suffix the retry indicator when the one-shot retry
+      // also failed (matches `connectionStatus.retried`) so the user knows
+      // we already gave the gateway a second chance.
+      if (status.timedOut) {
+        return `${SF_ORANGE("!")} ${SF_ORANGE(`Slow${status.retried ? " (retried)" : ""}`)}`;
+      }
+      return `${SF_ORANGE("!")} ${SF_ORANGE(`Unreachable${status.retried ? " (retried)" : ""}`)}`;
     case "degraded":
       return `${SF_ORANGE("!")} ${SF_ORANGE("Degraded")}`;
     case "unknown":
@@ -464,6 +472,15 @@ function buildLeftColumn(
     lines.push(
       formatGlyphInfoRow("gateway", mode, "LLM Gateway", formatGatewayStatusValue(data, mode)),
     );
+    // Phase 1.6: passive key-conflict nudge directly under the gateway row.
+    // Truncated to the column width so it never wraps. The gateway extension
+    // also notifies once per session via ctx.ui.notify() — this row is the
+    // visual reminder that persists for the splash's lifetime.
+    if (data.gatewayKeyConflict) {
+      const hint = `Two API keys configured (env: ${data.gatewayKeyConflict.envKeyHash}…, saved: ${data.gatewayKeyConflict.savedKeyHash}…, saved active)`;
+      const truncated = truncateToWidth(hint, Math.max(10, colWidth - 4), "…");
+      lines.push(`   ${SF_ORANGE("⚠")} ${MUTED(truncated)}`);
+    }
   }
 
   // SF CLI status only. Org/API/config context belongs in sf-devbar, not in

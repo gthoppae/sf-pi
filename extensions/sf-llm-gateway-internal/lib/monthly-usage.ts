@@ -16,6 +16,7 @@
  * extension directly. When this extension is disabled, no refresher is
  * registered and consumers see the empty snapshot.
  */
+import { createHash } from "node:crypto";
 import type {
   GatewayConnectionStatus,
   GatewayDailyActivity,
@@ -24,6 +25,9 @@ import type {
   GatewayKeyInfo,
   GatewayKeyList,
   GatewayMonthlyUsage,
+  GatewayProbeTrace,
+  GatewayProbeTraceEntry,
+  KeyConflictWarning,
   MonthlyUsageSnapshot,
 } from "../../../lib/common/monthly-usage/store.ts";
 import {
@@ -32,7 +36,7 @@ import {
   registerMonthlyUsageRefresher,
   setMonthlyUsageState,
 } from "../../../lib/common/monthly-usage/store.ts";
-import { API_KEY_ENV, getGatewayConfig } from "./config.ts";
+import { API_KEY_ENV, getGatewayConfig, getMergedSavedGatewayConfig } from "./config.ts";
 import { toGatewayRootBaseUrl } from "./gateway-url.ts";
 import { fetchWithTimeout } from "./models.ts";
 
@@ -41,7 +45,24 @@ import { fetchWithTimeout } from "./models.ts";
 // is still bounded by how often a consumer (footer repaint on turn_end)
 // actually asks for a refresh, so the request rate stays reasonable.
 const MONTHLY_USAGE_TTL_MS = 60 * 1000;
-const FETCH_TIMEOUT_MS = 10_000;
+
+// Phase 1.5: lowered from 10s to 5s so a slow probe surfaces faster. With
+// the one-shot retry below the worst-case is still bounded (~12s) but the
+// splash repaints sooner on a cold-network blip. Override via
+// SF_PI_GATEWAY_PROBE_TIMEOUT_MS for users on consistently sluggish links.
+const FETCH_TIMEOUT_MS = parseTimeoutEnv(process.env.SF_PI_GATEWAY_PROBE_TIMEOUT_MS, 5_000);
+
+// Phase 1.2: when every primary probe rejects with a non-HTTP error
+// (timeout / DNS / abort), retry once after this delay before classifying
+// the gateway as `unreachable`. Keeps cold-start blips from sticking on
+// the splash for the entire 30s window.
+const RETRY_DELAY_MS = 1_500;
+
+function parseTimeoutEnv(raw: string | undefined, fallback: number): number {
+  if (!raw) return fallback;
+  const parsed = Number.parseInt(raw, 10);
+  return Number.isFinite(parsed) && parsed >= 1_000 ? parsed : fallback;
+}
 
 // Re-export types so existing imports (e.g. status.ts) keep working without
 // reaching into lib/common directly.
@@ -53,6 +74,9 @@ export type {
   GatewayKeyInfo,
   GatewayKeyList,
   GatewayMonthlyUsage,
+  GatewayProbeTrace,
+  GatewayProbeTraceEntry,
+  KeyConflictWarning,
 } from "../../../lib/common/monthly-usage/store.ts";
 
 /**
@@ -66,6 +90,8 @@ export { getMonthlyUsageState };
 
 let lastFetchAt = 0;
 let refreshInFlight: Promise<void> | null = null;
+let lastDetailsFetchAt = 0;
+let detailsRefreshInFlight: Promise<void> | null = null;
 
 type GatewayProbeSource = NonNullable<GatewayConnectionStatus["source"]>;
 
@@ -78,6 +104,49 @@ class GatewayRequestError extends Error {
   ) {
     super(message);
     this.name = "GatewayRequestError";
+  }
+}
+
+/**
+ * Recorded per-probe trace context. Local to this module — we expose only
+ * the public `GatewayProbeTraceEntry` shape via the store. Wraps the
+ * fetcher so every call site picks up trace capture without per-call
+ * boilerplate.
+ *
+ * Capture is always-on but cheap (one entry per probe per refresh). The
+ * payload never includes the API key or full response body, only the path
+ * and a 240-char error preview.
+ */
+async function tracedProbe<T>(
+  source: GatewayProbeSource,
+  path: string,
+  run: () => Promise<T>,
+  trace: GatewayProbeTraceEntry[],
+): Promise<T> {
+  const t0 = Date.now();
+  try {
+    const value = await run();
+    trace.push({
+      source,
+      path,
+      durationMs: Date.now() - t0,
+      ok: true,
+    });
+    return value;
+  } catch (err) {
+    const entry: GatewayProbeTraceEntry = {
+      source,
+      path,
+      durationMs: Date.now() - t0,
+      ok: false,
+      errorName: err instanceof Error ? err.name : undefined,
+      errorMessage: err instanceof Error ? err.message.slice(0, 240) : String(err).slice(0, 240),
+    };
+    if (err instanceof GatewayRequestError && typeof err.status === "number") {
+      entry.status = err.status;
+    }
+    trace.push(entry);
+    throw err;
   }
 }
 
@@ -95,6 +164,24 @@ export function registerGatewayMonthlyUsageRefresher(): () => void {
   };
 }
 
+/**
+ * Refresh the three primary connection probes (user-info, key-info,
+ * health) plus the monthly-usage payload that drives the splash and the
+ * `💰 $N/∞` footer pill.
+ *
+ * Phase 1 changes:
+ *   1.1 Publishes `kind: "checking"` *before* firing requests so first-paint
+ *       UIs render "Checking..." instead of stale empty state.
+ *   1.2 One-shot retry on `unreachable` after RETRY_DELAY_MS. The retry
+ *       record is captured in `lastProbeTrace.wasRetry`.
+ *   1.3 Distinguishes AbortError (`timedOut: true`) from other unreachable.
+ *   1.4 Drops daily-activity and key-list from this hot path — they live
+ *       in `refreshUsageDetails` now, called from /sf-llm-gateway panel
+ *       and `usage-probe` only.
+ *   1.6 Computes a `keyConflict` warning when env and saved keys differ.
+ *
+ * Phase 3.1: per-endpoint trace is captured into `lastProbeTrace`.
+ */
 export async function refreshMonthlyUsage(force: boolean, cwd: string): Promise<void> {
   if (!force && lastFetchAt > 0 && Date.now() - lastFetchAt < MONTHLY_USAGE_TTL_MS) {
     return;
@@ -106,42 +193,82 @@ export async function refreshMonthlyUsage(force: boolean, cwd: string): Promise<
 
   refreshInFlight = (async () => {
     const config = getGatewayConfig(cwd);
+    const keyConflict = computeKeyConflict(cwd);
+
     if (!config.baseUrl) {
-      publishError("Missing base URL configuration.", {
-        kind: "not-configured",
-        detail: "Missing base URL configuration.",
-        checkedAt: new Date().toISOString(),
-        source: "config",
-      });
+      publishError(
+        "Missing base URL configuration.",
+        {
+          kind: "not-configured",
+          detail: "Missing base URL configuration.",
+          checkedAt: new Date().toISOString(),
+          source: "config",
+        },
+        keyConflict,
+      );
       lastFetchAt = Date.now();
       return;
     }
 
     if (!config.apiKey) {
       const message = `Missing ${API_KEY_ENV} or saved API key.`;
-      publishError(message, {
-        kind: "not-configured",
-        detail: message,
-        checkedAt: new Date().toISOString(),
-        source: "config",
-      });
+      publishError(
+        message,
+        {
+          kind: "not-configured",
+          detail: message,
+          checkedAt: new Date().toISOString(),
+          source: "config",
+        },
+        keyConflict,
+      );
       lastFetchAt = Date.now();
       return;
     }
 
-    // Fire all four in parallel. Each branch resolves to either the parsed
-    // payload or a recorded error — a single slow endpoint must not stall
-    // the others. Daily activity is additive: a failure here does not
-    // downgrade the connection-status classification, which is gated on
-    // the three primary probes (user-info, key-info, health).
-    const [usageResult, keyResult, healthResult, dailyResult, keyListResult] =
-      await Promise.allSettled([
-        fetchMonthlyUsage(config.baseUrl, config.apiKey),
-        fetchKeyInfo(config.baseUrl, config.apiKey),
-        fetchHealth(config.baseUrl, config.apiKey),
-        fetchDailyActivity(config.baseUrl, config.apiKey, DAILY_ACTIVITY_DEFAULT_DAYS),
-        fetchKeyList(config.baseUrl, config.apiKey),
-      ]);
+    // 1.1: announce the refresh immediately so consumers can render
+    // "Checking..." instead of a blank/last-error state. Done as a partial
+    // merge so we don't drop the previous snapshot's monthlyUsage — useful
+    // when a TTL-bounded re-probe is in flight and the splash shouldn't
+    // flash to $0.00.
+    publishChecking(keyConflict);
+
+    const startedAt = new Date();
+    let trace: GatewayProbeTraceEntry[] = [];
+    let attempt = await runPrimaryProbes(config.baseUrl, config.apiKey, trace);
+    let wasRetry = false;
+
+    // 1.2: retry once when classifying as `unreachable` AND the failure was
+    // not a clear HTTP error (i.e. it could be a cold-network blip).
+    const initialStatus = resolveConnectionStatus(
+      attempt.usageResult,
+      attempt.keyResult,
+      attempt.healthResult,
+    );
+    if (initialStatus.kind === "unreachable") {
+      await delay(RETRY_DELAY_MS);
+      trace = []; // overwrite — we want the trace to reflect the *final* state
+      attempt = await runPrimaryProbes(config.baseUrl, config.apiKey, trace);
+      wasRetry = true;
+    }
+
+    const finalStatus = resolveConnectionStatus(
+      attempt.usageResult,
+      attempt.keyResult,
+      attempt.healthResult,
+    );
+    if (wasRetry && finalStatus.kind === "unreachable") {
+      finalStatus.retried = true;
+    }
+
+    const finishedAt = new Date();
+    const probeTrace: GatewayProbeTrace = {
+      startedAt: startedAt.toISOString(),
+      finishedAt: finishedAt.toISOString(),
+      totalMs: finishedAt.getTime() - startedAt.getTime(),
+      wasRetry,
+      entries: trace,
+    };
 
     const snapshot: MonthlyUsageSnapshot = {
       monthlyUsage: null,
@@ -150,57 +277,35 @@ export async function refreshMonthlyUsage(force: boolean, cwd: string): Promise<
       keyInfoError: null,
       health: null,
       healthError: null,
-      connectionStatus: null,
-      dailyActivity: null,
-      dailyActivityError: null,
-      keyList: null,
-      keyListError: null,
+      connectionStatus: finalStatus,
+      // Preserve any details fetched by refreshUsageDetails so the splash
+      // doesn't lose its 7-day chart on a primary-only refresh.
+      dailyActivity: getMonthlyUsageState().dailyActivity ?? null,
+      dailyActivityError: getMonthlyUsageState().dailyActivityError ?? null,
+      keyList: getMonthlyUsageState().keyList ?? null,
+      keyListError: getMonthlyUsageState().keyListError ?? null,
+      keyConflict,
+      lastProbeTrace: probeTrace,
     };
 
-    if (usageResult.status === "fulfilled") {
-      snapshot.monthlyUsage = { ...usageResult.value, error: undefined };
+    if (attempt.usageResult.status === "fulfilled") {
+      snapshot.monthlyUsage = { ...attempt.usageResult.value, error: undefined };
     } else {
-      snapshot.monthlyUsageError =
-        usageResult.reason instanceof Error
-          ? usageResult.reason.message
-          : String(usageResult.reason);
+      snapshot.monthlyUsageError = formatErrorMessage(attempt.usageResult.reason);
     }
 
-    if (keyResult.status === "fulfilled") {
-      snapshot.keyInfo = keyResult.value;
+    if (attempt.keyResult.status === "fulfilled") {
+      snapshot.keyInfo = attempt.keyResult.value;
     } else {
-      snapshot.keyInfoError =
-        keyResult.reason instanceof Error ? keyResult.reason.message : String(keyResult.reason);
+      snapshot.keyInfoError = formatErrorMessage(attempt.keyResult.reason);
     }
 
-    if (healthResult.status === "fulfilled") {
-      snapshot.health = healthResult.value;
+    if (attempt.healthResult.status === "fulfilled") {
+      snapshot.health = attempt.healthResult.value;
     } else {
-      snapshot.healthError =
-        healthResult.reason instanceof Error
-          ? healthResult.reason.message
-          : String(healthResult.reason);
+      snapshot.healthError = formatErrorMessage(attempt.healthResult.reason);
     }
 
-    if (dailyResult.status === "fulfilled") {
-      snapshot.dailyActivity = dailyResult.value;
-    } else {
-      snapshot.dailyActivityError =
-        dailyResult.reason instanceof Error
-          ? dailyResult.reason.message
-          : String(dailyResult.reason);
-    }
-
-    if (keyListResult.status === "fulfilled") {
-      snapshot.keyList = keyListResult.value;
-    } else {
-      snapshot.keyListError =
-        keyListResult.reason instanceof Error
-          ? keyListResult.reason.message
-          : String(keyListResult.reason);
-    }
-
-    snapshot.connectionStatus = resolveConnectionStatus(usageResult, keyResult, healthResult);
     setMonthlyUsageState(snapshot);
     lastFetchAt = Date.now();
   })();
@@ -212,7 +317,87 @@ export async function refreshMonthlyUsage(force: boolean, cwd: string): Promise<
   }
 }
 
-function publishError(message: string, connectionStatus: GatewayConnectionStatus): void {
+/**
+ * Run only the primary three probes and update the trace array.
+ * Extracted so the retry path runs the exact same code without copy/paste.
+ */
+async function runPrimaryProbes(
+  baseUrl: string,
+  apiKey: string,
+  trace: GatewayProbeTraceEntry[],
+): Promise<{
+  usageResult: PromiseSettledResult<GatewayMonthlyUsage>;
+  keyResult: PromiseSettledResult<GatewayKeyInfo>;
+  healthResult: PromiseSettledResult<GatewayHealth>;
+}> {
+  const [usageResult, keyResult, healthResult] = await Promise.allSettled([
+    tracedProbe("user-info", "/user/info", () => fetchMonthlyUsage(baseUrl, apiKey), trace),
+    tracedProbe("key-info", "/key/info", () => fetchKeyInfo(baseUrl, apiKey), trace),
+    tracedProbe("health", "/health/readiness", () => fetchHealth(baseUrl, apiKey), trace),
+  ]);
+  return { usageResult, keyResult, healthResult };
+}
+
+function delay(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+function formatErrorMessage(value: unknown): string {
+  return value instanceof Error ? value.message : String(value);
+}
+
+/**
+ * Refresh daily activity and key-list — the two endpoints that aren't
+ * needed for the splash status row or the bottom-bar pill. Runs piggy-back
+ * on the panel commands and the first turn_end (Phase 1.4).
+ *
+ * Failures here never downgrade the primary connection status — they're
+ * surfaced via `dailyActivityError` / `keyListError` only.
+ */
+export async function refreshUsageDetails(force: boolean, cwd: string): Promise<void> {
+  if (!force && lastDetailsFetchAt > 0 && Date.now() - lastDetailsFetchAt < MONTHLY_USAGE_TTL_MS) {
+    return;
+  }
+
+  if (detailsRefreshInFlight) {
+    return detailsRefreshInFlight;
+  }
+
+  detailsRefreshInFlight = (async () => {
+    const config = getGatewayConfig(cwd);
+    if (!config.baseUrl || !config.apiKey) return;
+
+    const [dailyResult, keyListResult] = await Promise.allSettled([
+      fetchDailyActivity(config.baseUrl, config.apiKey, DAILY_ACTIVITY_DEFAULT_DAYS),
+      fetchKeyList(config.baseUrl, config.apiKey),
+    ]);
+
+    // Merge into existing snapshot so we never blow away the primary state.
+    const previous = getMonthlyUsageState();
+    setMonthlyUsageState({
+      ...previous,
+      dailyActivity: dailyResult.status === "fulfilled" ? dailyResult.value : null,
+      dailyActivityError:
+        dailyResult.status === "fulfilled" ? null : formatErrorMessage(dailyResult.reason),
+      keyList: keyListResult.status === "fulfilled" ? keyListResult.value : null,
+      keyListError:
+        keyListResult.status === "fulfilled" ? null : formatErrorMessage(keyListResult.reason),
+    });
+    lastDetailsFetchAt = Date.now();
+  })();
+
+  try {
+    await detailsRefreshInFlight;
+  } finally {
+    detailsRefreshInFlight = null;
+  }
+}
+
+function publishError(
+  message: string,
+  connectionStatus: GatewayConnectionStatus,
+  keyConflict: KeyConflictWarning | null,
+): void {
   setMonthlyUsageState({
     monthlyUsage: null,
     monthlyUsageError: message,
@@ -221,7 +406,54 @@ function publishError(message: string, connectionStatus: GatewayConnectionStatus
     health: null,
     healthError: message,
     connectionStatus,
+    keyConflict,
   });
+}
+
+/**
+ * Phase 1.1: publish a `checking` snapshot at the top of every refresh so
+ * UIs can render "Checking..." the moment a probe starts. Preserves any
+ * data fields from the previous snapshot so a transient re-probe doesn't
+ * flash empty values onto the splash.
+ */
+function publishChecking(keyConflict: KeyConflictWarning | null): void {
+  const previous = getMonthlyUsageState();
+  setMonthlyUsageState({
+    ...previous,
+    connectionStatus: {
+      kind: "checking",
+      checkedAt: new Date().toISOString(),
+    },
+    keyConflict,
+  });
+}
+
+/**
+ * Phase 1.6: compute a key-conflict warning when both env and saved keys
+ * are set and don't match. Saved beats env in `getGatewayConfig`, so the
+ * env key is the stale one. Returns null when there's nothing to warn
+ * about — caller can persist that into the snapshot to clear stale
+ * warnings after the user fixes the conflict.
+ */
+export function computeKeyConflict(cwd: string): KeyConflictWarning | null {
+  const saved = getMergedSavedGatewayConfig(cwd).apiKey?.trim();
+  const env = process.env[API_KEY_ENV]?.trim();
+  if (!saved || !env) return null;
+  if (saved === env) return null;
+
+  const savedHash = hashApiKey(saved);
+  const envHash = hashApiKey(env);
+  return {
+    savedKeyHash: savedHash,
+    envKeyHash: envHash,
+    active: "saved",
+    message: `Two gateway API keys are configured (env: ${envHash}…, saved: ${savedHash}…). The saved key is active. If the env key is stale, run /sf-llm-gateway doctor for guidance, or update your shell/Keychain to match.`,
+  };
+}
+
+/** Stable 8-char hash used to identify a key without ever logging it. */
+function hashApiKey(value: string): string {
+  return createHash("sha256").update(value).digest("hex").slice(0, 8);
 }
 
 function resolveConnectionStatus(
@@ -299,7 +531,20 @@ function resolveConnectionStatus(
 
   const unreachable = failures.find((error) => !(error instanceof GatewayRequestError));
   if (unreachable) {
-    return { kind: "unreachable", detail: formatError(unreachable), checkedAt };
+    // Phase 1.3: classify AbortError separately so the splash can render
+    // "Slow" instead of "Unreachable" — the gateway might be up but the
+    // VPN/cold-start link took longer than FETCH_TIMEOUT_MS.
+    const allTimedOut = failures.every(
+      (error) => error instanceof Error && error.name === "AbortError",
+    );
+    return {
+      kind: "unreachable",
+      detail: allTimedOut
+        ? `Gateway probe timed out after ${FETCH_TIMEOUT_MS} ms. VPN waking up, or gateway slow to respond.`
+        : formatError(unreachable),
+      checkedAt,
+      timedOut: allTimedOut,
+    };
   }
 
   const first = requestErrors[0];

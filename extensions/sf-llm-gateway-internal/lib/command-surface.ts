@@ -149,9 +149,9 @@ export const GATEWAY_COMMAND_SURFACE: readonly GatewayCommandSurfaceItem[] = [
   {
     id: "usage-probe",
     label: "Probe usage scope",
-    usage: "usage-probe",
+    usage: "usage-probe [--trace]",
     description:
-      "Classify whether live usage is user-level, key-level, budget-windowed, or unavailable.",
+      "Classify whether live usage is user-level, key-level, budget-windowed, or unavailable. Pass --trace to render the per-endpoint timings + status of the last refresh.",
     section: "Discovery & diagnostics",
     aliases: ["usage"],
   },

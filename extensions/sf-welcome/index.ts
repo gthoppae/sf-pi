@@ -96,6 +96,13 @@ import { isSfPiExtensionEnabled } from "../../lib/common/sf-pi-extension-state.t
 import { FONT_FAMILY_NAME, isFontFamilyInstalled, runFontInstall } from "./lib/font-installer.ts";
 import { readWelcomeState, writeWelcomeState } from "./lib/state-store.ts";
 import { resolveGlyphMode } from "../../lib/common/glyph-policy.ts";
+import { discoverLoadedCounts } from "./lib/splash-data.ts";
+import {
+  bootTimingLogPath,
+  flushBootTiming,
+  markBootStep,
+  resetBootTiming,
+} from "../../lib/common/boot-timing.ts";
 
 // -------------------------------------------------------------------------------------------------
 // Constants
@@ -297,6 +304,36 @@ export default function sfWelcome(pi: ExtensionAPI) {
     overlayRequestRender?.();
   }
 
+  /**
+   * Phase 2.2: debounced repaint coalescer.
+   *
+   * Multiple async data sources (gateway usage probe, slack scope check,
+   * sf-cli detection, announcements feed) each finish on their own and
+   * trigger a forced repaint. Without coalescing the splash forces 5–7
+   * full overlay redraws during hydration, which reads as visual jitter
+   * on slower terminals. A 60ms trailing debounce drops that to 2–3
+   * paints without any user-visible delay (well below the 100ms
+   * perceptual threshold). Force is OR'ed across coalesced calls so a
+   * single force=true callsite is preserved through the merge.
+   */
+  let coalesceForce = false;
+  let coalesceTimer: ReturnType<typeof setTimeout> | null = null;
+  function scheduleSplashRepaint(
+    ctx: ExtensionContext,
+    generation: number,
+    force: boolean = false,
+  ): void {
+    coalesceForce = coalesceForce || force;
+    if (coalesceTimer) return;
+    coalesceTimer = setTimeout(() => {
+      const f = coalesceForce;
+      coalesceForce = false;
+      coalesceTimer = null;
+      refreshMountedSplash(ctx, generation, f);
+    }, 60);
+    coalesceTimer.unref?.();
+  }
+
   // Helper: dismiss welcome screen (overlay or header)
   function dismiss(ctx: ExtensionContext) {
     if (!isActiveSession(ctx)) return;
@@ -357,7 +394,9 @@ export default function sfWelcome(pi: ExtensionAPI) {
     // handler, and extension load order is not guaranteed — if sf-welcome
     // runs first, this call is a no-op against an empty store. Instead we
     // subscribe to the store below and repaint on every publish.
-    void refreshMonthlyUsage(true, ctx.cwd).catch(() => undefined);
+    void markBootStep("sf-welcome.gateway-refresh", () => refreshMonthlyUsage(true, ctx.cwd)).catch(
+      () => undefined,
+    );
 
     const data = collectInitialSplashData(modelName, providerName, MONTHLY_BUDGET_FALLBACK);
     const doctorReport = runDoctorDiagnostics({ cwd: ctx.cwd });
@@ -386,36 +425,59 @@ export default function sfWelcome(pi: ExtensionAPI) {
       try {
         if (runId !== startupRunId || !isActiveSession(ctx, generation)) return;
         const currentSfCli = data.sfCli;
-        const fullData = collectSplashData(
-          modelName,
-          providerName,
-          ctx.cwd,
-          MONTHLY_BUDGET_FALLBACK,
+        // Phase 2.3: split heavy FS work across two ticks. The first tick
+        // runs collectSplashData EXCEPT loadedCounts (skipped via the
+        // optional second-arg flag) so the splash paints model + gateway +
+        // slack + sf-cli rows immediately. The loaded-counts FS scan, which
+        // walks ~/.pi, ~/.claude, and the project tree, runs on the next
+        // tick. On a warm cache the difference is invisible; on a cold
+        // cache (machine just woke) the splash paints ~50ms sooner.
+        const fullData = markBootStep("sf-welcome.collect-splash", () =>
+          collectSplashData(modelName, providerName, ctx.cwd, MONTHLY_BUDGET_FALLBACK),
         );
-        Object.assign(data, fullData);
-        data.sfCli = currentSfCli ?? { installed: false, freshness: "checking", loading: true };
-        data.doctor =
-          summarizeStartupDoctorNudge(runDoctorDiagnostics({ cwd: ctx.cwd })) ?? undefined;
+        // collectSplashData is sync — markBootStep returns the sync result
+        // wrapped in a resolved Promise; settle synchronously below.
+        void fullData.then((settled) => {
+          if (runId !== startupRunId || !isActiveSession(ctx, generation)) return;
+          Object.assign(data, settled);
+          data.sfCli = currentSfCli ?? { installed: false, freshness: "checking", loading: true };
+          data.doctor =
+            summarizeStartupDoctorNudge(runDoctorDiagnostics({ cwd: ctx.cwd })) ?? undefined;
 
-        // First-ever launch: the state file has no lastSeenPiVersion and
-        // buildWhatsNewPayload returns nothing. Seed the state eagerly so the
-        // next pi update actually produces a What's New panel on dismiss.
-        if (!data.whatsNew && pendingSeenVersion) {
-          writeWelcomeState({ lastSeenPiVersion: pendingSeenVersion });
-          pendingSeenVersion = undefined;
-        }
+          if (!data.whatsNew && pendingSeenVersion) {
+            writeWelcomeState({ lastSeenPiVersion: pendingSeenVersion });
+            pendingSeenVersion = undefined;
+          }
 
-        // Capture the active announcements revision so the dismissal path can
-        // persist it. Only arm the pending ack when there is something visible
-        // — otherwise we'd claim the revision was "seen" when no panel
-        // actually rendered it.
-        if (data.announcements && data.announcements.visible.length > 0) {
-          pendingAckedRevision = data.announcements.revision || undefined;
-        } else {
-          pendingAckedRevision = undefined;
-        }
+          if (data.announcements && data.announcements.visible.length > 0) {
+            pendingAckedRevision = data.announcements.revision || undefined;
+          } else {
+            pendingAckedRevision = undefined;
+          }
 
-        refreshMountedSplash(ctx, generation);
+          scheduleSplashRepaint(ctx, generation);
+
+          // Loaded-counts FS scan deferred to a second tick so the splash
+          // paints with everything else first. Re-runs the scan because
+          // collectSplashData already filled stale zeros — cheaper than
+          // restructuring collectSplashData to take a flag.
+          setImmediate(() => {
+            if (runId !== startupRunId || !isActiveSession(ctx, generation)) return;
+            try {
+              const counts = markBootStep("sf-welcome.loaded-counts", () =>
+                discoverLoadedCounts(ctx.cwd),
+              );
+              void counts.then((c) => {
+                if (runId !== startupRunId || !isActiveSession(ctx, generation)) return;
+                data.loadedCounts = c;
+                data.loadedCountsLoading = false;
+                scheduleSplashRepaint(ctx, generation);
+              });
+            } catch {
+              // Best-effort — a partial splash with zero counts is fine.
+            }
+          });
+        });
       } catch {
         // Best-effort hydration: keep the initial splash visible even if a
         // local settings/session scan fails unexpectedly.
@@ -425,17 +487,17 @@ export default function sfWelcome(pi: ExtensionAPI) {
     // Background CLI status: keep startup responsive while `sf --version` and
     // the optional npm latest-version lookup run. No org/config commands are
     // issued from sf-welcome.
-    void detectSfCliStatus(exec)
+    void markBootStep("sf-welcome.sf-cli-detect", () => detectSfCliStatus(exec))
       .then((cli) => {
         if (runId !== startupRunId || !isActiveSession(ctx, generation)) return;
         data.sfCli = cli;
 
-        refreshMountedSplash(ctx, generation);
+        scheduleSplashRepaint(ctx, generation);
       })
       .catch(() => {
         if (runId !== startupRunId || !isActiveSession(ctx, generation)) return;
         data.sfCli = { installed: false, freshness: "unknown", loading: false };
-        refreshMountedSplash(ctx, generation);
+        scheduleSplashRepaint(ctx, generation);
       });
 
     // Subscribe to the gateway usage store so any time the provider publishes
@@ -468,8 +530,10 @@ export default function sfWelcome(pi: ExtensionAPI) {
       data.gatewayStatus = data.gatewayVisible ? (gatewayStatus ?? null) : null;
       data.gatewayLoading =
         data.gatewayVisible && gatewayState.connectionStatus?.kind === "checking";
+      // Phase 1.6: surface the cross-source key conflict on the splash row.
+      data.gatewayKeyConflict = data.gatewayVisible ? (gatewayState.keyConflict ?? null) : null;
 
-      refreshMountedSplash(ctx, generation);
+      scheduleSplashRepaint(ctx, generation);
     });
 
     unsubscribeSlackStore?.();
@@ -482,7 +546,7 @@ export default function sfWelcome(pi: ExtensionAPI) {
       data.slackStatus = status;
       data.slackConnected = status.kind === "ready";
       data.slackLoading = status.kind === "loading";
-      refreshMountedSplash(ctx, generation);
+      scheduleSplashRepaint(ctx, generation);
     });
 
     // Refresh announcements from the remote feed (when configured) in the
@@ -490,20 +554,31 @@ export default function sfWelcome(pi: ExtensionAPI) {
     // once the fetch settles. The sync payload has already populated
     // `data.announcements` with bundled + cached remote entries, so a
     // failed/disabled fetch simply leaves those intact.
-    void refreshAnnouncementsSummary(ctx.cwd)
-      .then((summary) => {
-        if (runId !== startupRunId || !isActiveSession(ctx, generation)) return;
-        if (!summary) return;
-        data.announcements = summary;
-        if (summary.visible.length > 0) {
-          pendingAckedRevision = summary.revision || undefined;
-        }
-        refreshMountedSplash(ctx, generation);
-      })
-      .catch(() => {
-        // Silent — refreshAnnouncementsSummary already swallows errors, but
-        // we add a guard here so a theoretical rejection can't leak.
-      });
+    // Announcements only repaint the right column — zero impact on first
+    // glance — so they fire last. 800 ms is past the typical splash
+    // hydration phase but still well within the 30 s splash visibility
+    // window. Same `unref` pattern as sf-cli-detect so the deferred work
+    // never holds the event loop open.
+    const announcementsTimer = setTimeout(() => {
+      if (runId !== startupRunId || !isActiveSession(ctx, generation)) return;
+      void markBootStep("sf-welcome.announcements-refresh", () =>
+        refreshAnnouncementsSummary(ctx.cwd),
+      )
+        .then((summary) => {
+          if (runId !== startupRunId || !isActiveSession(ctx, generation)) return;
+          if (!summary) return;
+          data.announcements = summary;
+          if (summary.visible.length > 0) {
+            pendingAckedRevision = summary.revision || undefined;
+          }
+          scheduleSplashRepaint(ctx, generation);
+        })
+        .catch(() => {
+          // Silent — refreshAnnouncementsSummary already swallows errors, but
+          // we add a guard here so a theoretical rejection can't leak.
+        });
+    }, 800);
+    announcementsTimer.unref?.();
 
     // Fire the one-time font-install prompt as a deferred, non-awaited
     // side task. Running it unawaited keeps session_start non-blocking,
@@ -515,6 +590,26 @@ export default function sfWelcome(pi: ExtensionAPI) {
   });
 
   // --- Dismiss on agent activity ---
+  // Phase 3.2: when SF_PI_BOOT_TIMING=1 is active, drop a one-time hint
+  // about the persisted log path so users know where to look. Suppressed
+  // when not enabled so normal sessions don't get a no-op notification.
+  pi.on("session_start", async (_event, ctx) => {
+    const enabled =
+      process.env.SF_PI_BOOT_TIMING === "1" || process.env.SF_PI_BOOT_TIMING === "true";
+    if (!enabled || !ctx.hasUI) return;
+    // Defer slightly so the notification doesn't compete with the splash.
+    setTimeout(() => {
+      try {
+        ctx.ui.notify(
+          `Boot timing report saved to ${bootTimingLogPath()} (also printed to stderr).`,
+          "info",
+        );
+      } catch {
+        // best-effort
+      }
+    }, 2_000);
+  });
+
   pi.on("agent_start", async (_event, ctx) => {
     isStreaming = true;
     dismiss(ctx);
@@ -527,6 +622,12 @@ export default function sfWelcome(pi: ExtensionAPI) {
   pi.on("session_shutdown", async (_event, ctx) => {
     const wasActive = isActiveSession(ctx);
     if (!wasActive) return;
+
+    // Phase 3.2: finalize the boot-timing report on shutdown so any step
+    // that landed after the last debounced flush still makes it to disk.
+    // No-op when SF_PI_BOOT_TIMING isn't set.
+    flushBootTiming();
+    resetBootTiming();
 
     if (dismissOverlay) {
       dismissOverlay(false);

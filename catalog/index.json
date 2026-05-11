@@ -186,7 +186,7 @@
     "entry": "extensions/sf-devbar/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 1688
+    "srcLoc": 1718
   },
   {
     "id": "sf-feedback",
@@ -320,7 +320,7 @@
     "entry": "extensions/sf-llm-gateway-internal/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 8701
+    "srcLoc": 9055
   },
   {
     "id": "sf-lsp",
@@ -534,7 +534,7 @@
     "entry": "extensions/sf-slack/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 11271
+    "srcLoc": 11279
   },
   {
     "id": "sf-welcome",
@@ -577,6 +577,6 @@
     "entry": "extensions/sf-welcome/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 3516
+    "srcLoc": 3639
   }
 ]

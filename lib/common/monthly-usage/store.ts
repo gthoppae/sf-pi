@@ -110,6 +110,75 @@ export interface GatewayConnectionStatus {
     | "config"
     | "daily-activity"
     | "key-list";
+  /** True when every primary-probe failure was an AbortError (timeout).
+   *
+   * UIs can render "Slow" instead of "Unreachable" so users know the
+   * gateway is up but the cold-network path is sluggish. Only meaningful
+   * when `kind === "unreachable"`. */
+  timedOut?: boolean;
+  /** True when `resolveConnectionStatus` retried once and the retry also
+   * failed. UIs use this to suppress further auto-retry hints. Only
+   * meaningful when `kind === "unreachable"`. */
+  retried?: boolean;
+}
+
+/**
+ * Cross-source API-key conflict warning.
+ *
+ * Emitted when the env var `SF_LLM_GATEWAY_INTERNAL_API_KEY` and the saved
+ * config both hold a non-empty key and they don't match. Saved beats env
+ * today, but a stale env key is a footgun (`/login` flows that clear saved
+ * silently fall back to a blocked env key). UIs surface this once per
+ * session as a passive nudge — not an error.
+ */
+export interface KeyConflictWarning {
+  /** Eight-char SHA-256 prefix of the env-var key. Identifies *which* key
+   * is the stale one without ever logging the secret. */
+  envKeyHash: string;
+  /** Eight-char SHA-256 prefix of the saved-config key. */
+  savedKeyHash: string;
+  /** Active key (the one chat actually uses). Always "saved" today. */
+  active: "saved" | "env";
+  /** Human-readable nudge, ready to display verbatim. */
+  message: string;
+}
+
+/**
+ * Per-endpoint result of the most recent gateway probe. Captured for
+ * `/sf-llm-gateway probe --trace` and the boot-timing diagnostic.
+ */
+export interface GatewayProbeTraceEntry {
+  /** Logical probe name, e.g. "user-info", "health". */
+  source: NonNullable<GatewayConnectionStatus["source"]>;
+  /** HTTP path probed. */
+  path: string;
+  /** Wall-clock ms the request took. */
+  durationMs: number;
+  /** HTTP status when the response landed. Undefined for AbortError / DNS. */
+  status?: number;
+  /** Error name when the fetch threw, e.g. "AbortError". */
+  errorName?: string;
+  /** First 240 chars of an error/body preview. Never includes secrets. */
+  errorMessage?: string;
+  /** True when the fetch resolved successfully (`response.ok`). */
+  ok: boolean;
+}
+
+/**
+ * Snapshot of the most recent refresh's per-endpoint timings.
+ *
+ * Cleared at the start of every refresh and replaced once probes settle.
+ * Use this to answer "which endpoint was slow / failing?" without re-running
+ * the probes.
+ */
+export interface GatewayProbeTrace {
+  startedAt: string;
+  finishedAt: string;
+  /** Total wall-clock for the whole parallel refresh. */
+  totalMs: number;
+  /** True when this trace records a retry attempt (Phase 1.2). */
+  wasRetry: boolean;
+  entries: GatewayProbeTraceEntry[];
 }
 
 export interface MonthlyUsageSnapshot {
@@ -129,6 +198,13 @@ export interface MonthlyUsageSnapshot {
   /** Number of keys this user has on the gateway, from `/key/list`. */
   keyList?: GatewayKeyList | null;
   keyListError?: string | null;
+  /**
+   * Cross-source key-conflict warning. Computed by the refresher every time
+   * it resolves config; UIs render once per session.
+   */
+  keyConflict?: KeyConflictWarning | null;
+  /** Most recent per-endpoint probe trace. Used by `--trace` diagnostics. */
+  lastProbeTrace?: GatewayProbeTrace | null;
 }
 
 export type MonthlyUsageRefresher = (force: boolean, cwd: string) => Promise<void>;
@@ -149,6 +225,8 @@ const EMPTY_SNAPSHOT: MonthlyUsageSnapshot = {
   dailyActivityError: null,
   keyList: null,
   keyListError: null,
+  keyConflict: null,
+  lastProbeTrace: null,
 };
 
 // -----------------------------------------------------------------------------

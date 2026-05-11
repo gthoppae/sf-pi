@@ -107,6 +107,7 @@ import {
   type LifecycleActionId,
 } from "../../lib/common/extension-toggle.ts";
 import { registerExtensionDoctor } from "../../lib/common/doctor/registry.ts";
+import { markBootStep } from "../../lib/common/boot-timing.ts";
 import { buildSlackDoctor } from "./lib/extension-doctor.ts";
 import {
   type CommandPanelAction,
@@ -501,7 +502,12 @@ export default function sfSlack(pi: ExtensionAPI) {
     // final tool set after probing. Errors are swallowed per-branch so one
     // failure (e.g. users.list rate-limit) does not cancel the others.
     try {
-      const authResult = await slackApi<AuthTestResponse>("auth.test", token, {}, ctx.signal);
+      // Phase 3.2: capture identity probe duration in the boot-timing report.
+      // auth.test is one of the awaited steps in session_start so its cost is
+      // baked into how fast the splash hydrates.
+      const authResult = await markBootStep("sf-slack.auth-test", () =>
+        slackApi<AuthTestResponse>("auth.test", token, {}, ctx.signal),
+      );
       if (!isActiveSession(ctx, generation)) return;
       if (!authResult.ok) {
         // slackApi maps timeouts / network errors / HTTP 4xx-5xx into a non-throwing
@@ -532,11 +538,13 @@ export default function sfSlack(pi: ExtensionAPI) {
         .map((scope) => scope.trim())
         .filter(Boolean);
       requestedScopeCount = requestedScopes.length;
-      const [probeResult] = await Promise.all([
-        probeAndGateTools(pi, token, ctx.signal, requestedScopes, tokenType),
-        prewarmUserCache(token, ctx.signal),
-        prewarmChannelCache(token, ctx.signal),
-      ]);
+      const [probeResult] = await markBootStep("sf-slack.scope-probe+prewarm", () =>
+        Promise.all([
+          probeAndGateTools(pi, token, ctx.signal, requestedScopes, tokenType),
+          prewarmUserCache(token, ctx.signal),
+          prewarmChannelCache(token, ctx.signal),
+        ]),
+      );
       if (!isActiveSession(ctx, generation)) return;
       const grantedScopes = getGrantedScopes();
       missingGrantedScopeCount = probeResult.missingGrantedScopes.length;

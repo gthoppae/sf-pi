@@ -17,13 +17,30 @@
  * the same cached Connection — matches the lib/common Q2 rule.
  */
 
-import { Org, type Connection } from "@salesforce/core";
+// Lazy-import `@salesforce/core` so just *referencing* this module from an
+// extension's `index.ts` (e.g. `import { clearConnectionCache } from ...`)
+// doesn't drag the entire `@salesforce/core` tree (and its transitive
+// `keytar`, `jsforce`, crypto-bindings, etc.) into the boot path. The value
+// import only fires when a function below is actually invoked — by then we're
+// past `session_start` and the user is interacting. The type-only `Connection`
+// import is erased at TS compile time and costs nothing at runtime.
+import type { Org as OrgType, Connection } from "@salesforce/core";
+
+let orgCtor: typeof OrgType | undefined;
+async function getOrgCtor(): Promise<typeof OrgType> {
+  if (orgCtor) return orgCtor;
+  // Single dynamic import — Node's ES module cache memoizes the SDK across
+  // every call here and across every other lazy importer in this repo.
+  const mod = await import("@salesforce/core");
+  orgCtor = mod.Org;
+  return orgCtor;
+}
 
 // -------------------------------------------------------------------------------------------------
 // Cache
 // -------------------------------------------------------------------------------------------------
 
-const orgCache = new Map<string, Promise<Org>>();
+const orgCache = new Map<string, Promise<OrgType>>();
 const DEFAULT_KEY = "<default>";
 
 /**
@@ -32,11 +49,14 @@ const DEFAULT_KEY = "<default>";
  * Pass `undefined` to use the default org chain (project default → global
  * default), matching `sf` CLI behavior.
  */
-export async function orgFromAlias(targetOrg?: string): Promise<Org> {
+export async function orgFromAlias(targetOrg?: string): Promise<OrgType> {
   const key = targetOrg ?? DEFAULT_KEY;
   let pending = orgCache.get(key);
   if (!pending) {
-    pending = Org.create({ aliasOrUsername: targetOrg }).catch((err: unknown) => {
+    pending = (async () => {
+      const Org = await getOrgCtor();
+      return Org.create({ aliasOrUsername: targetOrg });
+    })().catch((err: unknown) => {
       orgCache.delete(key);
       throw err;
     });

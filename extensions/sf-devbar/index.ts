@@ -41,6 +41,7 @@ import type {
   ExtensionContext,
 } from "@earendil-works/pi-coding-agent";
 import { truncateToWidth, visibleWidth } from "@earendil-works/pi-tui";
+import { markBootStep } from "../../lib/common/boot-timing.ts";
 import {
   getCachedSfEnvironment,
   getSharedSfEnvironment,
@@ -332,18 +333,47 @@ export default function sfDevBar(pi: ExtensionAPI) {
     restoreFromSessionEntries(ctx, ctx.cwd);
     env = getCachedSfEnvironment(ctx.cwd);
 
-    // Trigger the shared async detection chain in the common environment runtime.
-    getSharedSfEnvironment(exec, ctx.cwd, { force: true })
-      .then((freshEnv) => {
+    // Phase-2-followup: don't fire a forced fresh detection at session_start.
+    // The disk cache + session-restored snapshot is good enough for the
+    // splash and the first turn. Forcing a refresh here was the largest
+    // single fire-and-forget contributor to event-loop saturation during
+    // boot (boot-timing reported 17-30s wall when 8+ other steps competed,
+    // vs <1s direct-invocation). Two scheduling rules now apply:
+    //
+    //   1. If we have NO cached env at all, fall through to a deferred
+    //      cache-priming refresh after the boot-storm settles (5s). This
+    //      keeps first-launch experience usable without making it worse.
+    //   2. Otherwise, skip the session_start refresh entirely. The footer
+    //      and top-bar already render from cache. Live refresh is
+    //      available via /sf-org refresh whenever the user wants the
+    //      latest org status.
+    //
+    // Stale-cache UX: if the cache is older than 60 minutes we still
+    // schedule a deferred refresh, capped at one fire-and-forget call.
+    const STALE_CACHE_MS = 60 * 60 * 1000;
+    const DEFERRED_REFRESH_DELAY_MS = 5_000;
+    const cacheStale = !env || (env.detectedAt && Date.now() - env.detectedAt > STALE_CACHE_MS);
+    if (cacheStale) {
+      const deferred = setTimeout(() => {
         if (!isActiveSession(ctx, generation)) return;
-        env = freshEnv;
-        updateTitle(ctx);
-        updateTopBar(ctx);
-        requestFooterRender?.();
-      })
-      .catch(() => {
-        // Detection failed — keep showing cached data if available
-      });
+        markBootStep("sf-devbar.env-detect (deferred)", () =>
+          getSharedSfEnvironment(exec, ctx.cwd, { force: true }),
+        )
+          .then((freshEnv) => {
+            if (!isActiveSession(ctx, generation)) return;
+            env = freshEnv;
+            updateTitle(ctx);
+            updateTopBar(ctx);
+            requestFooterRender?.();
+          })
+          .catch(() => {
+            // Detection failed — keep showing cached data if available
+          });
+      }, DEFERRED_REFRESH_DELAY_MS);
+      // Don't keep the event loop alive solely for this timer; if the
+      // session shuts down before the refresh fires, drop it cleanly.
+      deferred.unref?.();
+    }
 
     // Reset per-session state
     gitChanges = null;

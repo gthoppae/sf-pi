@@ -21,8 +21,25 @@
 
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
-import { ConfigAggregator, Org } from "@salesforce/core";
+// Lazy-import `@salesforce/core`: type-only references stay static (erased
+// at TS compile time, no runtime cost), but the value imports are deferred
+// to the first time `detectConfig()` / `readOrgInfo()` actually runs. This
+// keeps the multi-MB `@salesforce/core` tree (jsforce, keytar, crypto
+// bindings, etc.) off the boot path — no extension's `index.ts` should pay
+// for it just because they import a type from this file.
+// Renamed the Org type alias to `SfOrg` to avoid collision with the local
+// `OrgType` ("sandbox" | "scratch" | "production" | ...) re-exported from
+// ./types below.
+import type { ConfigAggregator as ConfigAggregatorClass, Org as SfOrg } from "@salesforce/core";
 import { orgFromAlias } from "../sf-conn/connection.ts";
+
+let configAggregatorCtor: typeof ConfigAggregatorClass | undefined;
+async function getConfigAggregatorCtor(): Promise<typeof ConfigAggregatorClass> {
+  if (configAggregatorCtor) return configAggregatorCtor;
+  const mod = await import("@salesforce/core");
+  configAggregatorCtor = mod.ConfigAggregator;
+  return configAggregatorCtor;
+}
 import type {
   CliInfo,
   ConfigInfo,
@@ -164,6 +181,7 @@ function normalizePackageDir(raw: {
  */
 export async function detectConfig(): Promise<ConfigInfo> {
   try {
+    const ConfigAggregator = await getConfigAggregatorCtor();
     const aggregator = await ConfigAggregator.create();
     const info = aggregator.getInfo("target-org");
     const value = info?.value;
@@ -211,7 +229,7 @@ export async function detectOrg(targetOrg: string): Promise<OrgInfo> {
  * succeeded against the auth files, which matches the offline behavior of
  * `sf org display`.
  */
-function readOrgInfo(org: Org, requestedAlias: string): OrgInfo {
+function readOrgInfo(org: SfOrg, requestedAlias: string): OrgInfo {
   const conn = org.getConnection();
   const fields = conn.getAuthInfoFields() as {
     instanceUrl?: string;

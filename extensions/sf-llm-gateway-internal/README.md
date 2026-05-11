@@ -121,8 +121,10 @@ Extension loads
   ├─ discoverAndRegister()              ← async, fire-and-forget
   ├─ registerMessageRenderer()          ← gateway provider renderer
   ├─ registerCommand("sf-llm-gateway-internal")
-  ├─ on("session_start")               → re-discover, sync defaults
-  ├─ on("turn_end")                    → update footer status
+  ├─ on("session_start")               → sync defaults (sync), discover (fire-and-forget),
+  │                                       one-time key-conflict notify
+  ├─ on("turn_end")                    → update footer status; first turn_end also
+  │                                       kicks refreshUsageDetails (daily activity, key list)
   ├─ on("model_select")                → set thinking to xhigh (gateway provider)
   ├─ on("after_provider_response")     → record throttle/upstream signal (gateway provider)
   └─ on("session_shutdown")            → clear footer status + provider signal
@@ -233,29 +235,30 @@ and `usage-probe` show short self-explanatory descriptions while typing.
 
 ## Behavior Matrix
 
-| Event/Trigger             | Condition                             | Result                                                                |
-| ------------------------- | ------------------------------------- | --------------------------------------------------------------------- |
-| Extension load            | enabled + has credentials             | Register unified provider (static catalog), fire-and-forget discovery |
-| Extension load            | disabled                              | Unregister provider                                                   |
-| session_start             | —                                     | Re-discover models, sync session defaults                             |
-| turn_end                  | model is on gateway provider          | Update footer (context + monthly usage)                               |
-| turn_end                  | model is not on gateway provider      | Clear footer status                                                   |
-| model_select              | selected model is on gateway provider | Set thinking to xhigh                                                 |
-| after_provider_response   | gateway model + 2xx/3xx               | Clear any live throttle/upstream badge                                |
-| after_provider_response   | gateway model + 429                   | Record throttle signal, footer shows ⚠ badge for 60s                  |
-| after_provider_response   | gateway model + >=500                 | Record upstream signal, footer shows ⚠ badge for 60s                  |
-| session_shutdown          | —                                     | Clear footer status + provider signal                                 |
-| /command (no args)        | interactive UI                        | Open status & controls panel                                          |
-| /command (no args)        | no UI                                 | Print text status report                                              |
-| /command on               | missing credentials                   | Prompt for credentials first                                          |
-| /command on               | credentials present                   | Save config, set default gateway model, register, discover            |
-| /command off              | additive scope                        | Disable, remove gateway pattern, switch to off-default                |
-| /command off              | exclusive scope                       | Disable, restore previous scoped models, switch to off-default        |
-| /command refresh          | —                                     | Re-discover, refresh monthly usage                                    |
-| /command usage-probe      | —                                     | Force a read-only usage probe and classify key/user spend scope       |
-| /command beta \<name\> on | —                                     | Toggle beta, re-register provider                                     |
-| Monthly usage fetch       | cached < 60 s old                     | Use cache                                                             |
-| Monthly usage fetch       | stale or forced                       | Fetch from gateway /user/info                                         |
+| Event/Trigger                | Condition                             | Result                                                                                                                                         |
+| ---------------------------- | ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------- |
+| Extension load               | enabled + has credentials             | Register unified provider (static catalog), fire-and-forget discovery                                                                          |
+| Extension load               | disabled                              | Unregister provider                                                                                                                            |
+| session_start                | —                                     | Sync session defaults (awaited, local-only); fire-and-forget model discovery; emit one-time key-conflict notify when env and saved keys differ |
+| turn_end                     | model is on gateway provider          | Update footer (context + monthly usage); first turn_end also kicks refreshUsageDetails (daily activity, key list)                              |
+| turn_end                     | model is not on gateway provider      | Clear footer status                                                                                                                            |
+| model_select                 | selected model is on gateway provider | Set thinking to xhigh                                                                                                                          |
+| after_provider_response      | gateway model + 2xx/3xx               | Clear any live throttle/upstream badge                                                                                                         |
+| after_provider_response      | gateway model + 429                   | Record throttle signal, footer shows ⚠ badge for 60s                                                                                           |
+| after_provider_response      | gateway model + >=500                 | Record upstream signal, footer shows ⚠ badge for 60s                                                                                           |
+| session_shutdown             | —                                     | Clear footer status + provider signal                                                                                                          |
+| /command (no args)           | interactive UI                        | Open status & controls panel                                                                                                                   |
+| /command (no args)           | no UI                                 | Print text status report                                                                                                                       |
+| /command on                  | missing credentials                   | Prompt for credentials first                                                                                                                   |
+| /command on                  | credentials present                   | Save config, set default gateway model, register, discover                                                                                     |
+| /command off                 | additive scope                        | Disable, remove gateway pattern, switch to off-default                                                                                         |
+| /command off                 | exclusive scope                       | Disable, restore previous scoped models, switch to off-default                                                                                 |
+| /command refresh             | —                                     | Re-discover, refresh monthly usage                                                                                                             |
+| /command usage-probe         | —                                     | Force a read-only usage probe and classify key/user spend scope                                                                                |
+| /command usage-probe --trace | —                                     | Render the per-endpoint trace (timings + status) from the last refresh, plus any active key-conflict warning                                   |
+| /command beta \<name\> on    | —                                     | Toggle beta, re-register provider                                                                                                              |
+| Monthly usage fetch          | cached < 60 s old                     | Use cache                                                                                                                                      |
+| Monthly usage fetch          | stale or forced                       | Fetch from gateway /user/info                                                                                                                  |
 
 ## File Structure
 
