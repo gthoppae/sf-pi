@@ -8,9 +8,13 @@
  *
  * Cache lifecycle:
  *  - One Org promise per alias (or one for the default org with key "<default>").
- *  - `clearConnectionCache()` is called from session_start / session_shutdown
- *    in `index.ts` so resumed sessions re-auth cleanly.
+ *  - `clearConnectionCache()` should be called from each consumer's
+ *    `session_start` / `session_shutdown` so resumed sessions re-auth cleanly.
  *  - On Org.create() failure the entry is removed so the next call can retry.
+ *
+ * History: the original lived in `extensions/sf-agentscript/lib/connection.ts`.
+ * Lifted into `lib/common/sf-conn/` once a second extension (sf-data360) needed
+ * the same cached Connection — matches the lib/common Q2 rule.
  */
 
 import { Org, type Connection } from "@salesforce/core";

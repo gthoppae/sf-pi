@@ -34,7 +34,7 @@ import {
   substitutePlaceholders,
   type ResolvedAgentIds,
 } from "./active-ids.ts";
-import { resolveOrgIdentity } from "../connection.ts";
+import { resolveOrgIdentity } from "../../../../lib/common/sf-conn/connection.ts";
 import type {
   EvalApiResponse,
   EvalSpec,

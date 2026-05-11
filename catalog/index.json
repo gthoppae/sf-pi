@@ -35,7 +35,6 @@
         "lib/sdk.ts",
         "lib/inspect.ts",
         "lib/mutate.ts",
-        "lib/connection.ts",
         "lib/tool-types.ts",
         "lib/eval/sfap.ts",
         "lib/eval/normalize.ts",
@@ -66,7 +65,7 @@
     "entry": "extensions/sf-agentscript/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 11840
+    "srcLoc": 11755
   },
   {
     "id": "sf-brain",

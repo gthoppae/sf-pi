@@ -14,7 +14,7 @@
  */
 
 import { AuthInfo, Connection, type Connection as ConnectionType } from "@salesforce/core";
-import { connFromAlias } from "./connection.ts";
+import { connFromAlias } from "../../../lib/common/sf-conn/connection.ts";
 
 export interface AgentApiAuthResult {
   conn: ConnectionType;

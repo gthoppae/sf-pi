@@ -23,7 +23,7 @@ import { readFile } from "node:fs/promises";
 import { Type } from "typebox";
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { connForAgentApi } from "./agent-api-auth.ts";
-import { connFromAlias } from "./connection.ts";
+import { connFromAlias } from "../../../lib/common/sf-conn/connection.ts";
 import {
   runEval,
   recordRunInIndex,

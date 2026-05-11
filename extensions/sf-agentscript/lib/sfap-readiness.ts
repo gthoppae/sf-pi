@@ -3,7 +3,7 @@
 
 import type { Connection } from "@salesforce/core";
 import { connForAgentApi } from "./agent-api-auth.ts";
-import { connFromAlias, resolveOrgIdentity } from "./connection.ts";
+import { connFromAlias, resolveOrgIdentity } from "../../../lib/common/sf-conn/connection.ts";
 import { callEval, type EvalApiHeaders } from "./eval/eval-client.ts";
 import { isSfapRoutingFailure, sfapRequest } from "./eval/sfap.ts";
 

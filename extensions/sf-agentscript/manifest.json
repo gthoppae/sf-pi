@@ -26,7 +26,6 @@
       "lib/sdk.ts",
       "lib/inspect.ts",
       "lib/mutate.ts",
-      "lib/connection.ts",
       "lib/tool-types.ts",
       "lib/eval/sfap.ts",
       "lib/eval/normalize.ts",

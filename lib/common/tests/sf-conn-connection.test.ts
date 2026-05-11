@@ -30,7 +30,7 @@ describe("orgFromAlias", () => {
     const fakeOrg = { id: "fake" };
     createMock.mockResolvedValue(fakeOrg);
 
-    const mod = await import("../lib/connection.ts");
+    const mod = await import("../sf-conn/connection.ts");
     mod.clearConnectionCache();
 
     const a = await mod.orgFromAlias("vivint-devint");
@@ -46,7 +46,7 @@ describe("orgFromAlias", () => {
     createMock.mockResolvedValueOnce({ tag: "default" });
     createMock.mockResolvedValueOnce({ tag: "explicit" });
 
-    const mod = await import("../lib/connection.ts");
+    const mod = await import("../sf-conn/connection.ts");
     mod.clearConnectionCache();
 
     await mod.orgFromAlias();
@@ -59,7 +59,7 @@ describe("orgFromAlias", () => {
   test("clearConnectionCache drops every entry", async () => {
     createMock.mockResolvedValue({ id: "x" });
 
-    const mod = await import("../lib/connection.ts");
+    const mod = await import("../sf-conn/connection.ts");
     mod.clearConnectionCache();
 
     await mod.orgFromAlias("a");
@@ -73,7 +73,7 @@ describe("orgFromAlias", () => {
   test("a failing Org.create does NOT poison the cache", async () => {
     createMock.mockRejectedValueOnce(new Error("auth expired")).mockResolvedValueOnce({ id: "ok" });
 
-    const mod = await import("../lib/connection.ts");
+    const mod = await import("../sf-conn/connection.ts");
     mod.clearConnectionCache();
 
     await expect(mod.orgFromAlias("bad")).rejects.toThrow(/auth expired/);

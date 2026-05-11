@@ -141,7 +141,6 @@ extensions/sf-agentscript/
     agent-api-auth.ts       ← implementation module
     code-actions.ts         ← implementation module
     compile-tool.ts         ← implementation module
-    connection.ts           ← implementation module
     create-tool.ts          ← implementation module
     create.ts               ← implementation module
     diagnostics.ts          ← implementation module
@@ -164,7 +163,6 @@ extensions/sf-agentscript/
     agent-api-auth.test.ts  ← unit / smoke test
     code-actions.test.ts    ← unit / smoke test
     compile-summary.test.ts ← unit / smoke test
-    connection.test.ts      ← unit / smoke test
     create.test.ts          ← unit / smoke test
     diagnostics.test.ts     ← unit / smoke test
     eval-normalize.test.ts  ← unit / smoke test
