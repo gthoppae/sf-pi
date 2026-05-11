@@ -210,27 +210,6 @@ export function classifyConnectionProbeResult(
   return { name, path, state: "ok", keys, exitCode };
 }
 
-/**
- * Back-compat shim for callers (and tests) that still pass the prior
- * CLI-output shape (exitCode, stdout, stderr). New code should use
- * `classifyConnectionProbeResult` directly.
- */
-export function classifyProbeResult(
-  name: string,
-  path: string,
-  exitCode: number | null,
-  stdout: string,
-  stderr: string,
-): ProbeResult {
-  const parsed = parseJson(stdout);
-  const stderrMsg = stripAnsi(stderr)
-    .split("\n")
-    .find((line) => !line.includes("currently in beta"));
-  const status = exitCode === 0 ? 200 : 500;
-  const body = parsed ?? (stderrMsg ? { message: stderrMsg } : null);
-  return classifyConnectionProbeResult(name, path, status, body);
-}
-
 export function summarizeReadiness(probes: ProbeResult[]): {
   state: "ready" | "ready_empty" | "partial" | "blocked";
   guidance: string;
@@ -271,14 +250,6 @@ export function summarizeReadiness(probes: ProbeResult[]): {
   };
 }
 
-function parseJson(text: string): unknown {
-  try {
-    return text.trim() ? JSON.parse(text) : null;
-  } catch {
-    return null;
-  }
-}
-
 function extractMessage(parsed: unknown): string | undefined {
   if (Array.isArray(parsed)) {
     const first = parsed[0] as { message?: unknown } | undefined;
@@ -308,8 +279,4 @@ function inferCount(parsed: unknown): { count: number; kind: ProbeCountKind } | 
     }
   }
   return undefined;
-}
-
-function stripAnsi(text: string): string {
-  return text.replace(/\u001b\[[0-?]*[ -/]*[@-~]/g, "").trim();
 }

@@ -163,6 +163,7 @@ extensions/sf-data360/
     path.ts                 ← implementation module
     probe-tool.ts           ← implementation module
     safety.ts               ← implementation module
+    target-org.ts           ← implementation module
     truncation.ts           ← implementation module
   tests/
     api-tool.test.ts        ← unit / smoke test
@@ -171,6 +172,7 @@ extensions/sf-data360/
     probe-tool.test.ts      ← unit / smoke test
     safety.test.ts          ← unit / smoke test
     smoke.test.ts           ← unit / smoke test
+    target-org.test.ts      ← unit / smoke test
     truncation.test.ts      ← unit / smoke test
   AGENTS.md                 ← extension-specific agent editing rules
   index.ts                  ← Pi extension entry point

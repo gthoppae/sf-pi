@@ -4,8 +4,10 @@
  * aggregated `/sf-pi doctor` view.
  *
  * Why we don't just reuse `d360_probe`:
- *   - The full probe issues ~15 sf-CLI calls and can take >5 seconds.
- *   - `/sf-pi doctor` budgets each registered provider at 5 seconds total.
+ *   - The full probe runs 15 parallel HTTP calls; even at sub-second wall
+ *     clock it pulls more data than `/sf-pi doctor` needs.
+ *   - `/sf-pi doctor` budgets each registered provider at ~5 seconds total
+ *     and prefers the cheapest possible signal.
  * Instead, this adapter answers two cheap questions:
  *   1. Is the active sf-pi target org connected?
  *   2. Does the cheapest readiness probe (`/ssot/data-spaces`) return OK?

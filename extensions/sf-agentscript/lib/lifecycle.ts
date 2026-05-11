@@ -117,15 +117,6 @@ async function getVersionDetails(
   return r.records[0];
 }
 
-// Kept for back-compat with callers that only need the version DeveloperName.
-// publishAgent uses `getVersionDetails` directly to read VersionNumber too.
-async function _getVersionDeveloperName(
-  conn: Connection,
-  botVersionId: string,
-): Promise<string | undefined> {
-  return (await getVersionDetails(conn, botVersionId))?.DeveloperName;
-}
-
 // -------------------------------------------------------------------------------------------------
 // Server compile (also used by compile fallback="server")
 // -------------------------------------------------------------------------------------------------

@@ -1,58 +1,39 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 import { describe, expect, it } from "vitest";
 
-import { classifyProbeResult, summarizeReadiness } from "../lib/probe-tool.ts";
+import { classifyConnectionProbeResult, summarizeReadiness } from "../lib/probe-tool.ts";
 
 describe("sf-data360 readiness probe", () => {
   it("classifies populated and empty list responses", () => {
     expect(
-      classifyProbeResult(
-        "data_spaces",
-        "/ssot/data-spaces",
-        0,
-        JSON.stringify({ dataSpaces: [{ name: "default" }], totalSize: 1 }),
-        "",
-      ),
+      classifyConnectionProbeResult("data_spaces", "/ssot/data-spaces", 200, {
+        dataSpaces: [{ name: "default" }],
+        totalSize: 1,
+      }),
     ).toMatchObject({ state: "enabled_populated", count: 1, countKind: "total" });
 
     expect(
-      classifyProbeResult(
-        "dmo_catalog",
-        "/ssot/data-model-objects?limit=1",
-        0,
-        JSON.stringify({ dataModelObject: [] }),
-        "",
-      ),
+      classifyConnectionProbeResult("dmo_catalog", "/ssot/data-model-objects?limit=1", 200, {
+        dataModelObject: [],
+      }),
     ).toMatchObject({ state: "enabled_empty", count: 0, countKind: "returned_rows" });
   });
 
   it("classifies feature gates and missing resources", () => {
     expect(
-      classifyProbeResult(
-        "data_streams",
-        "/ssot/data-streams?limit=1",
-        1,
-        JSON.stringify([
-          {
-            message:
-              "This feature is not currently enabled for this user type or org: [CdpDataStreams]",
-            errorCode: "FUNCTIONALITY_NOT_ENABLED",
-          },
-        ]),
-        "",
-      ),
+      classifyConnectionProbeResult("data_streams", "/ssot/data-streams?limit=1", 403, [
+        {
+          message:
+            "This feature is not currently enabled for this user type or org: [CdpDataStreams]",
+          errorCode: "FUNCTIONALITY_NOT_ENABLED",
+        },
+      ]),
     ).toMatchObject({ state: "feature_gated", featureCode: "CdpDataStreams" });
 
     expect(
-      classifyProbeResult(
-        "search_indexes",
-        "/ssot/search-indexes?limit=1",
-        1,
-        JSON.stringify([
-          { errorCode: "NOT_FOUND", message: "The requested resource does not exist" },
-        ]),
-        "",
-      ),
+      classifyConnectionProbeResult("search_indexes", "/ssot/search-indexes?limit=1", 404, [
+        { errorCode: "NOT_FOUND", message: "The requested resource does not exist" },
+      ]),
     ).toMatchObject({ state: "not_found" });
   });
 

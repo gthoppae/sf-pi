@@ -59,7 +59,7 @@ export type PackageDirectory = {
 };
 
 // -------------------------------------------------------------------------------------------------
-// Config (sf config list)
+// Config (@salesforce/core ConfigAggregator)
 // -------------------------------------------------------------------------------------------------
 
 export type ConfigInfo = {
@@ -72,7 +72,7 @@ export type ConfigInfo = {
 };
 
 // -------------------------------------------------------------------------------------------------
-// Org (sf org display)
+// Org (@salesforce/core Org)
 // -------------------------------------------------------------------------------------------------
 
 export type OrgType = "sandbox" | "scratch" | "developer" | "production" | "trial" | "unknown";

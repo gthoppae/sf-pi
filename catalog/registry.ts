@@ -39,7 +39,7 @@ export const SF_PI_REGISTRY: readonly SfPiExtension[] = [
     defaultEnabled: true,
     commands: ["/sf-data360"],
     tools: ["d360_api","d360_metadata","d360_probe"],
-    events: ["session_start","resources_discover"],
+    events: ["session_start","session_shutdown","resources_discover"],
     configurable: true,
     getConfigPanel: async () => {
       const mod = await import("../extensions/sf-data360/lib/config-panel.ts");
