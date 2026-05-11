@@ -8,8 +8,9 @@
  * - No MCP server/client support.
  * - No 180 always-on generated operation tools.
  * - One deterministic `d360_api` tool for direct Salesforce REST calls via
- *   `sf api request rest`, one compact `d360_metadata` helper for common DMO/DLO
- *   discovery, plus an extension-owned skill for progressive disclosure.
+ *   `@salesforce/core` Connection, one compact `d360_metadata` helper for
+ *   common DMO/DLO discovery, plus an extension-owned skill for progressive
+ *   disclosure.
  * - The skill is contributed only while this extension is enabled. Disabling
  *   sf-data360 removes both the tool and skill on reload/new sessions.
  *
@@ -23,7 +24,7 @@
  *   /sf-data360 status     | Print enablement, tools, target org, and API version
  *   /sf-data360 help       | Print command usage
  *   d360_api dry_run       | Resolve path/org/safety without calling Salesforce
- *   d360_api read          | Call Data 360 REST endpoint via sf api request rest
+ *   d360_api read          | Call Data 360 REST endpoint via @salesforce/core Connection
  *   d360_api mutating      | Confirm dangerous calls according to safety policy
  */
 import { fileURLToPath } from "node:url";
@@ -286,7 +287,7 @@ function buildHelpText(enabled: boolean): string {
     `  Disable: /sf-pi disable sf-data360`,
     "",
     "Tools when enabled:",
-    `  ${D360_TOOL_NAME}          Call /services/data/vXX.X Data 360 REST endpoints via sf api request rest`,
+    `  ${D360_TOOL_NAME}          Call /services/data/vXX.X Data 360 REST endpoints via @salesforce/core Connection`,
     `  ${D360_METADATA_TOOL_NAME}     Compact list/describe helpers for DMOs and DLOs`,
     `  ${D360_PROBE_TOOL_NAME}        Classify Data 360 readiness with read-only probes`,
     "",

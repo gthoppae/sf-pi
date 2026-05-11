@@ -8,8 +8,8 @@ hundreds of endpoint-specific tools.
 
 It registers three native tools:
 
-- `d360_api` — calls Data 360 REST endpoints through `sf api request rest` using the
-  active Salesforce CLI auth context.
+- `d360_api` — calls Data 360 REST endpoints directly via `@salesforce/core`
+  Connection (no subprocess), reusing the active Salesforce CLI auth context.
 - `d360_metadata` — compact list/describe helpers for common DMO and DLO
   discovery tasks, avoiding broad nested catalog payloads by default.
 - `d360_probe` — runs read-only probes across core Data 360 surfaces and
@@ -45,7 +45,7 @@ Agent calls d360_api
   ├─ Classify safety by method + path
   ├─ dry_run? → return resolved request, no network call
   ├─ confirmation required? → ask user or fail closed in headless mode
-  └─ sf api request rest ...
+  └─ conn.request(method, path, body) via @salesforce/core
        └─ truncate large output and save full result to temp file
 ```
 
@@ -91,7 +91,7 @@ version.
 | `d360_probe`                                             | Org readiness is uncertain                | Run read-only surface probes and classify readiness.                       |
 | `d360_metadata`                                          | list/describe DMO/DLO request             | Return compact metadata and save raw JSON to a temp file.                  |
 | `d360_api`                                               | `dry_run: true`                           | Return resolved request and safety decision without calling Salesforce.    |
-| `d360_api`                                               | Read/query/validate/test request          | Execute via `sf api request rest`.                                         |
+| `d360_api`                                               | Read/query/validate/test request          | Execute via `@salesforce/core` Connection (`conn.request`).                |
 | `d360_api`                                               | `output_mode: "summary"` or `"file_only"` | Save full output to a temp file and avoid large inline payloads.           |
 | `d360_api`                                               | Confirmation required and UI is available | Prompt the user to allow once or block.                                    |
 | `d360_api`                                               | Confirmation required and headless        | Fail closed unless `SF_D360_ALLOW_HEADLESS_WRITE=1`.                       |
@@ -195,8 +195,8 @@ Covered by unit tests:
 - Query-string construction handles repeated values and skips nullish values.
 - Safety classification allows reads/search/query/validation/count/test/preview calls, confirms deletes and operational action paths, and treats unresolved target orgs conservatively.
 - Request resolution chooses the target org API version, resolves explicit non-default target orgs before execution, and fails closed if that resolution fails.
-- Known `sf api request rest` beta warning noise is stripped before output parsing.
-- Salesforce REST error arrays are classified as failed calls even when the CLI exits zero.
+- HTTP errors from `Connection.request` surface as `{ status, body }` and are classified by `responseLooksLikeError`; the tool emits an error envelope instead of throwing.
+- Salesforce REST error arrays embedded in 2xx responses are still classified as failed calls.
 
 ## Troubleshooting
 

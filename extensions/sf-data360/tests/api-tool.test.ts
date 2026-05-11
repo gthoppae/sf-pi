@@ -9,7 +9,6 @@ vi.mock("@salesforce/core", () => ({
 }));
 
 import {
-  buildSfApiRequestArgs,
   responseLooksLikeError,
   resolveRequest,
   resolveRequestForExecution,
@@ -123,16 +122,6 @@ describe("sf-data360 request resolution", () => {
       orgType: "unknown",
       safety: { level: "create", requiresConfirmation: true },
     });
-  });
-
-  it("adds an explicit empty JSON body for DELETE requests", () => {
-    const resolved = resolveRequest(
-      { method: "DELETE", path: "/ssot/data-model-objects/Test__dlm" },
-      env,
-    );
-
-    expect(buildSfApiRequestArgs(resolved, undefined)).toContain("--body");
-    expect(buildSfApiRequestArgs(resolved, undefined).at(-1)).toBe("{}");
   });
 
   it("detects application-level REST errors even when the CLI exits zero", () => {

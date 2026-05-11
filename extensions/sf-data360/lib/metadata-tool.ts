@@ -16,14 +16,11 @@ import {
   getSharedSfEnvironment,
 } from "../../../lib/common/sf-environment/shared-runtime.ts";
 import type { SfEnvironment } from "../../../lib/common/sf-environment/types.ts";
+import { connFromAlias } from "../../../lib/common/sf-conn/connection.ts";
+import { connRequest } from "../../../lib/common/sf-conn/request.ts";
 import { buildApiPath } from "./path.ts";
 import { responseLooksLikeError } from "./api-tool.ts";
-import {
-  buildD360Envelope,
-  cleanD360CliOutput,
-  truncateD360Output,
-  writeFullD360Output,
-} from "./truncation.ts";
+import { buildD360Envelope, truncateD360Output, writeFullD360Output } from "./truncation.ts";
 
 export const D360_METADATA_TOOL_NAME = "d360_metadata";
 
@@ -123,23 +120,15 @@ export function registerD360MetadataTool(pi: ExtensionAPI): void {
 
       const plan = buildMetadataExecutionPlan(input);
       const apiPath = buildApiPath(plan.path, apiVersion);
-      const result = await pi.exec(
-        "sf",
-        [
-          "api",
-          "request",
-          "rest",
-          apiPath,
-          "--target-org",
-          targetOrg,
-          "--header",
-          "Accept: application/json",
-        ],
-        { signal, timeout: typeof input.timeout_ms === "number" ? input.timeout_ms : 120_000 },
-      );
-
-      const output = cleanD360CliOutput(result.stdout, result.stderr);
-      const ok = result.code === 0 && !responseLooksLikeError(output);
+      if (signal?.aborted) throw new Error("d360_metadata call cancelled before request.");
+      const conn = await connFromAlias(targetOrg);
+      const resp = await connRequest<unknown>(conn, {
+        method: "GET",
+        url: apiPath,
+        timeoutMs: typeof input.timeout_ms === "number" ? input.timeout_ms : 120_000,
+      });
+      const output = stringifyMetadataBody(resp.body);
+      const ok = resp.status >= 200 && resp.status < 300 && !responseLooksLikeError(output);
       if (!ok) {
         const formatted = await truncateD360Output(output);
         const errorDetails: Record<string, unknown> = {
@@ -147,8 +136,7 @@ export function registerD360MetadataTool(pi: ExtensionAPI): void {
           action: input.action,
           path: apiPath,
           targetOrg,
-          exitCode: result.code,
-          stderr: result.stderr,
+          status: resp.status,
           ...(formatted.truncation ? { truncation: formatted.truncation } : {}),
           ...(formatted.fullOutputPath ? { fullOutputPath: formatted.fullOutputPath } : {}),
         };
@@ -197,6 +185,16 @@ async function resolveEnvironment(
   ctx: ExtensionContext,
 ): Promise<SfEnvironment> {
   return getCachedSfEnvironment(ctx.cwd) ?? (await getSharedSfEnvironment(exec, ctx.cwd));
+}
+
+function stringifyMetadataBody(body: unknown): string {
+  if (typeof body === "string") return body;
+  if (body === undefined || body === null) return "";
+  try {
+    return JSON.stringify(body, null, 2);
+  } catch {
+    return String(body);
+  }
 }
 
 export function buildMetadataExecutionPlan(input: D360MetadataInput): MetadataExecutionPlan {

@@ -10,7 +10,7 @@
   "tools": ["d360_api", "d360_metadata", "d360_probe"],
   "events": ["session_start", "resources_discover"],
   "docs": {
-    "summary": "Direct Data 360 REST access through sf api request rest with API-version pinning, target-org resolution, dry-run, safety confirmation, compact metadata helpers, and progressive skill references.",
+    "summary": "Direct Data 360 REST access through @salesforce/core Connection with API-version pinning, target-org resolution, dry-run, safety confirmation, compact metadata helpers, and progressive skill references.",
     "primaryFiles": [
       "index.ts",
       "lib/api-tool.ts",

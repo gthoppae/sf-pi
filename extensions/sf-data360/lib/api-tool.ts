@@ -10,10 +10,11 @@ import {
 } from "../../../lib/common/sf-environment/shared-runtime.ts";
 import { detectOrg, type ExecFn } from "../../../lib/common/sf-environment/detect.ts";
 import type { OrgInfo, OrgType, SfEnvironment } from "../../../lib/common/sf-environment/types.ts";
+import { connFromAlias } from "../../../lib/common/sf-conn/connection.ts";
+import { connRequest } from "../../../lib/common/sf-conn/request.ts";
 import { buildApiPath, type QueryParams } from "./path.ts";
 import {
   buildD360Envelope,
-  cleanD360CliOutput,
   D360_OUTPUT_SUFFIX,
   formatD360Output,
   type D360OutputMode,
@@ -57,7 +58,7 @@ export const D360ApiParams = Type.Object({
   dry_run: Type.Optional(
     Type.Boolean({
       description:
-        "If true, only show the resolved sf api request rest command, target org, API path, and safety decision; do not call Salesforce.",
+        "If true, only show the resolved REST request, target org, API path, and safety decision; do not call Salesforce.",
     }),
   ),
   timeout_ms: Type.Optional(
@@ -100,9 +101,9 @@ export function registerD360ApiTool(pi: ExtensionAPI): void {
     name: D360_TOOL_NAME,
     label: "Data 360 API",
     description:
-      "Call Salesforce Data 360 REST APIs through sf api request rest using the active sf CLI auth context." +
+      "Call Salesforce Data 360 REST APIs through the active sf CLI auth context (via @salesforce/core Connection)." +
       D360_OUTPUT_SUFFIX,
-    promptSnippet: "Call Salesforce Data 360 REST endpoints safely via sf api request rest",
+    promptSnippet: "Call Salesforce Data 360 REST endpoints safely via @salesforce/core Connection",
     promptGuidelines: [
       "Use d360_api for Data Cloud/Data 360 REST endpoints instead of hand-rolled curl.",
       "Pass target_org explicitly when the intended Data 360 org is not the active sf-pi default org.",
@@ -141,23 +142,69 @@ export function registerD360ApiTool(pi: ExtensionAPI): void {
 
       await enforceSafety(ctx, resolved);
 
-      const args = buildSfApiRequestArgs(resolved, input.body);
-      const result = await pi.exec("sf", args, {
-        signal,
-        timeout: typeof input.timeout_ms === "number" ? input.timeout_ms : 120_000,
-      });
-
-      const output = cleanD360CliOutput(result.stdout, result.stderr);
-      const ok = result.code === 0 && !responseLooksLikeError(output);
-      return buildResult(output, input.output_mode ?? "inline", {
+      const { text, status, ok } = await callD360Rest(resolved, input, signal);
+      return buildResult(text, input.output_mode ?? "inline", {
         ok,
         action: "call",
-        exitCode: result.code,
-        stderr: result.stderr,
+        status,
         resolved,
       });
     },
   });
+}
+
+/**
+ * Issue the Data 360 REST call via @salesforce/core Connection.
+ *
+ * Replaces the prior `sf api request rest` subprocess path. Auth comes from
+ * the same auth files the sf CLI writes — no second login, automatic token
+ * refresh, ~30× lower per-call latency than shelling. HTTP errors surface
+ * as data via `connRequest` so the caller can keep the existing
+ * ok/text/status envelope without try/catch sprawl.
+ */
+async function callD360Rest(
+  resolved: ResolvedRequest,
+  input: D360ApiInput,
+  signal: AbortSignal | undefined,
+): Promise<{ text: string; status: number; ok: boolean }> {
+  if (!resolved.targetOrg) {
+    throw new Error(
+      "No Salesforce target org is configured. Pass target_org or set sf config target-org.",
+    );
+  }
+  if (signal?.aborted) {
+    throw new Error("d360_api call cancelled before request.");
+  }
+
+  const conn = await connFromAlias(resolved.targetOrg);
+  // Some sf CLI versions errored on DELETE without an explicit body; the
+  // REST endpoint itself accepts an empty body. Preserve the prior shape
+  // by sending `{}` for DELETE when the caller didn't pass one.
+  const body =
+    resolved.method === "GET"
+      ? undefined
+      : (input.body ?? (resolved.method === "DELETE" ? {} : undefined));
+
+  const resp = await connRequest<unknown>(conn, {
+    method: resolved.method,
+    url: resolved.apiPath,
+    body,
+    timeoutMs: typeof input.timeout_ms === "number" ? input.timeout_ms : 120_000,
+  });
+
+  const text = stringifyResponseBody(resp.body);
+  const ok = resp.status >= 200 && resp.status < 300 && !responseLooksLikeError(text);
+  return { text, status: resp.status, ok };
+}
+
+function stringifyResponseBody(body: unknown): string {
+  if (typeof body === "string") return body;
+  if (body === undefined || body === null) return "";
+  try {
+    return JSON.stringify(body, null, 2);
+  } catch {
+    return String(body);
+  }
 }
 
 async function resolveEnvironment(
@@ -234,34 +281,6 @@ function targetMatchesEnvironment(targetOrg: string, env: SfEnvironment): boolea
     targetOrg === env.org.alias ||
     targetOrg === env.org.username
   );
-}
-
-export function buildSfApiRequestArgs(resolved: ResolvedRequest, body: unknown): string[] {
-  if (!resolved.targetOrg) {
-    throw new Error(
-      "No Salesforce target org is configured. Pass target_org or set sf config target-org.",
-    );
-  }
-
-  const args = [
-    "api",
-    "request",
-    "rest",
-    resolved.apiPath,
-    "--method",
-    resolved.method,
-    "--target-org",
-    resolved.targetOrg,
-    "--header",
-    "Accept: application/json",
-  ];
-  if (resolved.method !== "GET" && (body !== undefined || resolved.method === "DELETE")) {
-    // Some sf CLI versions error on DELETE without an explicit body
-    // ("No 'mode' found in 'body' entry"). An empty JSON object avoids that
-    // client-side failure while keeping the REST request semantically empty.
-    args.push("--header", "Content-Type: application/json", "--body", JSON.stringify(body ?? {}));
-  }
-  return args;
 }
 
 async function enforceSafety(ctx: ExtensionContext, resolved: ResolvedRequest): Promise<void> {

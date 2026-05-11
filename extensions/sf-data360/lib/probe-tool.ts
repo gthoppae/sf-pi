@@ -16,6 +16,8 @@ import {
   getSharedSfEnvironment,
 } from "../../../lib/common/sf-environment/shared-runtime.ts";
 import type { SfEnvironment } from "../../../lib/common/sf-environment/types.ts";
+import { connFromAlias } from "../../../lib/common/sf-conn/connection.ts";
+import { connRequest } from "../../../lib/common/sf-conn/request.ts";
 import { buildApiPath } from "./path.ts";
 import { buildD360Envelope } from "./truncation.ts";
 
@@ -106,25 +108,18 @@ export function registerD360ProbeTool(pi: ExtensionAPI): void {
           "No Salesforce target org is configured. Pass target_org or set sf config target-org.",
         );
 
+      const conn = await connFromAlias(targetOrg);
+      const timeoutMs = typeof input.timeout_ms === "number" ? input.timeout_ms : 45_000;
       const probes: ProbeResult[] = [];
       for (const probe of PROBES) {
         if (signal?.aborted) throw new Error("Data 360 readiness probe cancelled.");
         const apiPath = buildApiPath(probe.path, apiVersion);
-        const raw = await pi.exec(
-          "sf",
-          [
-            "api",
-            "request",
-            "rest",
-            apiPath,
-            "--target-org",
-            targetOrg,
-            "--header",
-            "Accept: application/json",
-          ],
-          { signal, timeout: typeof input.timeout_ms === "number" ? input.timeout_ms : 45_000 },
-        );
-        probes.push(classifyProbeResult(probe.name, probe.path, raw.code, raw.stdout, raw.stderr));
+        const resp = await connRequest<unknown>(conn, {
+          method: "GET",
+          url: apiPath,
+          timeoutMs,
+        });
+        probes.push(classifyConnectionProbeResult(probe.name, probe.path, resp.status, resp.body));
       }
 
       const summary = summarizeReadiness(probes);
@@ -163,20 +158,20 @@ async function resolveEnvironment(
   return getCachedSfEnvironment(ctx.cwd) ?? (await getSharedSfEnvironment(exec, ctx.cwd));
 }
 
-export function classifyProbeResult(
+/**
+ * Classify a probe result using the parsed body returned by
+ * `Connection.request` plus the HTTP status. Replaces the prior CLI-output
+ * shape (exitCode + stdout + stderr).
+ */
+export function classifyConnectionProbeResult(
   name: string,
   path: string,
-  exitCode: number | null,
-  stdout: string,
-  stderr: string,
+  status: number,
+  body: unknown,
 ): ProbeResult {
-  const parsed = parseJson(stdout);
-  const message =
-    extractMessage(parsed) ||
-    stripAnsi(stderr)
-      .split("\n")
-      .find((line) => !line.includes("currently in beta"));
+  const message = extractMessage(body);
   const featureCode = message?.match(/\[([A-Za-z0-9]+)\]/)?.[1];
+  const exitCode = status >= 200 && status < 300 ? 0 : 1;
 
   if (message?.includes("This feature is not currently enabled")) {
     return { name, path, state: "feature_gated", message, featureCode, exitCode };
@@ -184,18 +179,19 @@ export function classifyProbeResult(
   if (message?.includes("Couldn't find CDP tenant ID")) {
     return { name, path, state: "tenant_missing", message, exitCode };
   }
-  if (exitCode !== 0) {
-    const state = message?.includes("requested resource does not exist")
-      ? "not_found"
-      : "cli_error";
+  if (status < 200 || status >= 300) {
+    const state =
+      status === 404 || message?.includes("requested resource does not exist")
+        ? "not_found"
+        : "cli_error";
     return { name, path, state, message, exitCode };
   }
-  if (!parsed || typeof parsed !== "object") {
+  if (!body || typeof body !== "object") {
     return { name, path, state: "ok", exitCode };
   }
 
-  const keys = Object.keys(parsed as Record<string, unknown>);
-  const countInfo = inferCount(parsed);
+  const keys = Object.keys(body as Record<string, unknown>);
+  const countInfo = inferCount(body);
   if (countInfo) {
     return {
       name,
@@ -208,6 +204,27 @@ export function classifyProbeResult(
     };
   }
   return { name, path, state: "ok", keys, exitCode };
+}
+
+/**
+ * Back-compat shim for callers (and tests) that still pass the prior
+ * CLI-output shape (exitCode, stdout, stderr). New code should use
+ * `classifyConnectionProbeResult` directly.
+ */
+export function classifyProbeResult(
+  name: string,
+  path: string,
+  exitCode: number | null,
+  stdout: string,
+  stderr: string,
+): ProbeResult {
+  const parsed = parseJson(stdout);
+  const stderrMsg = stripAnsi(stderr)
+    .split("\n")
+    .find((line) => !line.includes("currently in beta"));
+  const status = exitCode === 0 ? 200 : 500;
+  const body = parsed ?? (stderrMsg ? { message: stderrMsg } : null);
+  return classifyConnectionProbeResult(name, path, status, body);
 }
 
 export function summarizeReadiness(probes: ProbeResult[]): {

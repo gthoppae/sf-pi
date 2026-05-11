@@ -18,7 +18,9 @@ import {
   getCachedSfEnvironment,
   getSharedSfEnvironment,
 } from "../../../lib/common/sf-environment/shared-runtime.ts";
-import { classifyProbeResult } from "./probe-tool.ts";
+import { connFromAlias } from "../../../lib/common/sf-conn/connection.ts";
+import { connRequest } from "../../../lib/common/sf-conn/request.ts";
+import { classifyConnectionProbeResult } from "./probe-tool.ts";
 
 const QUICK_PROBE_PATH = "/ssot/data-spaces";
 const QUICK_PROBE_TIMEOUT_MS = 4_000;
@@ -74,17 +76,17 @@ export function buildSfData360Doctor(pi: ExtensionAPI) {
     const probePath = `/services/data/v${apiVersion}${QUICK_PROBE_PATH}`;
 
     try {
-      const raw = await exec(
-        "sf",
-        ["api", "request", "rest", probePath, "--target-org", targetOrg, "--method", "GET"],
-        { timeout: QUICK_PROBE_TIMEOUT_MS },
-      );
-      const probe = classifyProbeResult(
+      const conn = await connFromAlias(targetOrg);
+      const resp = await connRequest<unknown>(conn, {
+        method: "GET",
+        url: probePath,
+        timeoutMs: QUICK_PROBE_TIMEOUT_MS,
+      });
+      const probe = classifyConnectionProbeResult(
         "data_spaces",
         QUICK_PROBE_PATH,
-        raw.code,
-        raw.stdout,
-        raw.stderr,
+        resp.status,
+        resp.body,
       );
 
       const severity =

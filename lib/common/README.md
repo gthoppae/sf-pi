@@ -25,7 +25,8 @@ code lives in `extensions/<id>/lib/`.
 | `pi-paths.ts`                                 | all extensions that touch settings                                          | Global + project `settings.json` paths, pi home dir resolution                     |
 | `state-store.ts`                              | extensions that persist per-user state                                      | Shared `createStateStore<T>()`: atomic write, schema versioning, safe defaults     |
 | `exec-adapter.ts`                             | `sf-environment` consumers                                                  | Adapter from `pi.exec()` to the `ExecFn` type used by `sf-environment/detect.ts`   |
-| `sf-conn/connection.ts`                       | `sf-agentscript`, `sf-data360` (planned), `sf-environment` (planned)        | Cached `@salesforce/core` Org / Connection lookup (replaces `sf api request rest`) |
+| `sf-conn/connection.ts`                       | `sf-agentscript`, `sf-data360`, `sf-environment`                            | Cached `@salesforce/core` Org / Connection lookup (replaces `sf api request rest`) |
+| `sf-conn/request.ts`                          | `sf-data360`                                                                | `connRequest` thin wrapper that turns HTTP errors into `{ status, body }` data     |
 | `glyph-policy.ts`                             | `sf-welcome`, `sf-devbar`                                                   | Decides emoji vs ASCII glyphs based on terminal + user prefs + env vars            |
 | `display/types.ts`                            | `sf-pi-manager`, `sf-lsp`, `sf-agentscript-…`                               | `SfPiDisplayProfile` union + shared display types                                  |
 | `display/settings.ts`                         | `sf-pi-manager`                                                             | Read/write the shared `sfPi.display.profile` setting (project > global)            |

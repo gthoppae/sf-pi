@@ -56,7 +56,9 @@ class SfData360ConfigPanel implements Focusable {
     lines.push(pad(""));
 
     lines.push(pad(` ${t.fg("muted", "Runtime:")}`));
-    lines.push(pad(`   ${t.fg("text", "REST backend")} ${t.fg("dim", "sf api request rest")}`));
+    lines.push(
+      pad(`   ${t.fg("text", "REST backend")} ${t.fg("dim", "@salesforce/core Connection")}`),
+    );
     lines.push(
       pad(`   ${t.fg("text", "Auth source")}   ${t.fg("dim", "Salesforce CLI org auth")}`),
     );
