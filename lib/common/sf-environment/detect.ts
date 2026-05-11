@@ -12,10 +12,8 @@
  * They now use `@salesforce/core` directly, sharing auth files with the sf CLI
  * but skipping the subprocess + JSON parse — measured ~30× lower latency, and
  * the `Connection` is reusable by downstream callers via the cache in
- * `lib/common/sf-conn/connection.ts`.
- *
- * The `ExecFn` parameter on `detectConfig` / `detectOrg` is preserved for
- * back-compat with callers that still pass it; it is unused by those layers.
+ * `lib/common/sf-conn/connection.ts`. Only `detectCli` still shells out (it's
+ * the only honest answer to "is sf on PATH?").
  *
  * All functions are async, side-effect-free (except detectCli's exec), and
  * return typed results. They never throw — errors are captured in the result.
@@ -163,11 +161,8 @@ function normalizePackageDir(raw: {
  * Resolve the default target-org via `ConfigAggregator`. Reads the same
  * `~/.sfdx/config.json` + project `.sf/config.json` files the `sf` CLI does;
  * just skips the subprocess + JSON parse.
- *
- * The `_exec` parameter is preserved for back-compat with callers that still
- * pass it; it is unused.
  */
-export async function detectConfig(_exec?: ExecFn): Promise<ConfigInfo> {
+export async function detectConfig(): Promise<ConfigInfo> {
   try {
     const aggregator = await ConfigAggregator.create();
     const info = aggregator.getInfo("target-org");
@@ -194,11 +189,8 @@ export async function detectConfig(_exec?: ExecFn): Promise<ConfigInfo> {
 
 /**
  * Resolve org details for `targetOrg` via the cached `Org`. No subprocess.
- *
- * The `_exec` parameter is preserved for back-compat with callers that still
- * pass it; it is unused.
  */
-export async function detectOrg(_exec: ExecFn | undefined, targetOrg: string): Promise<OrgInfo> {
+export async function detectOrg(targetOrg: string): Promise<OrgInfo> {
   try {
     const org = await orgFromAlias(targetOrg);
     return readOrgInfo(org, targetOrg);
@@ -342,7 +334,7 @@ export async function detectEnvironment(exec: ExecFn, cwd: string): Promise<SfEn
   // Layer 4: Org (in-process, cached Org/Connection)
   let org: OrgInfo;
   if (config.hasTargetOrg && config.targetOrg) {
-    org = await detectOrg(undefined, config.targetOrg);
+    org = await detectOrg(config.targetOrg);
   } else {
     org = { detected: false, orgType: "unknown" };
   }

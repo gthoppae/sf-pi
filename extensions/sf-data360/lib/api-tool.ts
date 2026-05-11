@@ -8,7 +8,7 @@ import {
   getCachedSfEnvironment,
   getSharedSfEnvironment,
 } from "../../../lib/common/sf-environment/shared-runtime.ts";
-import { detectOrg, type ExecFn } from "../../../lib/common/sf-environment/detect.ts";
+import { detectOrg } from "../../../lib/common/sf-environment/detect.ts";
 import type { OrgInfo, OrgType, SfEnvironment } from "../../../lib/common/sf-environment/types.ts";
 import { connFromAlias } from "../../../lib/common/sf-conn/connection.ts";
 import { connRequest } from "../../../lib/common/sf-conn/request.ts";
@@ -28,8 +28,6 @@ import {
 
 export const D360_TOOL_NAME = "d360_api";
 export const HEADLESS_WRITE_ENV = "SF_D360_ALLOW_HEADLESS_WRITE";
-
-const explicitOrgCache = new Map<string, OrgInfo>();
 
 export const D360ApiParams = Type.Object({
   method: StringEnum(["GET", "POST", "PATCH", "PUT", "DELETE"] as const, {
@@ -117,7 +115,7 @@ export function registerD360ApiTool(pi: ExtensionAPI): void {
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       const input = params as D360ApiInput;
       const env = await resolveEnvironment(exec, ctx);
-      const resolved = await resolveRequestForExecution(input, env, exec);
+      const resolved = await resolveRequestForExecution(input, env);
 
       if (input.dry_run) {
         return buildResult(
@@ -217,10 +215,9 @@ async function resolveEnvironment(
 export async function resolveRequestForExecution(
   input: D360ApiInput,
   env: SfEnvironment,
-  exec: ExecFn,
 ): Promise<ResolvedRequest> {
   const targetOrg = normalizeTargetOrg(input.target_org, env);
-  const targetOrgInfo = await resolveExplicitTargetOrg(targetOrg, env, exec);
+  const targetOrgInfo = await resolveExplicitTargetOrg(targetOrg, env);
   return resolveRequest(input, env, targetOrgInfo);
 }
 
@@ -247,15 +244,12 @@ export function resolveRequest(
 async function resolveExplicitTargetOrg(
   targetOrg: string | undefined,
   env: SfEnvironment,
-  exec: ExecFn,
 ): Promise<OrgInfo | undefined> {
   if (!targetOrg || targetMatchesEnvironment(targetOrg, env)) return undefined;
-
-  const cached = explicitOrgCache.get(targetOrg);
-  if (cached) return cached;
-
-  const org = await detectOrg(exec, targetOrg);
-  if (org.detected) explicitOrgCache.set(targetOrg, org);
+  // No local OrgInfo cache needed: detectOrg() now reuses the global cached
+  // Org from lib/common/sf-conn/connection.ts, so derivation is just a
+  // synchronous read off the warm Connection's auth fields.
+  const org = await detectOrg(targetOrg);
   return org.detected ? org : undefined;
 }
 

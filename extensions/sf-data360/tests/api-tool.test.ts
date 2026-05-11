@@ -93,9 +93,7 @@ describe("sf-data360 request resolution", () => {
         apiVersion: "66.0",
       }),
     );
-    const resolved = await resolveRequestForExecution(input, env, async () => {
-      throw new Error("detectOrg should not shell out anymore");
-    });
+    const resolved = await resolveRequestForExecution(input, env);
 
     expect(resolved).toMatchObject({
       targetOrg: "other-org",
@@ -113,9 +111,7 @@ describe("sf-data360 request resolution", () => {
       target_org: "missing-org",
     };
     orgCreateMock.mockRejectedValueOnce(new Error("auth failed"));
-    const resolved = await resolveRequestForExecution(input, env, async () => {
-      throw new Error("detectOrg should not shell out anymore");
-    });
+    const resolved = await resolveRequestForExecution(input, env);
 
     expect(resolved).toMatchObject({
       targetOrg: "missing-org",

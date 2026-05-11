@@ -361,7 +361,7 @@ describe("detectOrg", () => {
       }),
     );
 
-    const result = await detectOrg(undefined, "TestOrg");
+    const result = await detectOrg("TestOrg");
     expect(result.detected).toBe(true);
     expect(result.alias).toBe("TestOrg");
     expect(result.orgType).toBe("sandbox");
@@ -381,14 +381,14 @@ describe("detectOrg", () => {
       }),
     );
 
-    const result = await detectOrg(undefined, "MyScratch");
+    const result = await detectOrg("MyScratch");
     expect(result.alias).toBe("MyScratch");
     expect(result.orgType).toBe("scratch");
   });
 
   it("captures Org.create errors as { detected: false, error }", async () => {
     orgCreateMock.mockRejectedValueOnce(new Error("auth expired"));
-    const result = await detectOrg(undefined, "BadOrg");
+    const result = await detectOrg("BadOrg");
     expect(result.detected).toBe(false);
     expect(result.error).toContain("auth expired");
     expect(result.orgType).toBe("unknown");
