@@ -52,6 +52,18 @@ export interface ComponentSummary {
   subagent_refs?: string[];
   /** `@variables.X` referenced anywhere in this component. */
   variable_refs?: string[];
+  /**
+   * For action declarations only: the raw `target:` URI (e.g. `flow://X`,
+   * `apex://X`, `generatePromptResponse://X`). Empty for topics/subagents.
+   * Consumers can split on `://` to get scheme + name.
+   */
+  target?: string;
+  /**
+   * For action declarations only: the parent component when the action is
+   * inline-declared inside a subagent or topic body (e.g. `subagent.triage`).
+   * Empty for actions declared at the top level.
+   */
+  parent?: string;
 }
 
 export interface VariableSummary {
@@ -195,6 +207,11 @@ function summarizeWithRefs(name: string, entry: unknown): ComponentSummary {
   if (refs.actions.size) summary.action_refs = Array.from(refs.actions).sort();
   if (refs.subagents.size) summary.subagent_refs = Array.from(refs.subagents).sort();
   if (refs.variables.size) summary.variable_refs = Array.from(refs.variables).sort();
+  // Action declarations carry a `target:` URI — surface it so downstream
+  // consumers (publish pre-flight, doctor checks) can validate without
+  // re-parsing the AST.
+  const target = unwrapScalar(e.target);
+  if (typeof target === "string" && target.length > 0) summary.target = target;
   return summary;
 }
 
@@ -264,7 +281,32 @@ export async function inspectFile(filePath: string): Promise<InspectResult> {
   // Topics, subagents, actions are NamedMaps. Variables too.
   const topics = namedMapEntries(ast.topic).map(([n, e]) => summarizeWithRefs(n, e));
   const subagents = namedMapEntries(ast.subagent).map(([n, e]) => summarizeWithRefs(n, e));
-  const actions = namedMapEntries(ast.actions).map(([n, e]) => summarizeWithRefs(n, e));
+  // Top-level `actions:` block.
+  const topLevelActions = namedMapEntries(ast.actions).map(([n, e]) => summarizeWithRefs(n, e));
+  // Inline action declarations inside `subagent.<X>.actions:` and
+  // `topic.<X>.actions:`. Many real-world agents (and most recipes) put
+  // their action declarations inline; if we only walked the top-level
+  // block we'd miss every `target:` in the file. Each inline action gets
+  // its parent component recorded so downstream consumers (publish
+  // pre-flight, check_targets) can attribute it back to the source block.
+  const inlineActions: ComponentSummary[] = [];
+  for (const [parentName, entry] of namedMapEntries(ast.subagent)) {
+    const inner = (entry as { actions?: unknown }).actions;
+    for (const [aName, aEntry] of namedMapEntries(inner)) {
+      const summary = summarizeWithRefs(aName, aEntry);
+      summary.parent = `subagent.${parentName}`;
+      inlineActions.push(summary);
+    }
+  }
+  for (const [parentName, entry] of namedMapEntries(ast.topic)) {
+    const inner = (entry as { actions?: unknown }).actions;
+    for (const [aName, aEntry] of namedMapEntries(inner)) {
+      const summary = summarizeWithRefs(aName, aEntry);
+      summary.parent = `topic.${parentName}`;
+      inlineActions.push(summary);
+    }
+  }
+  const actions = [...topLevelActions, ...inlineActions];
   const variables = namedMapEntries(ast.variables).map(([n, e]) => summarizeVariable(n, e));
 
   const components = {

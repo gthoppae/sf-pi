@@ -154,6 +154,7 @@ extensions/sf-agentscript/
     lifecycle.ts            ← implementation module
     mutate-tool.ts          ← implementation module
     mutate.ts               ← implementation module
+    preflight.ts            ← implementation module
     preview-tool.ts         ← implementation module
     sdk.ts                  ← implementation module
     sfap-readiness.ts       ← implementation module
@@ -173,12 +174,14 @@ extensions/sf-agentscript/
     file-classify.test.ts   ← unit / smoke test
     inspect-actions.test.ts ← unit / smoke test
     inspect-cycle-safety.test.ts← unit / smoke test
+    inspect-inline-actions.test.ts← unit / smoke test
     inspect.test.ts         ← unit / smoke test
     lifecycle-sdr-layout.test.ts← unit / smoke test
     mutate-dry-run.test.ts  ← unit / smoke test
     mutate-emit-regression.test.ts← unit / smoke test
     mutate.test.ts          ← unit / smoke test
     path-containment.test.ts← unit / smoke test
+    preflight.test.ts       ← unit / smoke test
     preview-agent-api.test.ts← unit / smoke test
     preview-session-store.test.ts← unit / smoke test
     publish-authoring-bundle.test.ts← unit / smoke test

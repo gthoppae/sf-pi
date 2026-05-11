@@ -62,6 +62,58 @@ Reports land in `.pi/state/recipe-harness/report-<ts>.md`.
 
 ## Hardening fixes shipped
 
+### Pre-flight: action targets resolve in the org
+
+**Symptom**: An agent that references `flow://X` or `apex://Y` in a `target:`
+field publishes successfully via SFAP — right up until the server's late
+validation step rejects with `Invocation Target: bad value for restricted
+picklist field: <name>`. Or worse, publish + activate succeed and the
+failure surfaces only at preview-start runtime as `Precondition Failed:
+Unable to load agent config: Invalid Config`. Either way, the user has
+already paid the publish + (sometimes) activate round-trip before learning
+that backing metadata is missing.
+
+**Fix**: `lib/preflight.ts::checkActionTargets()` runs **before** server
+compile / publish. For every `target:` URI on every action declaration
+(top-level OR inline under subagent / topic), it queries the target org:
+
+- `flow://X` → `SELECT ApiName FROM FlowDefinitionView WHERE ApiName = X`
+- `apex://X` → `SELECT Name FROM ApexClass WHERE Name = X` (Tooling API)
+- `generatePromptResponse://X` and other schemes are reported as
+  `unverifiable` (we don't pre-flight prompt templates today).
+
+When any target is missing the publish raises `PreflightFailureError` with
+the full list of missing names, the deploy command to fix them, and a
+`recover_via` envelope pointing the LLM at `agentscript_inspect
+action='check_targets'` for a per-target breakdown. Pass `skipPreflight:
+true` to bypass the network check (the local `bundleType` check still
+runs).
+
+**Surface**: same module is callable standalone via the new
+`agentscript_inspect action='check_targets'` action, which returns the
+same breakdown without invoking publish. Useful when authoring an agent
+before the org is ready.
+
+**Tests**: `tests/preflight.test.ts` (12 cases covering bundle XML
+parsing, target extraction, status classification, dedup), plus
+`tests/inspect-inline-actions.test.ts` (the inline-subagent-action walk
+that feeds the pre-flight) and live exercise in the recipe harness.
+
+### Pre-flight: bundleType in bundle-meta.xml
+
+**Symptom**: hand-rolled `<AiAuthoringBundle>` XML lacking
+`<bundleType>AGENT</bundleType>` fails the SDR deploy step with the
+cryptic `Required fields are missing: [BundleType]` error AFTER the
+zip + upload round-trip.
+
+**Fix**: `lib/preflight.ts::checkBundleType()` reads the bundle XML
+before SDR ever sees it. Missing-field / wrong-root / unparseable cases
+each return a distinct `reason` code so the LLM error envelope can carry
+a clear suggestion ("Add `<bundleType>AGENT</bundleType>` inside
+`<AiAuthoringBundle>` and retry"). Scaffolds produced by
+`agentscript_create` already include the field; this only fires on
+user-authored XML.
+
 ### `ensureSdrFriendlyLayout` — bundle deploy works regardless of caller path
 
 **Symptom**: `ComponentSet.fromSource(bundleDir).deploy()` failed with
@@ -88,35 +140,8 @@ target injection).
 
 ## Hardening insights filed but not yet shipped
 
-### `bundleType` pre-flight in publish
-
-**Symptom**: hand-rolled `bundle-meta.xml` files lacking `<bundleType>AGENT</bundleType>`
-fail SDR deploy with the cryptic `Required fields are missing: [BundleType]`.
-
-**Proposed fix**: in `lifecycle.ts`, read the bundle XML before invoking SDR
-and emit a clear `MISSING_BUNDLE_TYPE` error with a `recover_via` pointing
-at `agentscript_create` or a docs link.
-
-**Workaround today**: scaffolds produced by `agentscript_create` already
-include the field; this only bites when developers hand-roll XML.
-
-### Pre-flight unresolved action references
-
-**Symptom**: recipes whose `.agent` file references undeployed actions
-(e.g. `flow://GetCurrentTimestamp`) fail at preview start with HTTP 500
-`Precondition Failed: Unable to load agent config: Invalid Config`.
-Local compile + inspect both pass cleanly. Server compile + publish + activate
-succeed. The runtime config-load is where the resolution happens.
-
-**Proposed fix**: extend `agentscript_inspect` (or add a new
-`agentscript_doctor` style action) that walks `action_refs` and reports any
-that look like `flow://...` / `apex://...` / `function://...` symbols whose
-backing metadata can't be resolved in the target org. Save users a publish +
-activate round-trip.
-
-**Workaround today**: the harness's `LIVE_LIFECYCLE_RECIPES` list curates
-out recipes with backing-metadata dependencies (`AfterReasoning`,
-`ComplexStateManagement`, `CustomerServiceAgent`, etc.).
+_(none currently — the two earlier insights graduated to shipped fixes
+in the section above.)_
 
 ---
 

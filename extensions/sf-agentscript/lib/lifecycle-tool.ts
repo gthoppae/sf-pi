@@ -191,6 +191,19 @@ async function actionPublish(
         ? `  ⚠️ AiAuthoringBundle deploy failed (Agent Script Studio will fall back to legacy builder): ${ab.error.slice(0, 200)}`
         : `  • AiAuthoringBundle ${ab.full_name} deployed (target=${ab.target}, ${ab.created ? "created" : "updated"})`
       : null;
+    const missing = result.preflight?.missing_action_targets ?? [];
+    const preflightLines: string[] = [];
+    if (missing.length > 0) {
+      preflightLines.push(
+        `  ⚠️ ${missing.length} action target(s) missing in org (preview will fail until deployed):`,
+      );
+      for (const m of missing.slice(0, 4)) {
+        preflightLines.push(`     • ${m.name} → ${m.scheme}://${m.ref_name}`);
+      }
+      if (missing.length > 4) {
+        preflightLines.push(`     …and ${missing.length - 4} more in details.preflight`);
+      }
+    }
     return toolOk(
       {
         ok: true as const,
@@ -201,6 +214,7 @@ async function actionPublish(
         was_new_agent: result.was_new_agent,
         activated: result.activated,
         authoring_bundle: result.authoring_bundle,
+        ...(result.preflight ? { preflight: result.preflight } : {}),
       },
       [
         `📦 Published ${result.developer_name}`,
@@ -208,12 +222,45 @@ async function actionPublish(
         `  • bot_version_id: ${result.bot_version_id}`,
         bundleLine,
         result.activated ? "  • activated ✓" : "  • not activated (set activate=true to chain)",
+        ...preflightLines,
       ]
         .filter(Boolean)
         .join("\n"),
     );
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
+    // Pre-flight failure. The same exception class covers two distinct
+    // checks (bundle XML, action targets); we route on the message prefix.
+    if (err instanceof Error && err.name === "PreflightFailureError") {
+      const path = (err as { path?: string }).path;
+      if (/Bundle XML is invalid/i.test(msg)) {
+        return toolError(
+          msg,
+          "Add `<bundleType>AGENT</bundleType>` inside `<AiAuthoringBundle>` and retry. " +
+            "Scaffolds produced by `agentscript_create` already include this field.",
+          path
+            ? {
+                tool: "edit",
+                params: { path, find: "<AiAuthoringBundle", replace: "<AiAuthoringBundle" },
+              }
+            : undefined,
+        );
+      }
+      // Action-target preflight failure — point at check_targets so the LLM
+      // can drill into the per-target breakdown without re-reading prose.
+      return toolError(
+        msg,
+        "Run agentscript_inspect action='check_targets' for a per-target breakdown. Then deploy the missing flows / apex classes and retry.",
+        {
+          tool: "agentscript_inspect",
+          params: {
+            action: "check_targets",
+            path: filePath,
+            target_org: input.target_org ?? "<alias>",
+          },
+        },
+      );
+    }
     if (/Local compile rejected/i.test(msg)) {
       return toolError(msg, undefined, {
         tool: "agentscript_compile",

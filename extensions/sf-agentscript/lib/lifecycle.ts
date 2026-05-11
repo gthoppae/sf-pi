@@ -23,6 +23,8 @@ import path from "node:path";
 import type { Connection } from "@salesforce/core";
 import { ComponentSet } from "@salesforce/source-deploy-retrieve";
 import { isSfapRoutingFailure, sfapRequest } from "./eval/sfap.ts";
+import { inspectFile } from "./inspect.ts";
+import { checkActionTargets, checkBundleType } from "./preflight.ts";
 import { loadAgentforceSDK } from "./sdk.ts";
 
 // -------------------------------------------------------------------------------------------------
@@ -82,6 +84,26 @@ export interface PublishResult {
     target: string;
     created: boolean;
     error?: string;
+  };
+  /**
+   * Pre-flight findings collected before the publish call. Bundle XML
+   * issues block the publish (publishAgent throws); action-target gaps
+   * surface here as warnings so the user sees them on a successful
+   * publish too. Empty/undefined when nothing was flagged.
+   */
+  preflight?: {
+    /** action_name -> { target, scheme, ref_name, status, detail? } */
+    missing_action_targets?: Array<{
+      name: string;
+      target: string;
+      scheme: string;
+      ref_name: string;
+      detail: string;
+    }>;
+    /** Total declared actions inspected. */
+    actions_inspected?: number;
+    /** When pre-flight was skipped (no Connection, etc.) the reason lives here. */
+    skipped?: string;
   };
 }
 
@@ -168,6 +190,24 @@ export interface PublishOptions {
   activate?: boolean;
   /** Optional progress callback. */
   log?: (msg: string) => void;
+  /**
+   * When true, skip the action-target Tooling-API pre-flight (network).
+   * The local bundleType pre-flight always runs; it's a file read.
+   * Default false.
+   */
+  skipPreflight?: boolean;
+}
+
+/** Thrown when a local pre-flight blocks the publish. Recoverable. */
+export class PreflightFailureError extends Error {
+  public readonly reason: string;
+  public readonly path?: string;
+  constructor(reason: string, path?: string) {
+    super(reason);
+    this.name = "PreflightFailureError";
+    this.reason = reason;
+    this.path = path;
+  }
 }
 
 // Match the CLI's bundle-meta.xml shape — needs both <bundleType>AGENT</bundleType>
@@ -279,6 +319,88 @@ export async function publishAgent(opts: PublishOptions): Promise<PublishResult>
           `Run agentscript_compile to see them, fix, and retry.`,
       );
     }
+  }
+
+  // Pre-flight: local bundle XML check (always blocks on failure).
+  // Reading the bundle-meta.xml is cheap (file read), and SDR's deploy step
+  // surfaces a cryptic 'Required fields are missing: [BundleType]' error
+  // when the field is missing. Catch it locally so the LLM gets a clean
+  // INVALID_BUNDLE envelope with a clear next step.
+  if (opts.bundleDir) {
+    const bundleMetaPath = path.join(opts.bundleDir, `${opts.agentApiName}.bundle-meta.xml`);
+    const bundleCheck = await checkBundleType(bundleMetaPath);
+    if (!bundleCheck.ok) {
+      throw new PreflightFailureError(
+        `Bundle XML is invalid: ${bundleCheck.detail}`,
+        bundleMetaPath,
+      );
+    }
+  }
+
+  // Pre-flight: action targets via Tooling API. Non-blocking — we collect
+  // missing references and surface them on PublishResult.preflight so the
+  // caller can warn the user without aborting the publish. Server-side
+  // validation will catch them too, but pre-flighting lets us route the
+  // user to deploy the missing flows / classes BEFORE the publish round-
+  // trip succeeds and the agent fails at preview-start runtime.
+  let preflightFindings: PublishResult["preflight"];
+  if (!opts.skipPreflight) {
+    if (opts.bundleDir) {
+      try {
+        // Reuse inspectFile so we walk both top-level `actions:` and inline
+        // declarations under `subagent.<X>.actions:` / `topic.<X>.actions:`.
+        // CSA-style recipes declare every action inline, so a top-level-only
+        // walk would silently miss them all and the pre-flight would no-op.
+        const agentPath = path.join(opts.bundleDir, `${opts.agentApiName}.agent`);
+        const inspect = await inspectFile(agentPath);
+        const actions = inspect.ok ? (inspect.components?.actions ?? []) : [];
+        const targeted = actions.filter((a) => typeof a.target === "string" && a.target.length > 0);
+        if (targeted.length > 0) {
+          log(`Pre-flighting ${targeted.length} action target(s) against the org…`);
+          const tcheck = await checkActionTargets(opts.conn, targeted);
+          const missing = tcheck.targets.filter((t) => t.status === "missing");
+          preflightFindings = {
+            actions_inspected: tcheck.total,
+            ...(missing.length > 0
+              ? {
+                  missing_action_targets: missing.map((m) => ({
+                    name: m.name,
+                    target: m.target,
+                    scheme: m.scheme,
+                    ref_name: m.ref_name,
+                    detail: m.detail ?? "",
+                  })),
+                }
+              : {}),
+          };
+          // Block the publish when any action target is missing in the org.
+          // Server publish would otherwise fail with a cryptic 'Invocation
+          // Target: bad value for restricted picklist field' error after the
+          // network round-trip. The clean local error includes the full list
+          // of missing targets so the user can deploy them, then retry.
+          if (missing.length > 0) {
+            const lines = [
+              `${missing.length} action target(s) missing in org — publish would fail at server validation.`,
+              "Missing:",
+              ...missing.slice(0, 10).map((m) => `  • ${m.name} → ${m.scheme}://${m.ref_name}`),
+            ];
+            if (missing.length > 10) lines.push(`  …and ${missing.length - 10} more`);
+            lines.push("");
+            lines.push(
+              "Deploy the missing flows / classes (sf project deploy start -m Flow:<X> -m ApexClass:<Y>), then retry. Pass skipPreflight=true to bypass this check.",
+            );
+            throw new PreflightFailureError(lines.join("\n"));
+          }
+        }
+      } catch (err) {
+        if (err instanceof PreflightFailureError) throw err;
+        preflightFindings = {
+          skipped: `action-target pre-flight skipped: ${err instanceof Error ? err.message : String(err)}`,
+        };
+      }
+    }
+  } else {
+    preflightFindings = { skipped: "opts.skipPreflight=true" };
   }
 
   const agentApiConn = opts.agentApiConn ?? opts.conn;
@@ -447,6 +569,7 @@ export async function publishAgent(opts: PublishOptions): Promise<PublishResult>
     activated,
     version_developer_name: versionDeveloperName,
     authoring_bundle: authoringBundleResult,
+    ...(preflightFindings ? { preflight: preflightFindings } : {}),
   };
 }
 

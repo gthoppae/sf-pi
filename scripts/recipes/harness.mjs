@@ -82,23 +82,21 @@ function parseArgs() {
 // -----------------------------------------------------------------------------
 
 // Recipes selected for live lifecycle. Curated to ones whose .agent file
-// does NOT depend on backing flows / Apex / custom objects from the recipe
-// repo — those would 500 at preview start because their config references
-// undeployed `flow://...` actions (see hardening note in the harness output).
+// has zero `flow://` / `apex://` action targets (so the publish pre-flight
+// doesn't block) AND no backing-metadata dependencies. Recipes with
+// `generatePromptResponse://` URIs are still allowed because the pre-flight
+// reports them as 'unverifiable' rather than 'missing'.
+//
+// Recipes with flow/apex deps that would block (SimpleQA, TemplateExpressions,
+// ReasoningInstructions, MultiSubagentNavigation, BidirectionalNavigation, etc.)
+// are exercised in a separate phase that uses skipPreflight=true to demo the
+// escape hatch.
 const LIVE_LIFECYCLE_RECIPES = [
-  // 01_languageEssentials — pure language features, no actions
   { name: "HelloWorld", utterance: "Tell me a poem about clouds." },
-  { name: "SimpleQA", utterance: "What is Salesforce in one sentence?" },
   { name: "LanguageSettings", utterance: "Hello!" },
   { name: "SystemInstructionOverrides", utterance: "Hi there." },
   { name: "VariableManagement", utterance: "Hello." },
-  { name: "TemplateExpressions", utterance: "Hello." },
-  // 03_reasoningMechanics — ReasoningInstructions has no flow actions; AfterReasoning does.
-  { name: "ReasoningInstructions", utterance: "Hi there." },
-  // 04_architecturalPatterns — no actions in these particular recipes
   { name: "PromptTemplateActions", utterance: "Hi." },
-  { name: "MultiSubagentNavigation", utterance: "Hi." },
-  { name: "BidirectionalNavigation", utterance: "Hi." },
 ];
 
 // -----------------------------------------------------------------------------
@@ -115,7 +113,8 @@ async function loadSdk() {
   const { publishAgent, activateVersion, deactivateVersion } = await import(
     `${SDK_LIB}/lifecycle.ts`
   );
-  const { connFromAlias } = await import(`${SDK_LIB}/connection.ts`);
+  // connection.ts was lifted into lib/common/sf-conn during the @salesforce/core migration.
+  const { connFromAlias } = await import(`${REPO_ROOT}/lib/common/sf-conn/connection.ts`);
   const { connForAgentApi } = await import(`${SDK_LIB}/agent-api-auth.ts`);
   const { startPreviewByApiName, sendMessage, endPreview } = await import(
     `${SDK_LIB}/preview/client.ts`

@@ -29,6 +29,18 @@ export interface PublishDetails {
   authoring_bundle?: AuthoringBundleResult | null;
   /** Studio URL — populated when we can derive it from the connection. */
   studio_url?: string;
+  /** Pre-flight findings (action targets, etc.). */
+  preflight?: {
+    actions_inspected?: number;
+    missing_action_targets?: Array<{
+      name: string;
+      target: string;
+      scheme: string;
+      ref_name: string;
+      detail: string;
+    }>;
+    skipped?: string;
+  };
 }
 
 export interface VersionRow {
@@ -176,6 +188,28 @@ function formatPublishBody(
   } else {
     lines.push(
       `  ${dim("·")} Not activated ${dim(`(set activate=true to chain publish + activate)`)}`,
+    );
+  }
+
+  // Pre-flight: surface missing action targets as a clear card so the user
+  // sees them on a successful publish (publish itself doesn't block on
+  // these — the runtime will, but the heads-up here saves a round-trip).
+  const missing = details.preflight?.missing_action_targets ?? [];
+  if (missing.length > 0) {
+    lines.push("");
+    lines.push(
+      `  ${err("⚠")}  ${bold(`${missing.length} action target(s) missing in org`)} ${dim("(preview will fail until deployed)")}`,
+    );
+    for (const m of missing.slice(0, 6)) {
+      lines.push(`     ${err("•")} ${code(m.name)}  ${dim(`→ ${m.scheme}://${m.ref_name}`)}`);
+    }
+    if (missing.length > 6) {
+      lines.push(
+        `     ${dim(`…and ${missing.length - 6} more in details.preflight.missing_action_targets`)}`,
+      );
+    }
+    lines.push(
+      `  ${dim("deploy with")} ${code("sf project deploy start -m Flow:<X> -m ApexClass:<Y>")}`,
     );
   }
 
