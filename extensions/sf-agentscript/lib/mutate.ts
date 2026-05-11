@@ -194,6 +194,41 @@ async function commitOrPreview(
       diff: makeUnifiedDiff(op.path, sourceBefore, after),
     };
   }
+  // Defensive write: confirm the proposed source is a regression-free
+  // rewrite of the original BEFORE clobbering the file on disk. The
+  // vendored SDK's CST/AST emit has shown rare edge cases where a deep
+  // mutation causes emit() to duplicate a small tail of the source
+  // (observed live: `set_field` on a deep `topic.escalation.description`
+  // appended a partial copy of the file's last line). Pre-write
+  // validation catches these without leaving a corrupt file in the
+  // user's working tree.
+  //
+  // Rollback rule: if the proposed source introduces ANY new severity-1
+  // diagnostic that wasn't present in the source we received, refuse
+  // the write and surface what changed.
+  const beforeCheck = await checkAgentScriptFileFromSource(sourceBefore);
+  const afterCheck = await checkAgentScriptFileFromSource(after);
+  const beforeSev1 = (beforeCheck?.diagnostics ?? [])
+    .filter((d) => d.severity === 1)
+    .map((d) => `${d.code ?? "(no-code)"}@L${(d.range.start.line ?? 0) + 1}`);
+  const afterSev1 = (afterCheck?.diagnostics ?? [])
+    .filter((d) => d.severity === 1)
+    .map((d) => `${d.code ?? "(no-code)"}@L${(d.range.start.line ?? 0) + 1}`);
+  const newSev1 = afterSev1.filter((s) => !beforeSev1.includes(s));
+  if (newSev1.length > 0) {
+    return {
+      ok: false,
+      reason: "emit_regression",
+      reason_detail:
+        `${appliedVia} mutation passed locally but the SDK emit() introduced ` +
+        `${newSev1.length} new severity-1 diagnostic(s): ${newSev1.slice(0, 5).join(", ")}. ` +
+        `Refusing to write the regression to disk. Run agentscript_compile on the ` +
+        `current file to confirm it is still clean, then either retry the same mutate ` +
+        `(emit edge cases are non-deterministic across runs) or fall back to the ` +
+        `generic edit tool for this change.`,
+    };
+  }
+
   await fs.writeFile(op.path, after, "utf8");
   const recompile = await checkAgentScriptFile(op.path);
   return {
@@ -203,6 +238,35 @@ async function commitOrPreview(
     bytes_changed: after.length - sourceBefore.length,
     diagnostics_after: recompile.ok ? recompile.diagnostics : [],
   };
+}
+
+/**
+ * Run the SDK compile on an in-memory string without touching the disk.
+ * Used by `commitOrPreview` to compare the proposed `after` against the
+ * `before` source, so we can refuse to write any AST emit that introduces
+ * a severity-1 regression. Exported for tests.
+ */
+export async function checkAgentScriptFileFromSource(
+  source: string,
+): Promise<{
+  ok: boolean;
+  diagnostics: Array<{ severity?: number; code?: string; range: { start: { line?: number } } }>;
+} | null> {
+  const sdk = await loadAgentforceSDK();
+  if (!sdk) return null;
+  try {
+    const r = (sdk as { compileSource: (s: string) => { diagnostics?: unknown[] } }).compileSource(
+      source,
+    );
+    const diagnostics = (r.diagnostics ?? []) as Array<{
+      severity?: number;
+      code?: string;
+      range: { start: { line?: number } };
+    }>;
+    return { ok: true, diagnostics };
+  } catch {
+    return { ok: false, diagnostics: [] };
+  }
 }
 
 /**
