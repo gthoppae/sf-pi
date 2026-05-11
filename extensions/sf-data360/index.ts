@@ -19,6 +19,8 @@
  *   Event/Trigger          | Result
  *   -----------------------|-----------------------------------------------------------
  *   extension load         | Register d360_api, d360_metadata, d360_probe, and /sf-data360
+ *   session_start          | Re-register tools if enabled; clear cached @salesforce/core Org
+ *   session_shutdown       | Clear cached @salesforce/core Org so resume re-auths cleanly
  *   resources_discover     | Contribute ./skills so sf-data360 skill is visible
  *   /sf-data360 (no args)  | Open standardized command panel (status/help/close)
  *   /sf-data360 status     | Print enablement, tools, target org, and API version
@@ -53,6 +55,7 @@ import {
   getSharedSfEnvironment,
 } from "../../lib/common/sf-environment/shared-runtime.ts";
 import type { SfEnvironment } from "../../lib/common/sf-environment/types.ts";
+import { clearConnectionCache } from "../../lib/common/sf-conn/connection.ts";
 import { requirePiVersion } from "../../lib/common/pi-compat.ts";
 import { isSfPiExtensionEnabled } from "../../lib/common/sf-pi-extension-state.ts";
 import { D360_TOOL_NAME, registerD360ApiTool } from "./lib/api-tool.ts";
@@ -80,6 +83,14 @@ export default function sfData360(pi: ExtensionAPI) {
 
   pi.on("session_start", (_event, ctx) => {
     if (isSfPiExtensionEnabled(ctx.cwd, "sf-data360")) ensureToolsRegistered();
+    // Drop the cached @salesforce/core Org so resumed sessions re-auth and
+    // pick up any token refresh that happened outside this process. Cache
+    // is global; clearing it here is harmless when other extensions also
+    // wire the same hook.
+    clearConnectionCache();
+  });
+  pi.on("session_shutdown", () => {
+    clearConnectionCache();
   });
 
   // Contribute a small org-connectivity + readiness probe to the

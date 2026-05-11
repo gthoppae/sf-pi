@@ -19,6 +19,7 @@ import {
   readPersistedSfEnvironment,
   writePersistedSfEnvironment,
 } from "./persisted-cache.ts";
+import { clearConnectionCache } from "../sf-conn/connection.ts";
 import type { SfEnvironment } from "./types.ts";
 import type { CustomEntry, ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
 
@@ -154,9 +155,20 @@ export function peekSharedSfEnvironment(cwd: string): SfEnvironment | null {
   return cache.get(getEnvironmentCacheKey(cwd))?.value ?? null;
 }
 
+/**
+ * Drop the in-memory env snapshot cache.
+ *
+ * - Called with no args: wipe every cwd. Also drops the global
+ *   `@salesforce/core` Org/Connection cache from `lib/common/sf-conn` so
+ *   the next detection re-reads auth files. This keeps the two caches
+ *   in lock-step on session-wide refreshes.
+ * - Called with a `cwd`: scoped delete. Leaves the Connection cache
+ *   intact because it's keyed by org alias, not cwd.
+ */
 export function clearSharedSfEnvironment(cwd?: string): void {
   if (cwd === undefined) {
     cache.clear();
+    clearConnectionCache();
     return;
   }
 
