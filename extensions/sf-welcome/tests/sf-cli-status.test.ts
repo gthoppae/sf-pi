@@ -1,6 +1,10 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /**
  * Targeted tests for the welcome-screen SF CLI status helper.
+ *
+ * Post-Phase-4: the latest-version lookup hits the npm registry directly
+ * via `fetch` instead of shelling `npm view`. Tests stub it through the
+ * `fetchLatest` parameter on `detectSfCliStatus`.
  */
 import { describe, expect, it } from "vitest";
 import {
@@ -8,6 +12,7 @@ import {
   isVersionCurrent,
   parseSfCliVersion,
   type SfCliExecFn,
+  type SfCliFetchLatestFn,
 } from "../lib/sf-cli-status.ts";
 
 function createExec(
@@ -29,6 +34,10 @@ function createExec(
   };
 }
 
+function stubFetchLatest(version: string | undefined): SfCliFetchLatestFn {
+  return async () => version;
+}
+
 describe("parseSfCliVersion", () => {
   it("extracts the version from sf --version output", () => {
     expect(parseSfCliVersion("@salesforce/cli/2.132.14 darwin-arm64 node-v22\n")).toBe("2.132.14");
@@ -45,12 +54,12 @@ describe("isVersionCurrent", () => {
 });
 
 describe("detectSfCliStatus", () => {
-  it("reports latest when installed version matches npm", async () => {
+  it("reports latest when installed version matches the registry", async () => {
     const status = await detectSfCliStatus(
       createExec({
         "sf --version": { stdout: "@salesforce/cli/2.132.14 darwin-arm64\n" },
-        "npm view @salesforce/cli version": { stdout: "2.132.14\n" },
       }),
+      stubFetchLatest("2.132.14"),
     );
 
     expect(status).toEqual({
@@ -62,20 +71,21 @@ describe("detectSfCliStatus", () => {
     });
   });
 
-  it("reports update availability when npm is newer", async () => {
+  it("reports update availability when the registry has a newer version", async () => {
     const status = await detectSfCliStatus(
       createExec({
         "sf --version": { stdout: "@salesforce/cli/2.132.14 darwin-arm64\n" },
-        "npm view @salesforce/cli version": { stdout: "2.133.0\n" },
       }),
+      stubFetchLatest("2.133.0"),
     );
 
     expect(status.freshness).toBe("update-available");
     expect(status.latestVersion).toBe("2.133.0");
   });
 
-  it("does not run npm when sf is missing", async () => {
+  it("does not run the registry fetch when sf is missing", async () => {
     const calls: string[] = [];
+    let fetchCalls = 0;
     const status = await detectSfCliStatus(
       createExec(
         {
@@ -83,18 +93,23 @@ describe("detectSfCliStatus", () => {
         },
         calls,
       ),
+      async () => {
+        fetchCalls += 1;
+        return "2.133.0";
+      },
     );
 
     expect(status).toEqual({ installed: false, freshness: "unknown", loading: false });
     expect(calls).toEqual(["sf --version"]);
+    expect(fetchCalls).toBe(0);
   });
 
-  it("keeps installed status when npm latest lookup fails", async () => {
+  it("keeps installed status when the registry lookup fails", async () => {
     const status = await detectSfCliStatus(
       createExec({
         "sf --version": { stdout: "@salesforce/cli/2.132.14 darwin-arm64\n" },
-        "npm view @salesforce/cli version": { code: 1, stderr: "network unavailable" },
       }),
+      stubFetchLatest(undefined),
     );
 
     expect(status).toEqual({
