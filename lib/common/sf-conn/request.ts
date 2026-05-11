@@ -26,7 +26,16 @@ export interface ConnRequest {
   method: HttpMethod;
   /** Path relative to instance URL (e.g. `/services/data/v66.0/...`) or absolute URL. */
   url: string;
-  /** Request body. JSON-serialized internally; pass undefined to omit. */
+  /**
+   * Request body. Passed through unchanged when it's already a string
+   * (caller has serialized it; e.g. an LLM tool that accepted a raw JSON
+   * body). Otherwise JSON-serialized. Pass undefined to omit.
+   *
+   * The string-passthrough path matters in practice: if a caller hands us
+   * an already-stringified `{"sql":"..."}` and we run it through
+   * `JSON.stringify` again, the server receives a JSON-quoted string and
+   * returns `JSON_PARSER_ERROR`. See `serializeBody` below for the rule.
+   */
   body?: unknown;
   /** Custom headers. Defaults to `Content-Type: application/json` + `Accept: application/json`. */
   headers?: Record<string, string>;
@@ -63,13 +72,32 @@ export async function connRequest<T = unknown>(
       method: req.method,
       url: req.url,
       headers,
-      body: req.body !== undefined ? JSON.stringify(req.body) : undefined,
+      body: serializeBody(req.body),
       timeout,
     } as Parameters<typeof conn.request>[0]);
     return { status: 200, body };
   } catch (err) {
     return { status: inferStatus(err), body: errorAsBody(err) as T };
   }
+}
+
+/**
+ * Serialize a request body for jsforce's HTTP transport.
+ *
+ * jsforce sends `request.body` to the wire as-is — it does not re-stringify.
+ * That makes the rule simple: if the caller already gave us a string, trust
+ * it and pass it through; otherwise JSON-encode the value.
+ *
+ * Why not always JSON.stringify? Because some callers (most often LLM tool
+ * inputs declared as `Type.Any()`) hand us a body that's already a JSON
+ * string. `JSON.stringify('{"sql":"SELECT 1"}')` produces
+ * `'"{\\"sql\\":\\"SELECT 1\\"}"'` and the server returns
+ * `JSON_PARSER_ERROR: Value does not match expected type`.
+ */
+export function serializeBody(body: unknown): string | undefined {
+  if (body === undefined) return undefined;
+  if (typeof body === "string") return body;
+  return JSON.stringify(body);
 }
 
 /**

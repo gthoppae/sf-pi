@@ -8,7 +8,7 @@
   "configurable": true,
   "commands": ["/sf-data360"],
   "tools": ["d360_api", "d360_metadata", "d360_probe"],
-  "events": ["session_start", "resources_discover"],
+  "events": ["session_start", "session_shutdown", "resources_discover"],
   "docs": {
     "summary": "Direct Data 360 REST access through @salesforce/core Connection with API-version pinning, target-org resolution, dry-run, safety confirmation, compact metadata helpers, and progressive skill references.",
     "primaryFiles": [

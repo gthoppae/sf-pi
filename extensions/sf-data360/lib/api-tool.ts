@@ -8,11 +8,16 @@ import {
   getCachedSfEnvironment,
   getSharedSfEnvironment,
 } from "../../../lib/common/sf-environment/shared-runtime.ts";
-import { detectOrg } from "../../../lib/common/sf-environment/detect.ts";
 import type { OrgInfo, OrgType, SfEnvironment } from "../../../lib/common/sf-environment/types.ts";
 import { connFromAlias } from "../../../lib/common/sf-conn/connection.ts";
 import { connRequest } from "../../../lib/common/sf-conn/request.ts";
 import { buildApiPath, type QueryParams } from "./path.ts";
+import {
+  normalizeTargetOrg,
+  resolveApiVersion,
+  resolveExplicitTargetOrg,
+  resolveOrgType,
+} from "./target-org.ts";
 import {
   buildD360Envelope,
   D360_OUTPUT_SUFFIX,
@@ -229,52 +234,12 @@ export function resolveRequest(
   const method = normalizeMethod(input.method);
   const targetOrg = normalizeTargetOrg(input.target_org, env);
   const resolvedTargetOrgInfo = targetOrgInfo?.detected ? targetOrgInfo : undefined;
-  const apiVersion =
-    resolvedTargetOrgInfo?.apiVersion ??
-    env.org.apiVersion ??
-    env.project.sourceApiVersion ??
-    "66.0";
+  const apiVersion = resolveApiVersion(env, resolvedTargetOrgInfo);
   const apiPath = buildApiPath(input.path, apiVersion, input.query);
   const orgType = resolveOrgType(targetOrg, env, resolvedTargetOrgInfo);
   const safety = classifyD360Request(method, input.path, orgType);
 
   return { method, apiPath, targetOrg, apiVersion, orgType, safety };
-}
-
-async function resolveExplicitTargetOrg(
-  targetOrg: string | undefined,
-  env: SfEnvironment,
-): Promise<OrgInfo | undefined> {
-  if (!targetOrg || targetMatchesEnvironment(targetOrg, env)) return undefined;
-  // No local OrgInfo cache needed: detectOrg() now reuses the global cached
-  // Org from lib/common/sf-conn/connection.ts, so derivation is just a
-  // synchronous read off the warm Connection's auth fields.
-  const org = await detectOrg(targetOrg);
-  return org.detected ? org : undefined;
-}
-
-function normalizeTargetOrg(targetOrg: string | undefined, env: SfEnvironment): string | undefined {
-  const explicit = targetOrg?.trim();
-  if (explicit) return explicit;
-  return env.config.targetOrg ?? env.org.alias ?? env.org.username;
-}
-
-function resolveOrgType(
-  targetOrg: string | undefined,
-  env: SfEnvironment,
-  targetOrgInfo?: OrgInfo,
-): OrgType | "unknown" {
-  if (!targetOrg) return "unknown";
-  if (targetMatchesEnvironment(targetOrg, env)) return env.org.orgType;
-  return targetOrgInfo?.orgType ?? "unknown";
-}
-
-function targetMatchesEnvironment(targetOrg: string, env: SfEnvironment): boolean {
-  return (
-    targetOrg === env.config.targetOrg ||
-    targetOrg === env.org.alias ||
-    targetOrg === env.org.username
-  );
 }
 
 async function enforceSafety(ctx: ExtensionContext, resolved: ResolvedRequest): Promise<void> {

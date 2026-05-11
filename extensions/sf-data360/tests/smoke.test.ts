@@ -14,7 +14,7 @@ describe("sf-data360 extension smoke", () => {
     expect(manifest.defaultEnabled).toBe(true);
     expect(manifest.configurable).toBe(true);
     expect(manifest.tools).toEqual(["d360_api", "d360_metadata", "d360_probe"]);
-    expect(manifest.events).toEqual(["session_start", "resources_discover"]);
+    expect(manifest.events).toEqual(["session_start", "session_shutdown", "resources_discover"]);
   });
 
   it("keeps skill references on disk instead of package-level skill registration", () => {

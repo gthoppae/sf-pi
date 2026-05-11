@@ -19,6 +19,7 @@ import type { SfEnvironment } from "../../../lib/common/sf-environment/types.ts"
 import { connFromAlias } from "../../../lib/common/sf-conn/connection.ts";
 import { connRequest } from "../../../lib/common/sf-conn/request.ts";
 import { buildApiPath } from "./path.ts";
+import { resolveTargetOrgContext } from "./target-org.ts";
 import { buildD360Envelope } from "./truncation.ts";
 
 export const D360_PROBE_TOOL_NAME = "d360_probe";
@@ -100,9 +101,11 @@ export function registerD360ProbeTool(pi: ExtensionAPI): void {
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       const input = params as D360ProbeInput;
       const env = await resolveEnvironment(exec, ctx);
-      const apiVersion = env.org.apiVersion ?? env.project.sourceApiVersion ?? "66.0";
-      const targetOrg =
-        input.target_org?.trim() || env.config.targetOrg || env.org.alias || env.org.username;
+      // Resolve apiVersion against the *target* org, not the active sf-pi org.
+      // Otherwise a target_org on a different release than the default produces
+      // /services/data/v<wrong>/... URLs that 404 every probe and falsely
+      // report "blocked".
+      const { targetOrg, apiVersion } = await resolveTargetOrgContext(input.target_org, env);
       if (!targetOrg)
         throw new Error(
           "No Salesforce target org is configured. Pass target_org or set sf config target-org.",
