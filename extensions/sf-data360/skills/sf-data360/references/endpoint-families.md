@@ -11,7 +11,7 @@ relative to `/services/data/vXX.X`.
 - `GET /ssot/query-sql/{queryId}` — check query status.
 - `GET /ssot/query-sql/{queryId}/rows` — fetch query rows.
 - `DELETE /ssot/query-sql/{queryId}` — cancel query.
-- `POST /connect/search/metadata/results` — natural-language metadata search. Treat backend index errors as search-plane readiness issues, not proof that catalog APIs are unavailable.
+- `POST /connect/search/metadata/results` — natural-language metadata search. Body shape: `{ "query": "...", "pagination": { "limit": N }, "filters": [{ "field": "metadataType", "values": [...] }] }` (see `examples.md`). Treat backend index errors (e.g. `PRISM_RUNTIME_ERROR: msr_metadata_index__dlm does not exist`) as search-plane unindexed signals — catalog APIs still work.
 - `GET /ssot/metadata` — fetch metadata for a specific entity. Use `entityName`.
 - `GET /ssot/metadata-entities` — list metadata entities with filters/pagination.
 
@@ -86,14 +86,15 @@ relative to `/services/data/vXX.X`.
 - `GET /ssot/profile/{dataModelName}/{id}` and child/CI variants — require `orderby` when `offset` is supplied.
 - `GET /ssot/insight/metadata` and `/ssot/insight/metadata/{ciName}` — calculated insight metadata; need an existing CI.
 - `GET /ssot/insight/calculated-insights/{ciName}` — calculated insight rows; need an existing CI.
-- `GET /ssot/data-graphs` — list data graphs.
+- `GET /ssot/data-graphs/metadata` — list data graphs. The bare `/ssot/data-graphs` is detail-only; calling it without a name returns `400 INTERNAL_ERROR: Empty Data Graph Name`.
 - `GET /ssot/data-graphs/data/{dataGraphEntityName}` and `/{id}` — record reads on a data graph entity; require additional query parameters such as field IDs.
 
 ## Document AI and machine learning
 
 - `GET /ssot/document-processing/configurations` and detail/manifest reads.
 - `POST /ssot/document-processing/actions/extract-data` and `actions/generate-schema` — operational and require structured inputs.
-- `GET /ssot/machine-learning/alerts`, `model-setups`, `model-artifacts`, and `configured-models` — list endpoints; do not pass an unknown `connectorType` query value.
+- `GET /ssot/machine-learning/{model-setups|model-artifacts|configured-models}` — list endpoints; do not pass an unknown `connectorType` query value.
+- `POST /ssot/machine-learning/alerts` — POST-only; `GET` returns `405 METHOD_NOT_ALLOWED`. Body requires `asset`.
 - `POST /ssot/machine-learning/predict` — inference endpoint with a polymorphic body; the JSON requires a `type` discriminator and prediction-specific fields.
 
 ## Data clean room and private network routes
