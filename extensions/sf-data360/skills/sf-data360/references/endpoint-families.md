@@ -3,6 +3,10 @@
 This is a compact endpoint map for common Data 360 REST workflows. Paths are
 relative to `/services/data/vXX.X`.
 
+This file is the **map only**. Body shapes for `POST` / `PATCH` calls
+live in `examples.md` and `data-shapes.md`; if a row here has no inline
+`body:` example, grep both files before guessing a payload.
+
 ## Query and metadata
 
 - `GET /ssot/data-spaces` — list data spaces.
