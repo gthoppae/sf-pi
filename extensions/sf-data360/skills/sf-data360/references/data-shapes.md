@@ -13,6 +13,35 @@ Conventions used in this file:
   use older or service-layer DTO names; prefer Swagger names when they
   conflict.
 
+## Path id fields (which list-response field maps into the path)
+
+When a list endpoint returns multiple identifiers (`id`, `name`,
+`developerName`, …), the detail / PATCH / DELETE endpoint accepts only
+one of them in the URL path. Sending the wrong one returns
+`404 ITEM_NOT_FOUND` with no hint about which field to use. This table
+lists the verified path-segment field per family.
+
+| Family                | Detail path                                    | Path field            | Source list field                                            | Notes                                                                                           |
+| --------------------- | ---------------------------------------------- | --------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------------------------- |
+| Data spaces           | `/ssot/data-spaces/{name}`                     | `name`                | `dataSpaces[].name`                                          | Common value: `default`.                                                                        |
+| DMOs                  | `/ssot/data-model-objects/{name}`              | `name`                | `metadata[].name`                                            | Full API name with `__dlm` suffix.                                                              |
+| DLOs                  | `/ssot/data-lake-objects/{name}`               | `name`                | `dataLakeObjects[].name`                                     | Full API name with `__dll` suffix.                                                              |
+| Connectors (catalog)  | `/ssot/connectors/{name}`                      | `name`                | `connectorInfoList[].name`                                   | Catalog name; differs from connection `connectorType`.                                          |
+| Connections           | `/ssot/connections/{id}`                       | `id`                  | `connections[].id`                                           | Opaque id, e.g. `0hMKa00000…`.                                                                  |
+| Data Streams          | `/ssot/data-streams/{name}`                    | `name`                | `dataStreams[].name`                                         | Use the stream `name`, not the platform internal id.                                            |
+| Data Transforms       | `/ssot/data-transforms/{id}`                   | `id`                  | `dataTransforms[].id`                                        | Opaque id, e.g. `1dtKa00000…`.                                                                  |
+| Semantic Models       | `/ssot/semantic/models/{name}`                 | `name`                | `items[].apiName`                                            | Subresource paths come from URLs the model returns; do not synthesize them.                     |
+| Calculated Insights   | `/ssot/calculated-insights/{apiName}`          | `apiName`             | `collection.items[].apiName`                                 | Must end `__cio`.                                                                               |
+| Data Actions          | `/ssot/data-actions/{developerName}`           | `developerName`       | `dataActions[].developerName`                                | Verified for DELETE; some target-detail paths expect an internal id (see `troubleshooting.md`). |
+| ML Model Artifacts    | `/ssot/machine-learning/model-artifacts/{id}`  | `id`                  | `modelArtifacts[].id`                                        | `.name` (e.g. `GPT41`) returns 404.                                                             |
+| DataKits              | `/ssot/data-kits/{id}`                         | `id`                  | `dataKits[].id`                                              | Manifest path uses a different identifier — see `troubleshooting.md`.                           |
+| Data Graphs (records) | `/ssot/data-graphs/data/{dataGraphEntityName}` | `dataGraphEntityName` | `dataGraphMetadata[].name` from `/ssot/data-graphs/metadata` | The bare `/ssot/data-graphs` is detail-only; do not call it as a list.                          |
+
+For families not in this table (Segments, Activations, Identity
+Resolutions, ML Configured Models, Mappings detail, etc.) the path-field
+choice is unverified — confirm via the list response shape before
+retrying a 404.
+
 ## DMO — `/ssot/data-model-objects`
 
 Schema: `DataModelObjectInputRepresentation`.
