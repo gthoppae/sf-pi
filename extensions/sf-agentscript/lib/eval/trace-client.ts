@@ -40,7 +40,15 @@ export async function fetchTrace(
   conn: Connection,
   sessionId: string,
   planId: string,
-  opts?: { timeoutMs?: number },
+  opts?: {
+    timeoutMs?: number;
+    /**
+     * Pin to the SFAP host that served the session's `start` call. When
+     * omitted, falls back to the full host walk (legacy sessions written
+     * before sticky-host pinning).
+     */
+    pinnedEndpoint?: "" | "test." | "dev.";
+  },
 ): Promise<unknown | null> {
   const url = TRACE_URL_TPL.replace("{sid}", sessionId).replace("{pid}", planId);
   const res = await sfapRequest<unknown>(conn, {
@@ -50,6 +58,7 @@ export async function fetchTrace(
     timeoutMs: opts?.timeoutMs ?? 60_000,
     maxRetries: 2,
     fallback: true,
+    ...(opts?.pinnedEndpoint !== undefined ? { pinnedEndpoint: opts.pinnedEndpoint } : {}),
   });
   if (res.status >= 200 && res.status < 300 && res.body && typeof res.body === "object") {
     return res.body;

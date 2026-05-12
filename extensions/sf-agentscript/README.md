@@ -140,6 +140,8 @@ extensions/sf-agentscript/
       types.ts              ← implementation module
     preview/
       client.ts             ← implementation module
+      error-map.ts          ← implementation module
+      resolve-agent-version.ts← implementation module
       session-store.ts      ← implementation module
       trace-digest.ts       ← implementation module
     render/
@@ -203,6 +205,10 @@ extensions/sf-agentscript/
     path-containment.test.ts← unit / smoke test
     preflight.test.ts       ← unit / smoke test
     preview-agent-api.test.ts← unit / smoke test
+    preview-agent-version-resolver.test.ts← unit / smoke test
+    preview-api-name-preflight.test.ts← unit / smoke test
+    preview-error-map.test.ts← unit / smoke test
+    preview-host-pinning.test.ts← unit / smoke test
     preview-session-store.test.ts← unit / smoke test
     publish-authoring-bundle.test.ts← unit / smoke test
     render-compile.test.ts  ← unit / smoke test

@@ -31,6 +31,8 @@ import {
   type PreviewMetadata,
 } from "./session-store.ts";
 import { loadAgentforceSDK } from "../sdk.ts";
+import { resolveAgentVersionDeveloperName } from "./resolve-agent-version.ts";
+import { mapPreviewError } from "./error-map.ts";
 
 // -------------------------------------------------------------------------------------------------
 // SFAP endpoint pins
@@ -84,6 +86,26 @@ export interface PreviewStartOptions {
   /** Inline `.agent` source (preferred). Required for now. */
   agentSource: string;
   mockMode: "Mock" | "Live Test";
+  /**
+   * Absolute path to the `.agent` file. When provided we look up the
+   * sibling `<bundle>.bundle-meta.xml` to mirror the upstream CLI's
+   * `<target>X.vN</target>` resolution for `agentVersion.developerName`.
+   * Optional — `agentSource` alone still works.
+   */
+  agentFilePath?: string;
+  /**
+   * Pin `agentDefinition.agentVersion.developerName` explicitly. Highest
+   * priority resolver source. Use when previewing a specific BotVersion
+   * (e.g. `"v3"`). When omitted we resolve from bundle-meta → SOQL → `"v0"`.
+   */
+  versionDeveloperName?: string;
+  /**
+   * Target-org alias / username the session is being started against.
+   * Persisted in metadata.json so subsequent send/end/trace calls don't
+   * have to repeat `target_org` (omitting it would otherwise silently
+   * fall back to the global default org and 500 with "Session not found").
+   */
+  targetOrg?: string;
 }
 
 export interface PreviewStartResult {
@@ -134,6 +156,8 @@ export interface PreviewStartByApiNameOptions {
   conn: Connection;
   cwd: string;
   agentApiName: string;
+  /** See `PreviewStartOptions.targetOrg`. */
+  targetOrg?: string;
 }
 
 export interface PreviewEndOptions {
@@ -203,7 +227,23 @@ export async function startPreview(opts: PreviewStartOptions): Promise<PreviewSt
     throw new Error("Server compile returned no compiledArtifact.");
   }
 
-  // 3. bypassUser rule (verbatim from upstream ScriptAgent).
+  // 3. Pin agentVersion.developerName so the planner cache lookup succeeds.
+  // Server returns 500 "bot version ID to insert into cache, but record not
+  // found" when this is null/missing or names a non-existent BotVersion.
+  // Resolution priority: caller override → bundle-meta `<target>vN</target>`
+  // → latest BotVersion via SOQL → `"v0"` (server fresh-preview sentinel).
+  const versionResolution = await resolveAgentVersionDeveloperName({
+    override: opts.versionDeveloperName,
+    agentFilePath: opts.agentFilePath,
+    conn: opts.conn,
+    agentName: opts.agentName,
+  });
+  agentJson.agentVersion = {
+    ...((agentJson.agentVersion as Record<string, unknown> | undefined) ?? {}),
+    developerName: versionResolution.developerName,
+  } as AgentJson["agentVersion"];
+
+  // 4. bypassUser rule (verbatim from upstream ScriptAgent).
   let bypassUser = false;
   const defaultAgentUser = agentJson.globalConfiguration?.defaultAgentUser;
   if (defaultAgentUser) {
@@ -216,7 +256,7 @@ export async function startPreview(opts: PreviewStartOptions): Promise<PreviewSt
     bypassUser = false;
   }
 
-  // 4. Start session.
+  // 5. Start session.
   const sessionResp = await sfapRequest<SessionStartBody>(opts.conn, {
     url: SESSIONS_URL,
     method: "POST",
@@ -240,15 +280,12 @@ export async function startPreview(opts: PreviewStartOptions): Promise<PreviewSt
     },
   });
   if (sessionResp.status < 200 || sessionResp.status >= 300) {
-    if (isSfapRoutingFailure(sessionResp)) {
-      throw new Error(
-        "Preview session start is unavailable in this org — the SFAP routes returned 404 across api / test.api / dev.api hosts. " +
-          "Use an Agentforce-enabled org.",
-      );
-    }
-    throw new Error(
-      `Session start failed (HTTP ${sessionResp.status}): ${JSON.stringify(sessionResp.body).slice(0, 600)}`,
-    );
+    const mapped = mapPreviewError(sessionResp.status, sessionResp.body, {
+      phase: "start",
+      surface: "agent_file",
+      agentName: opts.agentName,
+    });
+    throw new Error(mapped.message);
   }
 
   const startTime = new Date().toISOString();
@@ -257,13 +294,21 @@ export async function startPreview(opts: PreviewStartOptions): Promise<PreviewSt
     throw new Error("Session start returned no sessionId.");
   }
 
-  // 5. Init session store + write the first agent turn.
+  // 6. Init session store + write the first agent turn. Persist the SFAP
+  // host that served `start` so subsequent send/end/trace calls pin to the
+  // same shard (sessions don't replicate across api / test.api / dev.api).
+  // Also persist target-org and agent-file path so end can suggest the
+  // exact next `lifecycle publish` command without the caller refeeding
+  // them.
   const sessionDir = await initSession(opts.cwd, {
     sessionId,
     agentName: opts.agentName,
     startTime,
     mockMode: opts.mockMode,
     sessionKind: "agent_file",
+    endpoint: sessionResp.endpoint,
+    targetOrg: opts.targetOrg,
+    agentFilePath: opts.agentFilePath,
   });
   const initialMsg = (sessionResp.body.messages ?? []).map((m) => m.message ?? "").join("\n");
   await logTurn(sessionDir, {
@@ -309,11 +354,18 @@ export async function sendMessage(opts: PreviewSendOptions): Promise<PreviewSend
       variables: [],
       ...(opts.apexDebug ? { apexDebugging: true } : {}),
     },
+    // Pin to the SFAP host that served `start` (sessions are shard-local).
+    // Falls back to the full host walk for legacy sessions written before
+    // we persisted `endpoint` in metadata.
+    ...(metadata.endpoint !== undefined ? { pinnedEndpoint: metadata.endpoint } : {}),
   });
   if (resp.status < 200 || resp.status >= 300) {
-    throw new Error(
-      `Send message failed (HTTP ${resp.status}): ${JSON.stringify(resp.body).slice(0, 600)}`,
-    );
+    const mapped = mapPreviewError(resp.status, resp.body, {
+      phase: "send",
+      surface: metadata.sessionKind === "api_name" ? "api_name" : "agent_file",
+      agentName: opts.agentName,
+    });
+    throw new Error(mapped.message);
   }
   const latencyMs = Date.now() - start;
   const first = (resp.body.messages ?? [])[0];
@@ -339,7 +391,10 @@ export async function sendMessage(opts: PreviewSendOptions): Promise<PreviewSend
   let digest: TraceDigest | undefined;
   if (planId && metadata.sessionKind !== "api_name") {
     try {
-      const trace = await fetchTrace(opts.conn, opts.sessionId, planId, { timeoutMs: 60_000 });
+      const trace = await fetchTrace(opts.conn, opts.sessionId, planId, {
+        timeoutMs: 60_000,
+        pinnedEndpoint: metadata.endpoint,
+      });
       if (trace) {
         await logTrace(sessionDir, planId, trace);
         const tracePath = `${sessionDir}/traces/${planId}.json`;
@@ -444,6 +499,8 @@ export async function endPreview(opts: PreviewEndOptions): Promise<PreviewEndRes
       method: "DELETE",
       headers: { "x-session-end-reason": "UserRequest" },
       timeoutMs: 30_000,
+      // Pin to the host that served `start`.
+      ...(beforeEnd.endpoint !== undefined ? { pinnedEndpoint: beforeEnd.endpoint } : {}),
     });
     remoteEnded = endResp.status >= 200 && endResp.status < 300;
     if (!remoteEnded) {
@@ -501,20 +558,52 @@ function isInvalidUserIdStartFailure(resp: { status: number; body: unknown }): b
 export async function startPreviewByApiName(
   opts: PreviewStartByApiNameOptions,
 ): Promise<PreviewStartResult> {
-  // Resolve BotDefinition.Id by api name. We don't try to validate Active here;
-  // the server endpoint will fail clearly if it can't route.
+  // Pre-flight: one SOQL covers BotDefinition existence + AgentType +
+  // BotUserId (for the bypassUser decision) + the latest BotVersion's
+  // Status. Lets us return clean diagnostics instead of the server's
+  // confusing 412 "No access to Einstein Copilot" / 404 / 500s.
   const r = await opts.conn.query<{
     Id: string;
     AgentType?: string;
     BotUserId?: string | null;
+    BotVersions?: {
+      records?: Array<{
+        Id?: string;
+        DeveloperName?: string | null;
+        Status?: string | null;
+        VersionNumber?: number | null;
+      }>;
+    } | null;
   }>(
-    `SELECT Id, AgentType, BotUserId FROM BotDefinition WHERE DeveloperName='${soqlEscape(opts.agentApiName)}'`,
+    `SELECT Id, AgentType, BotUserId, ` +
+      `(SELECT Id, DeveloperName, Status, VersionNumber FROM BotVersions ` +
+      `ORDER BY VersionNumber DESC LIMIT 1) ` +
+      `FROM BotDefinition WHERE DeveloperName='${soqlEscape(opts.agentApiName)}'`,
   );
   const bot = r.records[0];
   const botId = bot?.Id;
   if (!botId) {
     throw new Error(
       `Agent '${opts.agentApiName}' not found in the org. Use agentscript_lifecycle action='list_versions' to discover agents.`,
+    );
+  }
+  // Inactive latest version → SFAP returns a confusing 412 "No access to
+  // Einstein Copilot". Catch it here with an actionable message.
+  const latestVersion = bot.BotVersions?.records?.[0];
+  if (latestVersion && latestVersion.Status !== "Active") {
+    const v = latestVersion.VersionNumber ?? "?";
+    throw new Error(
+      `Agent '${opts.agentApiName}' has no active BotVersion ` +
+        `(latest is v${v}, Status='${latestVersion.Status ?? "unknown"}'). ` +
+        `Activate it first: agentscript_lifecycle action='activate' ` +
+        `agent_api_name='${opts.agentApiName}' version=${v}.`,
+    );
+  }
+  if (!latestVersion) {
+    throw new Error(
+      `Agent '${opts.agentApiName}' exists but has no BotVersions. ` +
+        `Publish first: agentscript_lifecycle action='publish' ` +
+        `agent_file=<path to your .agent file>.`,
     );
   }
 
@@ -540,15 +629,12 @@ export async function startPreviewByApiName(
     });
   }
   if (sessionResp.status < 200 || sessionResp.status >= 300) {
-    if (isSfapRoutingFailure(sessionResp)) {
-      throw new Error(
-        "Production-agent session start is unavailable in this org — the SFAP routes returned 404 across api / test.api / dev.api hosts. " +
-          "Use an Agentforce-enabled org.",
-      );
-    }
-    throw new Error(
-      `Production-agent session start failed (HTTP ${sessionResp.status}): ${JSON.stringify(sessionResp.body).slice(0, 600)}`,
-    );
+    const mapped = mapPreviewError(sessionResp.status, sessionResp.body, {
+      phase: "start",
+      surface: "api_name",
+      agentApiName: opts.agentApiName,
+    });
+    throw new Error(mapped.message);
   }
 
   const startTime = new Date().toISOString();
@@ -556,12 +642,17 @@ export async function startPreviewByApiName(
   if (!sessionId) {
     throw new Error("Production-agent session start returned no sessionId.");
   }
+  // Persist the SFAP host that served `start` (api / test.api / dev.api)
+  // and target-org so send/end/trace can route correctly without the
+  // caller having to repeat `target_org` on every call.
   const sessionDir = await initSession(opts.cwd, {
     sessionId,
     agentName: opts.agentApiName,
     startTime,
     mockMode: "Live Test",
     sessionKind: "api_name",
+    endpoint: sessionResp.endpoint,
+    targetOrg: opts.targetOrg,
   });
   const initialMsg = (sessionResp.body.messages ?? []).map((m) => m.message ?? "").join("\n");
   await logTurn(sessionDir, {

@@ -40,7 +40,21 @@ describe("startPreviewByApiName", () => {
       instanceUrl: "https://example.my.salesforce.com",
       query: vi.fn(async () => ({
         records: [
-          { Id: "0Xx000000000001", AgentType: "AgentforceServiceAgent", BotUserId: "005xx" },
+          {
+            Id: "0Xx000000000001",
+            AgentType: "AgentforceServiceAgent",
+            BotUserId: "005xx",
+            BotVersions: {
+              records: [
+                {
+                  Id: "0X9000000000001",
+                  DeveloperName: "v1",
+                  Status: "Active",
+                  VersionNumber: 1,
+                },
+              ],
+            },
+          },
         ],
       })),
       request: vi.fn(async (req: { url: string; body?: string }) => {

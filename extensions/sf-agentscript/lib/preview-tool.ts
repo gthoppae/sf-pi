@@ -20,6 +20,7 @@ import {
   startPreview,
   startPreviewByApiName,
 } from "./preview/client.ts";
+import type { PreviewMetadata } from "./preview/session-store.ts";
 import { fetchTrace } from "./eval/trace-client.ts";
 import { isAgentScriptFile } from "./file-classify.ts";
 import { safeResolveToolPath, toolError, toolOk, type ToolError } from "./tool-types.ts";
@@ -221,6 +222,7 @@ async function actionStart(
         conn,
         cwd: ctx.cwd,
         agentApiName: input.agent_api_name,
+        targetOrg: input.target_org,
       });
       return toolOk(
         {
@@ -278,7 +280,11 @@ async function actionStart(
       cwd: ctx.cwd,
       agentName,
       agentSource: source,
+      agentFilePath: filePath,
       mockMode: input.mock_mode ?? "Mock",
+      targetOrg: input.target_org,
+      // (agentFilePath above is also persisted to metadata.json by
+      //  startPreview — used by `end` to suggest the next publish command.)
     });
     return toolOk(
       {
@@ -328,8 +334,19 @@ async function actionSend(
   };
   stream("Sending message…");
 
+  // Resolve the target_org from session metadata when the caller didn't
+  // pass one (or refuse if it conflicts with what start was called with).
+  // Prevents the silent "send hits the wrong org → Session not found" bug.
+  const orgResolution = await resolveSessionTargetOrg(
+    ctx.cwd,
+    input.agent_name,
+    input.session_id,
+    input.target_org,
+  );
+  if (orgResolution.kind === "conflict") return toolError(orgResolution.message);
+
   try {
-    const { conn } = await connForAgentApi(input.target_org);
+    const { conn } = await connForAgentApi(orgResolution.targetOrg);
     const result = await sendMessage({
       conn,
       cwd: ctx.cwd,
@@ -415,10 +432,19 @@ async function actionEnd(
   content: { type: "text"; text: string }[];
   details: Record<string, unknown> | ToolError;
 }> {
+  // Same target_org resolution as actionSend.
+  const orgResolution = await resolveSessionTargetOrg(
+    ctx.cwd,
+    input.agent_name,
+    input.session_id,
+    input.target_org,
+  );
+  if (orgResolution.kind === "conflict") return toolError(orgResolution.message);
+
   try {
     let conn;
     try {
-      ({ conn } = await connForAgentApi(input.target_org));
+      ({ conn } = await connForAgentApi(orgResolution.targetOrg));
     } catch {
       // Local metadata end should still work if remote auth/bootstrap is unavailable.
     }
@@ -428,6 +454,17 @@ async function actionEnd(
       agentName: input.agent_name,
       sessionId: input.session_id,
     });
+    // Suggest the obvious next lifecycle step. We only nudge for sessions
+    // that have an agent_file on disk — api_name sessions are already
+    // running against a published agent.
+    const nextStepHint =
+      result.metadata.sessionKind === "agent_file" && result.metadata.agentFilePath
+        ? `
+
+→ Ready to ship? agentscript_lifecycle action='publish' agent_file='${result.metadata.agentFilePath}' activate=true${
+            result.metadata.targetOrg ? ` target_org='${result.metadata.targetOrg}'` : ""
+          }`
+        : "";
     return toolOk(
       {
         ok: true as const,
@@ -442,7 +479,7 @@ async function actionEnd(
         result.remoteEnded === false ? `⚠️ ${result.remoteEndError}` : null,
       ]
         .filter(Boolean)
-        .join("\n"),
+        .join("\n") + nextStepHint,
     );
   } catch (err) {
     return toolError(err instanceof Error ? err.message : String(err));
@@ -514,5 +551,39 @@ async function actionCleanup(
   }
 }
 
-// Allow the unused-import linter to keep loadSession for downstream readers.
-void loadSession;
+/**
+ * Resolve the org alias / username to use for a send/end call. Sessions
+ * persist `targetOrg` in their metadata at `start` time; subsequent calls
+ * should reuse it so the LLM doesn't have to remember to pass `target_org`
+ * on every call. Falls back to the caller-supplied value (or default org
+ * resolution) when the session predates this field.
+ *
+ * Returns a discriminated union so callers can surface a clean conflict
+ * error without an exception.
+ */
+async function resolveSessionTargetOrg(
+  cwd: string,
+  agentName: string,
+  sessionId: string,
+  callerTargetOrg: string | undefined,
+): Promise<{ kind: "ok"; targetOrg: string | undefined } | { kind: "conflict"; message: string }> {
+  let metadata: PreviewMetadata | undefined;
+  try {
+    const loaded = await loadSession(cwd, agentName, sessionId);
+    metadata = loaded.metadata;
+  } catch {
+    // No metadata on disk — fall back to whatever the caller passed.
+    return { kind: "ok", targetOrg: callerTargetOrg };
+  }
+  const stored = metadata?.targetOrg;
+  if (callerTargetOrg && stored && callerTargetOrg !== stored) {
+    return {
+      kind: "conflict",
+      message:
+        `target_org mismatch: session was started against '${stored}' but ` +
+        `you passed '${callerTargetOrg}'. Re-run with target_org='${stored}' ` +
+        `or omit target_org to reuse the session's stored org.`,
+    };
+  }
+  return { kind: "ok", targetOrg: callerTargetOrg ?? stored };
+}

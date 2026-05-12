@@ -39,6 +39,12 @@ export interface SfapRequest {
   maxRetries?: number;
   /** Toggle the api → test.api → dev.api walk on 404. Default true. */
   fallback?: boolean;
+  /**
+   * When set, skip the host walk and target only this endpoint. Used by
+   * sticky-session calls (send/end/trace) to pin to the host that served
+   * `start`. Overrides `fallback`.
+   */
+  pinnedEndpoint?: "" | "test." | "dev.";
 }
 
 export interface SfapResponse<T = unknown> {
@@ -170,7 +176,16 @@ export async function sfapRequest<T = unknown>(
   conn: Connection,
   req: SfapRequest,
 ): Promise<SfapResponse<T>> {
-  const endpoints = req.fallback === false ? [""] : (PREFIXES as readonly string[]);
+  // Resolution order:
+  //   1. `pinnedEndpoint` set → only that host (sticky session continuity).
+  //   2. `fallback === false` → only production.
+  //   3. default → walk api → test.api → dev.api on 404.
+  const endpoints =
+    req.pinnedEndpoint !== undefined
+      ? [req.pinnedEndpoint]
+      : req.fallback === false
+        ? [""]
+        : (PREFIXES as readonly string[]);
   const maxRetries = req.maxRetries ?? 2;
   const timeoutMs = req.timeoutMs ?? (req.method === "POST" ? 300_000 : 60_000);
 

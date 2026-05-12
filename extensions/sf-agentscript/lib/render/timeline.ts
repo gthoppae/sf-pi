@@ -133,7 +133,6 @@ function formatSendBody(
   const accent = (s: string): string => fg("accent", s);
   const ok = (s: string): string => fg("success", s);
   const err = (s: string): string => fg("error", s);
-  const warn = (s: string): string => fg("warning", s);
 
   const lines: string[] = [];
 
@@ -222,7 +221,9 @@ function formatSendBody(
   }
   if (digest.notes && digest.notes.length > 0) {
     for (const n of digest.notes) {
-      lines.push(warn(`ⓘ ${n}`));
+      // Notes are informational (e.g. "production-v1 endpoint has no
+      // per-step trace") — not warnings. Render in dim gray.
+      lines.push(dim(`ⓘ ${n}`));
     }
   }
   if (sid && digest.turn.plan_id) {

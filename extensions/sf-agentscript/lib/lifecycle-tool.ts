@@ -288,6 +288,14 @@ async function actionActivate(input: ParamsAny): Promise<{
       agentApiName,
       version: input.version,
     });
+    // The agent is now reachable by the Eval API. Surface the next-step
+    // hint so the LLM (or the human) knows how to lock the baseline
+    // before iterating further.
+    const orgFlag = input.target_org ? ` target_org='${input.target_org}'` : "";
+    const evalHint =
+      `\n\n→ Lock the regression baseline: ` +
+      `agentscript_eval action='run' agent_api_name='${agentApiName}'${orgFlag} ` +
+      `spec_path=<path-to-spec.json>`;
     return toolOk(
       {
         ok: true as const,
@@ -296,7 +304,7 @@ async function actionActivate(input: ParamsAny): Promise<{
         version_number: row.VersionNumber,
         status: row.Status,
       },
-      `🟢 ${agentApiName} v${row.VersionNumber} activated`,
+      `🟢 ${agentApiName} v${row.VersionNumber} activated` + evalHint,
     );
   } catch (err) {
     return classifyLifecycleError(err, agentApiName, "activate");

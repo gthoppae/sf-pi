@@ -24,6 +24,8 @@ import path from "node:path";
 // Public types
 // -------------------------------------------------------------------------------------------------
 
+export type SfapHostPrefix = "" | "test." | "dev.";
+
 export interface PreviewMetadata {
   sessionId: string;
   agentName: string;
@@ -32,6 +34,28 @@ export interface PreviewMetadata {
   mockMode: "Mock" | "Live Test";
   /** agent_file = v1.1 preview session; api_name = published-agent v1 session. */
   sessionKind?: "agent_file" | "api_name";
+  /**
+   * Which SFAP host served the `start` call (`""` = api.salesforce.com,
+   * `"test."` = sandbox, `"dev."` = pre-prod). Send/end/trace pin to this
+   * host so they don't accidentally hit a different shard than the session
+   * lives on. Optional for backward compat — sessions written before this
+   * field was introduced fall back to the host walk.
+   */
+  endpoint?: SfapHostPrefix;
+  /**
+   * Target org alias / username the session was started against. Send/end
+   * reuse this so the caller doesn't have to repeat `target_org` on every
+   * call — omitting it would silently route to the global default org and
+   * surface as "Session not found". Optional for backward compat.
+   */
+  targetOrg?: string;
+  /**
+   * Absolute path to the `.agent` file the session was started from. Used
+   * by `end` to suggest the exact `agentscript_lifecycle action='publish'`
+   * command. Only populated for the agent_file path; api_name sessions
+   * reference an already-published agent and don't need this hint.
+   */
+  agentFilePath?: string;
   planIds: string[];
 }
 
@@ -104,6 +128,9 @@ export async function initSession(
     startTime: meta.startTime,
     mockMode: meta.mockMode,
     sessionKind: meta.sessionKind,
+    endpoint: meta.endpoint,
+    targetOrg: meta.targetOrg,
+    agentFilePath: meta.agentFilePath,
     planIds: meta.planIds ?? [],
   };
   await writeFile(path.join(dir, "metadata.json"), JSON.stringify(full, null, 2), "utf8");
