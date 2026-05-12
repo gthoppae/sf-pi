@@ -1883,9 +1883,12 @@ async function syncGatewaySessionDefaults(
   }
 
   if (options.awaitFooterRefresh === false) {
-    void markBootStep("sf-llm-gateway.sync.footer-refresh (deferred)", () =>
-      updateFooterStatus(ctx, forceRefreshUsage),
-    ).catch(() => undefined);
+    const footerTimer = setTimeout(() => {
+      void markBootStep("sf-llm-gateway.sync.footer-refresh (deferred)", () =>
+        updateFooterStatus(ctx, forceRefreshUsage),
+      ).catch(() => undefined);
+    }, 3_000);
+    footerTimer.unref?.();
     return;
   }
 
