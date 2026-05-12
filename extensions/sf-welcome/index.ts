@@ -384,20 +384,6 @@ export default function sfWelcome(pi: ExtensionAPI) {
     // is dismissed. Done here (not inside collectSplashData) so a cached
     // splash render never races with the current process's version.
     pendingSeenVersion = readCurrentPiVersion();
-    // Kick the gateway's monthly-usage cache in the background so the splash
-    // matches the bottom bar. We don't await it here — the splash renders
-    // immediately with whatever cache is available and we re-render below
-    // once the store publishes.
-    //
-    // We intentionally do NOT listen to this promise to drive a repaint. The
-    // gateway extension registers its refresher during its own session_start
-    // handler, and extension load order is not guaranteed — if sf-welcome
-    // runs first, this call is a no-op against an empty store. Instead we
-    // subscribe to the store below and repaint on every publish.
-    void markBootStep("sf-welcome.gateway-refresh", () => refreshMonthlyUsage(true, ctx.cwd)).catch(
-      () => undefined,
-    );
-
     const data = collectInitialSplashData(modelName, providerName, MONTHLY_BUDGET_FALLBACK);
     const doctorReport = runDoctorDiagnostics({ cwd: ctx.cwd });
     data.doctor = summarizeStartupDoctorNudge(doctorReport) ?? undefined;
@@ -420,6 +406,22 @@ export default function sfWelcome(pi: ExtensionAPI) {
     } else {
       setupOverlay(ctx, data, generation);
     }
+
+    // Kick the gateway's monthly-usage cache in the background so the splash
+    // matches the bottom bar. We don't await it here — the splash renders
+    // immediately with whatever cache is available and repaints when the
+    // shared store publishes.
+    //
+    // Chunk 5: delay this slightly so first paint and cheap local hydration
+    // win the event-loop race. Gateway status is display data and already
+    // renders as "Checking..." until the probe completes.
+    const gatewayRefreshTimer = setTimeout(() => {
+      if (runId !== startupRunId || !isActiveSession(ctx, generation)) return;
+      void markBootStep("sf-welcome.gateway-refresh", () =>
+        refreshMonthlyUsage(true, ctx.cwd),
+      ).catch(() => undefined);
+    }, 700);
+    gatewayRefreshTimer.unref?.();
 
     setImmediate(() => {
       try {
