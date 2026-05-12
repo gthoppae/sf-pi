@@ -15,6 +15,8 @@ Each entry: symptom → cause → fix. Lifecycle-shape gotchas live in
 - **Metadata request is too broad.** Prefer `d360_metadata` `list_dmos`/`list_dlos` and `describe_dmo`/`describe_dlo`. Do not call `/ssot/data-model-objects` broadly. For other entities, use `POST /connect/search/metadata/results` or `GET /ssot/metadata-entities`.
 - **Optional surface returns `NOT_FOUND`.** Search index, retrievers, some DataKit manifest paths can be absent in healthy orgs. Treat as feature gating unless core probes also fail.
 - **DLO category filter returns no rows.** `list_dlos` filters on compact metadata categories from `/ssot/metadata-entities`, which can differ from detailed DLO categories. Retry without the category filter and inspect the helper output.
+- **`GET /ssot/data-graphs` returns `400 INTERNAL_ERROR: Empty Data Graph Name`.** The bare `/ssot/data-graphs` is detail-only. Use `GET /ssot/data-graphs/metadata` for the list. The detail-records endpoint stays at `GET /ssot/data-graphs/data/{dataGraphEntityName}`.
+- **Detail endpoint returns `404 ITEM_NOT_FOUND` even though the resource exists.** List responses commonly carry several identifiers (`id`, `name`, `developerName`, `apiName`); the detail path accepts only one. See the "Path id fields" table in `data-shapes.md`. Concrete known traps: `/ssot/machine-learning/model-artifacts/{id}` requires the artifact `.id`, not its `.name`; `/ssot/calculated-insights/{apiName}` requires an apiName ending `__cio`.
 
 ## Mapping list and connector lookup
 
@@ -34,12 +36,14 @@ Each entry: symptom → cause → fix. Lifecycle-shape gotchas live in
 - **`/ssot/profile/{name}` rejects `filter=...`.** The plural `filters` query parameter and bracketed equality syntax are required: `filters=[Field__c=Value]`. Combine with `fields=` to limit columns.
 - **`/ssot/profile/{name}/{id}` returns `orderby is required with offset`.** Always pair `offset` with `orderby`.
 - **`/ssot/calculated-insights/{name}` returns `apiName must end in __cio`.** Provide a CI apiName ending `__cio`.
+- **`POST /ssot/query-sql` returns inline rows but no top-level `queryId`.** Synchronous results live entirely in the first response: rows under `data[]`, metadata under `metadata[]`, and the queryId nested under `status.queryId`. Use the `/{queryId}` and `/{queryId}/rows` lifecycle endpoints only when `status.completionStatus != "ResultsProduced"` or `status.chunkCount > 1`. The legacy `/ssot/queryv2` puts `queryId` at the top level — different shape; do not reuse a `query-sql` extraction path.
 
 ## Lifecycle quirks
 
 - **`DELETE /ssot/data-streams/{name}` returns `MALFORMED_QUERY: shouldDeleteDataLakeObject`.** Add the query parameter explicitly: `?shouldDeleteDataLakeObject=true|false`.
 - **`POST /ssot/data-streams/{name}/actions/run` rejects `SalesforceDotCom`.** CRM streams cannot be run from the API in non-interactive mode; trigger from the UI.
 - **`POST /ssot/semantic/models/{name}/validate` returns `METHOD_NOT_ALLOWED: GET,HEAD`.** Validate is GET for semantic models, not POST.
+- **`GET /ssot/machine-learning/alerts` returns `405 METHOD_NOT_ALLOWED: Allowed are POST`.** Alerts is POST-only; body requires `asset`. The sibling list endpoints (`model-setups`, `model-artifacts`, `configured-models`) are GET, but `alerts` is the exception.
 - **`POST /ssot/data-transforms-validation` returns `TARGET_DLO_NOT_FOUND` or `DLO_NAME_DOES_NOT_EXIST: ... neither exists nor can be created`.** Pre-create the output DLO that the STL `outputD360` node references, then re-validate.
 - **`PUT /ssot/data-transforms/{name}/schedule` rejects `timezone` field.** Use camelCase `timeZone`. The Swagger lists only `frequency`+`time` as required; the platform also requires `interval` (1–31). Use `frequency: "None"` to clear the schedule.
 - **`POST /ssot/data-model-object-mappings` returns auto-inflated `fieldMappings[]`.** Expected: the platform adds system field mappings (DataSource, DataSourceObject, InternalOrganization, KQ\_\*) on top of explicit ones. Do not echo system mappings back.
