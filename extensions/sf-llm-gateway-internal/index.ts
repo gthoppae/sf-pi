@@ -211,7 +211,6 @@ import { registerExtensionDoctor } from "../../lib/common/doctor/registry.ts";
 import { runExtensionDoctor as runGatewayExtensionDoctor } from "./lib/doctor.ts";
 import { openGatewayPanel } from "./lib/command-panel.ts";
 import {
-  computeKeyConflict,
   getMonthlyUsageState,
   refreshMonthlyUsage,
   refreshUsageDetails,
@@ -425,11 +424,10 @@ export default function sfLlmGatewayInternalExtension(pi: ExtensionAPI) {
     }, 2_500);
     discoveryTimer.unref?.();
 
-    // Phase 1.6: surface a key-conflict warning once per session. Computed
-    // outside the async refresher so it fires even when the gateway is
-    // unreachable. notify() is best-effort — in headless / no-UI flows it's
-    // a no-op.
-    notifyKeyConflictOnce(ctx);
+    // Phase 1.6: key-conflict detection is surfaced by sf-welcome's inline
+    // gateway row and /sf-llm-gateway doctor / usage-probe --trace. Do not
+    // toast during startup: notifications render over the splash and make
+    // first paint noisy.
   });
 
   // Track whether we've already kicked off the cold-start details fetch
@@ -497,27 +495,6 @@ export default function sfLlmGatewayInternalExtension(pi: ExtensionAPI) {
       unregisterMonthlyUsage = null;
     }
   });
-}
-
-// ---------------------------------------------------------------------------
-// Phase 1.6: one-time key-conflict notify
-//
-// Fires at most once per session. The check is cheap (two file reads + an
-// env-var lookup) and bypasses the refresh path so a misconfigured base URL
-// or missing API key doesn't suppress the warning.
-// ---------------------------------------------------------------------------
-let keyConflictNotifiedThisSession = false;
-function notifyKeyConflictOnce(ctx: ExtensionContext): void {
-  if (keyConflictNotifiedThisSession) return;
-  keyConflictNotifiedThisSession = true;
-  try {
-    const conflict = computeKeyConflict(ctx.cwd);
-    if (conflict) {
-      ctx.ui.notify(conflict.message, "warning");
-    }
-  } catch {
-    // Best-effort — nothing here should ever break session_start.
-  }
 }
 
 /**
