@@ -104,9 +104,11 @@
     "vscode-languageserver-protocol": "^3.17.5"
   },
   "overridesNotes": {
-    "fast-xml-parser": "Force >= 5.7.0 to clear GHSA-gh4j-gqv2-49f6 (XMLBuilder CDATA injection). Reaches sf-pi through pi-ai -> AWS SDK Bedrock client; remove once upstream AWS SDK resolves the advisory."
+    "fast-xml-parser": "Force >= 5.7.0 to clear GHSA-gh4j-gqv2-49f6 (XMLBuilder CDATA injection). Reaches sf-pi through pi-ai -> AWS SDK Bedrock client; remove once upstream AWS SDK resolves the advisory.",
+    "@mistralai/mistralai": "Hard-pin to 2.2.1, the last clean release before the npm-publish-account takeover (GHSA-3q49-cfcf-g5fm, published 2026-05-11). Versions 2.2.2/2.2.3/2.2.4 are flagged as malware by GitHub Advisory DB. Reaches sf-pi transitively through @earendil-works/pi-ai. Tarball verified: SRI integrity sha512-uKU8C... matches registry, hasInstallScript=false, no preinstall/postinstall hooks. Remove once upstream republishes a clean Mistral SDK and pi-ai bumps past it."
   },
   "overrides": {
-    "fast-xml-parser": "^5.7.0"
+    "fast-xml-parser": "^5.7.0",
+    "@mistralai/mistralai": "2.2.1"
   }
 }
