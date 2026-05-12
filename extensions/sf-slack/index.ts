@@ -69,6 +69,7 @@ import {
   setDetectedTeamId,
   detectTokenType,
   getGrantedScopes,
+  seedGrantedScopesForStartup,
   type SlackTokenType,
 } from "./lib/api.ts";
 import { buildAuthStatus } from "./lib/format.ts";
@@ -98,6 +99,7 @@ import {
 } from "./lib/preferences.ts";
 import { openPreferencesPanel } from "./lib/preferences-panel.ts";
 import { renderStatsLines, resetStats, setStatsListener } from "./lib/stats.ts";
+import { readSlackRuntimeCache, writeSlackRuntimeCache } from "./lib/runtime-cache.ts";
 import { classifySlackStatus, slackStatusLabel } from "./lib/status.ts";
 import { clearSlackStatus, setSlackStatus } from "../../lib/common/slack-status/store.ts";
 import {
@@ -326,6 +328,71 @@ export default function sfSlack(pi: ExtensionAPI) {
     });
   }
 
+  async function refreshSlackIdentityAndScopes(options: {
+    token: string;
+    requestedScopes: string[];
+    generation: number;
+    ctx: ExtensionContext;
+    timingLabel: string;
+    notifyOnFailure: boolean;
+  }): Promise<void> {
+    const { token, requestedScopes, generation, ctx, timingLabel, notifyOnFailure } = options;
+    try {
+      const authResult = await markBootStep(timingLabel, () =>
+        slackApi<AuthTestResponse>("auth.test", token, {}, ctx.signal),
+      );
+      if (!isActiveSession(ctx, generation)) return;
+      if (!authResult.ok) {
+        const errMessage = (authResult as ApiErr).error;
+        lastError = { step: "auth.test", message: errMessage };
+        if (notifyOnFailure && ctx.hasUI) {
+          ctx.ui.notify(`Slack auth.test failed: ${errMessage}`, "warning");
+        }
+        deactivateSlackTools(pi);
+        updateStatus(ctx, "error", generation);
+        return;
+      }
+
+      identity = {
+        userId: authResult.data?.user_id || "",
+        userName: authResult.data?.user || "",
+        teamId: authResult.data?.team_id || authResult.data?.enterprise_id || "",
+      };
+      setDetectedTeamId(authResult.data?.team_id);
+
+      const probeResult = gateToolsFromGrantedScopes(pi, requestedScopes, tokenType);
+      const grantedScopes = getGrantedScopes();
+      missingGrantedScopeCount = probeResult.missingGrantedScopes.length;
+      grantedScopeCount = computeGrantedRequestedScopeCount(grantedScopes, requestedScopes);
+
+      writeSlackRuntimeCache({
+        token,
+        tokenType,
+        identity,
+        grantedScopes,
+      });
+
+      lastError = null;
+      updateStatus(ctx, "connected", generation);
+
+      void markBootStep("sf-slack.cache-prewarm (deferred)", () =>
+        Promise.all([prewarmUserCache(token, ctx.signal), prewarmChannelCache(token, ctx.signal)]),
+      ).catch(() => undefined);
+    } catch (error) {
+      if (isAbortError(error) && ctx.signal?.aborted) return;
+      const message = error instanceof Error ? error.message : String(error);
+      lastError = {
+        step: identity ? "probe-or-prewarm" : "auth.test",
+        message,
+      };
+      if (notifyOnFailure && ctx.hasUI) {
+        ctx.ui.notify(`Slack ${lastError.step} failed: ${message}`, "warning");
+      }
+      deactivateSlackTools(pi);
+      updateStatus(ctx, "error", generation);
+    }
+  }
+
   // ─── Slack tool registration gate (Option B) ────────────────────────────
   //
   // Register tools only once, and only after we know a token is available.
@@ -498,68 +565,50 @@ export default function sfSlack(pi: ExtensionAPI) {
 
     ensureSlackToolsRegistered();
     const token = auth.token;
+    const requestedScopes = oauthScopes()
+      .split(",")
+      .map((scope) => scope.trim())
+      .filter(Boolean);
+    requestedScopeCount = requestedScopes.length;
     tokenType = detectTokenType(token);
     updateStatus(ctx, "loading", generation);
 
-    // Awaited (not fire-and-forget) so the first user turn already sees the
-    // final tool set after probing. Errors are swallowed per-branch so one
-    // failure (e.g. users.list rate-limit) does not cancel the others.
-    try {
-      // Phase 3.2: capture identity probe duration in the boot-timing report.
-      // auth.test is one of the awaited steps in session_start so its cost is
-      // baked into how fast the splash hydrates.
-      const authResult = await markBootStep("sf-slack.auth-test", () =>
-        slackApi<AuthTestResponse>("auth.test", token, {}, ctx.signal),
-      );
-      if (!isActiveSession(ctx, generation)) return;
-      if (!authResult.ok) {
-        // slackApi maps timeouts / network errors / HTTP 4xx-5xx into a non-throwing
-        // ok:false envelope (see classifyFetchError + toApiResult in lib/api.ts).
-        // Without this branch the failure was silently absorbed: identity stayed
-        // null, the parallel probe/prewarm calls also returned ok:false, and the
-        // final updateStatus(ctx, "connected") flipped the splash to
-        // "? Scopes unknown 0/22" — misleading because the token was never
-        // actually validated. Surface the real reason instead.
-        const errMessage = (authResult as ApiErr).error;
-        lastError = { step: "auth.test", message: errMessage };
-        if (ctx.hasUI) {
-          ctx.ui.notify(`Slack auth.test failed: ${errMessage}`, "warning");
-        }
-        deactivateSlackTools(pi);
-        updateStatus(ctx, "error", generation);
-        return;
-      }
-      identity = {
-        userId: authResult.data?.user_id || "",
-        userName: authResult.data?.user || "",
-        teamId: authResult.data?.team_id || authResult.data?.enterprise_id || "",
-      };
-      setDetectedTeamId(authResult.data?.team_id);
-
-      const requestedScopes = oauthScopes()
-        .split(",")
-        .map((scope) => scope.trim())
-        .filter(Boolean);
-      requestedScopeCount = requestedScopes.length;
-
-      // auth.test above already populated the granted-scope cache via the
-      // X-OAuth-Scopes response header. Gate from that captured state instead
-      // of making a second auth.test call. This preserves first-turn tool-set
-      // stability without paying an extra Slack round-trip.
+    const cached = readSlackRuntimeCache(token);
+    if (cached) {
+      identity = cached.identity;
+      tokenType = cached.tokenType;
+      setDetectedTeamId(cached.identity.teamId);
+      seedGrantedScopesForStartup(cached.grantedScopes);
       const probeResult = gateToolsFromGrantedScopes(pi, requestedScopes, tokenType);
       const grantedScopes = getGrantedScopes();
       missingGrantedScopeCount = probeResult.missingGrantedScopes.length;
       grantedScopeCount = computeGrantedRequestedScopeCount(grantedScopes, requestedScopes);
-
       lastError = null;
       updateStatus(ctx, "connected", generation);
 
-      // Cache prewarm is a display-quality optimization, not first-turn
-      // correctness. Run it after status is connected so session_start is not
-      // held hostage by users.list / conversations.list latency.
-      void markBootStep("sf-slack.cache-prewarm (deferred)", () =>
-        Promise.all([prewarmUserCache(token, ctx.signal), prewarmChannelCache(token, ctx.signal)]),
-      ).catch(() => undefined);
+      // Cache is good enough for first paint / first turn; verify live in the
+      // background and correct stale identity/scopes if the token changed on
+      // the Slack side since the last session.
+      void refreshSlackIdentityAndScopes({
+        token,
+        requestedScopes,
+        generation,
+        ctx,
+        timingLabel: "sf-slack.auth-test (deferred)",
+        notifyOnFailure: false,
+      });
+      return;
+    }
+
+    try {
+      await refreshSlackIdentityAndScopes({
+        token,
+        requestedScopes,
+        generation,
+        ctx,
+        timingLabel: "sf-slack.auth-test",
+        notifyOnFailure: true,
+      });
     } catch (error) {
       // Distinguish user-cancelled (ctx.signal aborted, e.g. session_shutdown
       // or /reload races) from a per-request timeout fired by
@@ -741,6 +790,7 @@ export default function sfSlack(pi: ExtensionAPI) {
           const grantedScopes = getGrantedScopes();
           missingGrantedScopeCount = probeResult.missingGrantedScopes.length;
           grantedScopeCount = computeGrantedRequestedScopeCount(grantedScopes, requestedScopes);
+          writeSlackRuntimeCache({ token, tokenType, identity, grantedScopes });
           lastError = null;
           updateStatus(ctx, "connected", generation);
           const status = await buildAuthStatus(ctx);

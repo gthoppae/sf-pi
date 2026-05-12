@@ -60,6 +60,16 @@ export function getGrantedScopes(): Set<string> | null {
   return grantedScopes ? new Set(grantedScopes) : null;
 }
 
+/** Seed the granted-scope cache from trusted persisted state.
+ *
+ * Used at session_start to apply last-known scope gating before the live
+ * Slack auth probe completes. The next successful Slack response overwrites
+ * this cache from the authoritative X-OAuth-Scopes header. */
+export function seedGrantedScopesForStartup(scopes: readonly string[]): void {
+  const normalized = scopes.map((scope) => scope.trim()).filter(Boolean);
+  grantedScopes = normalized.length > 0 ? new Set(normalized) : null;
+}
+
 /** True when Slack told us the token has `scope`. When nothing has been
  *  captured yet (grantedScopes === null) we return `true` — the header is
  *  unknown, not denied, and we don't want to falsely pre-gate callers before

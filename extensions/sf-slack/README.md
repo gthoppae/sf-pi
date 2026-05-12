@@ -503,6 +503,7 @@ extensions/sf-slack/
     research-tool.ts        ← implementation module
     resolve-tool.ts         ← implementation module
     resolve.ts              ← implementation module
+    runtime-cache.ts        ← implementation module
     scope-probe.ts          ← implementation module
     search-plan.ts          ← implementation module
     send-tool-recipient.ts  ← implementation module
@@ -534,6 +535,7 @@ extensions/sf-slack/
     render-snapshot.test.ts ← unit / smoke test
     resolve-tool-clarify-gate.test.ts← unit / smoke test
     resolve.test.ts         ← unit / smoke test
+    runtime-cache.test.ts   ← unit / smoke test
     scope-probe.test.ts     ← unit / smoke test
     search-plan.test.ts     ← unit / smoke test
     send-tool.test.ts       ← unit / smoke test
