@@ -21,7 +21,7 @@ import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import type { Connection } from "@salesforce/core";
-import { ComponentSet } from "@salesforce/source-deploy-retrieve";
+import type { ComponentSet as ComponentSetType } from "@salesforce/source-deploy-retrieve";
 import { isSfapRoutingFailure, sfapRequest } from "./eval/sfap.ts";
 import { inspectFile } from "./inspect.ts";
 import { checkActionTargets, checkBundleType } from "./preflight.ts";
@@ -33,6 +33,14 @@ import { loadAgentforceSDK } from "./sdk.ts";
 
 const COMPILE_URL = "https://api.salesforce.com/einstein/ai-agent/v1.1/authoring/scripts";
 const AGENTS_URL = "https://api.salesforce.com/einstein/ai-agent/v1.1/authoring/agents";
+
+let sdrPromise: Promise<{ ComponentSet: typeof ComponentSetType }> | undefined;
+async function loadSdr() {
+  sdrPromise ??= import("@salesforce/source-deploy-retrieve").then(({ ComponentSet }) => ({
+    ComponentSet,
+  }));
+  return sdrPromise;
+}
 
 // -------------------------------------------------------------------------------------------------
 // Public types
@@ -507,6 +515,7 @@ export async function publishAgent(opts: PublishOptions): Promise<PublishResult>
         //    CLI uses, just without us hand-rolling the zip format.
         const deploySource = await ensureSdrFriendlyLayout(opts.bundleDir, opts.agentApiName);
         if (deploySource.tmpRoot) tmpRoot = deploySource.tmpRoot;
+        const { ComponentSet } = await loadSdr();
         const componentSet = ComponentSet.fromSource(deploySource.bundleDir);
         const deployJob = await componentSet.deploy({ usernameOrConnection: opts.conn });
         const deployResult = await deployJob.pollStatus();

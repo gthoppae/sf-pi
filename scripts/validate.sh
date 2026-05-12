@@ -44,6 +44,9 @@ npx tsc --noEmit -p tsconfig.json
 banner "Panel consistency"
 node scripts/check-panel-consistency.mjs
 
+banner "Boot-path import check"
+node scripts/check-boot-path.mjs
+
 banner "Tests"
 npx vitest run --reporter=dot
 

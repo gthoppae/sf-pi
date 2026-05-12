@@ -13,8 +13,23 @@
  * implementation without importing `@salesforce/agents` at runtime.
  */
 
-import { AuthInfo, Connection, type Connection as ConnectionType } from "@salesforce/core";
+import type { AuthInfo as AuthInfoType, Connection as ConnectionType } from "@salesforce/core";
 import { connFromAlias } from "../../../lib/common/sf-conn/connection.ts";
+
+let corePromise:
+  | Promise<{
+      AuthInfo: typeof AuthInfoType;
+      Connection: typeof ConnectionType;
+    }>
+  | undefined;
+
+async function loadSfCore() {
+  corePromise ??= import("@salesforce/core").then(({ AuthInfo, Connection }) => ({
+    AuthInfo,
+    Connection,
+  }));
+  return corePromise;
+}
 
 export interface AgentApiAuthResult {
   conn: ConnectionType;
@@ -106,6 +121,7 @@ export async function connForAgentApi(targetOrg?: string): Promise<AgentApiAuthR
     throw new Error("Agent API auth bootstrap failed: could not resolve org username.");
   }
 
+  const { AuthInfo, Connection } = await loadSfCore();
   const authInfo = await AuthInfo.create({ username });
   const conn = await Connection.create({ authInfo });
   try {
