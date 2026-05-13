@@ -36,7 +36,7 @@ export interface InspectStructureDetails {
   dialect?: { name?: string; version?: string };
   components?: {
     config?: Record<string, unknown>;
-    system?: { instructions?: string; agent_type?: string };
+    system?: { instructions?: string };
     topics: ComponentSummary[];
     subagents: ComponentSummary[];
     variables: VariableSummary[];

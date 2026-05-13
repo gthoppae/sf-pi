@@ -161,4 +161,40 @@ describe("inspectFile", () => {
     // Either parseDialectAnnotation or resolveDialect should produce a name.
     expect(typeof result.dialect?.name).toBe("string");
   });
+
+  test("agent_type is surfaced on components.config (not components.system)", async () => {
+    // Locks in the SDK schema: agent_type is a `config:` field. An
+    // earlier inspect summary mirrored it onto `system` too, which was
+    // wrong — readers expecting it on system would silently get
+    // undefined for correctly-authored scripts.
+    const filePath = await writeAgent(
+      "typed.agent",
+      [
+        "config:",
+        '    agent_name: "Typed_Bot"',
+        '    agent_type: "AgentforceServiceAgent"',
+        '    description: "d"',
+        '    default_agent_user: "u@example.com"',
+        "",
+        "system:",
+        '    instructions: "hi"',
+        "",
+        "topic main:",
+        '    description: "d"',
+        "",
+        "start_agent main:",
+        '    description: "e"',
+        "    transition to @topic.main",
+        "",
+      ].join("\n"),
+    );
+    const result = await inspectFile(filePath);
+    expect(result.ok).toBe(true);
+    expect(result.components?.config?.agent_type).toBe("AgentforceServiceAgent");
+    expect(result.components?.config?.default_agent_user).toBe("u@example.com");
+    // The system summary intentionally does NOT carry agent_type; it's
+    // purely instructions.
+    const systemKeys = Object.keys(result.components?.system ?? {});
+    expect(systemKeys).toEqual(["instructions"]);
+  });
 });

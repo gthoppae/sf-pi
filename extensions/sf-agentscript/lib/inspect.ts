@@ -26,7 +26,13 @@ export interface InspectResult {
   dialect?: { name: string; version?: string; unknown?: boolean };
   components?: {
     config?: Record<string, unknown>;
-    system?: { instructions: string; agent_type?: string };
+    /**
+     * Note: `agent_type` is a `config:` field per the SDK schema (see
+     * vendored browser.js around the AgentforceConfigSchema definition).
+     * Earlier versions of this summary mirrored it onto `system` too,
+     * which was a stale model — readers should use `config.agent_type`.
+     */
+    system?: { instructions: string };
     topics: ComponentSummary[];
     subagents: ComponentSummary[];
     variables: VariableSummary[];
@@ -346,18 +352,18 @@ function extractConfigSummary(configNode: unknown): Record<string, unknown> | un
   return Object.keys(out).length ? out : undefined;
 }
 
-function extractSystemSummary(
-  systemNode: unknown,
-): { instructions: string; agent_type?: string } | undefined {
+function extractSystemSummary(systemNode: unknown): { instructions: string } | undefined {
   if (!systemNode || typeof systemNode !== "object") return undefined;
   const s = systemNode as Record<string, unknown>;
   const instructions = unwrapScalar(s.instructions);
-  const summary: { instructions: string; agent_type?: string } = {
+  return {
     instructions: truncate(instructions, MAX_INSTRUCTIONS_CHARS),
   };
-  const agentType = unwrapScalar(s.agent_type);
-  if (typeof agentType === "string") summary.agent_type = agentType;
-  return summary;
+  // agent_type used to be mirrored here but it lives on the `config:`
+  // block per the SDK schema. extractConfigSummary already surfaces it
+  // via the generic scalar-walk; consumers should read it from
+  // `summary.config.agent_type` (or use readAgentConfigSlice for a
+  // typed slice).
 }
 
 // -------------------------------------------------------------------------------------------------
