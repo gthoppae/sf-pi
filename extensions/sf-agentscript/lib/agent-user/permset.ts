@@ -42,21 +42,28 @@ export async function listPermissionSetAssignments(
   conn: Connection,
   userId: string,
 ): Promise<PermissionSetAssignmentRow[]> {
+  // NOTE: do NOT add `ORDER BY PermissionSet.Name`. SOQL on
+  // PermissionSetAssignment silently drops rows where the parent
+  // PermissionSet has a NamespacePrefix (e.g. force) when ordered by a
+  // parent field. Smoke-tested 2026-05-12 against an Agentforce-enabled
+  // sandbox: ordering hid AgentforceServiceAgentUser entirely, producing
+  // false-negative status/diagnose checks. Sort consumer-side if needed.
   const r = await conn.query<{
     Id: string;
     PermissionSetId: string;
     PermissionSet: { Name: string; Label?: string } | null;
   }>(
     `SELECT Id, PermissionSetId, PermissionSet.Name, PermissionSet.Label ` +
-      `FROM PermissionSetAssignment WHERE AssigneeId='${escapeSoql(userId)}' ` +
-      `ORDER BY PermissionSet.Name`,
+      `FROM PermissionSetAssignment WHERE AssigneeId='${escapeSoql(userId)}'`,
   );
-  return r.records.map((row) => ({
+  const rows: PermissionSetAssignmentRow[] = r.records.map((row) => ({
     AssignmentId: row.Id,
     PermissionSetId: row.PermissionSetId,
     PermissionSetName: row.PermissionSet?.Name ?? "",
     PermissionSetLabel: row.PermissionSet?.Label,
   }));
+  rows.sort((a, b) => a.PermissionSetName.localeCompare(b.PermissionSetName));
+  return rows;
 }
 
 /**
