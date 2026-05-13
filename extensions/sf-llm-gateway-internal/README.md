@@ -69,10 +69,25 @@ short-circuits subsequent sessions. Users see no prompt and no manual step.
 
 `lib/transport.ts` hosts focused wrappers on top of the pi-ai transports:
 
-1. **Codex** (`streamSfGatewayOpenAI`). Flattens Chat Completions tools into
-   the Responses tool shape LiteLLM expects for Codex, and clamps
-   `reasoning_effort` to the `low|medium|high` values the gateway currently
-   accepts. Non-Codex payloads pass straight through.
+1. **Codex** (`streamSfGatewayOpenAI`). Clamps `reasoning_effort` to the
+   `low|medium|high` values the gateway's Codex path currently accepts
+   (xhigh is silently demoted to `high`). Tool definitions pass through
+   unchanged in pi-ai's native Chat Completions
+   `{ type: "function", function: {...} }` shape.
+
+   _Historical note:_ an earlier revision flattened Chat Completions tools
+   into the Responses-API tool shape because the gateway used to require
+   it on `/v1/chat/completions`. The gateway has since been fixed to
+   handle the Chat Completions shape correctly, and the flattened shape
+   now triggers HTTP 500 (`'NoneType' object is not subscriptable`). The
+   `flattenCodexTools` shim was removed in v0.71.x. Live probe evidence
+   lives in the `tests/codex-regression.test.ts` suite.
+
+   For non-Codex GPT-5+ models, the strongest auto-injected
+   `reasoning_effort` is `max` (was `xhigh` until v0.71.x). The gateway
+   tightened its OpenAI reasoning_effort validator to
+   `{low,medium,high,max}`; raw `xhigh` returns HTTP 400
+   `reasoning_effort=xhigh is not supported for this model`.
 
    Also: **gpt-5.5 force-strips `reasoning_effort`**. The gateway returns
    400 `"Function tools with reasoning_effort are not supported for gpt-5.5
@@ -95,16 +110,24 @@ in /v1/chat/completions. Please use /v1/responses instead."` when an
      thinking mode 4.7 accepts).
    - Maps the caller's pi reasoning level to `output_config.effort`:
      `minimal`/`low` → `low`, `medium` → `medium`, `high` → `high`,
-     `xhigh` → `xhigh` (new 4.7 tier between `high` and `max`). Unset
-     falls back to `high`, which is Anthropic's documented default.
+     `xhigh` → `high`. The gateway's Anthropic effort validator accepts
+     `{low,medium,high,max}`; the model-specific guard further restricts
+     `max` to Opus 4.6 only (`effort='max' is only supported by Claude
+Opus 4.6`). Opus 4.7's strongest accepted tier is therefore `high`,
+     which is what pi's user-facing `xhigh` collapses to on the wire.
+     Unset reasoning level falls back to `high` as well.
    - Scales `max_tokens` by pi reasoning level (`minimal`/`low` → 16K,
      `medium` → 32K, `high`/`xhigh` → 64K). Live probes showed that
-     `max_tokens: 128000` + `effort: "max"` on heavier generations
-     intermittently surfaces `api_error: Internal server error` from
-     Anthropic upstream. 64K matches what the gateway advertises via
-     `/v1/model/info` and keeps `xhigh` heavy-workload turns away from that
-     failure window. Model hard ceiling is 128K (`OPUS_47_MODEL_MAX_TOKENS`);
-     callers who need the extra headroom can override per request.
+     `max_tokens: 128000` on heavier generations intermittently surfaces
+     `api_error: Internal server error` from Anthropic upstream. 64K
+     matches what the gateway advertises via `/v1/model/info` and keeps
+     heavy-workload turns away from that failure window. Model hard
+     ceiling is 128K (`OPUS_47_MODEL_MAX_TOKENS`); callers who need the
+     extra headroom can override per request.
+   - Sanitizes a pre-existing `output_config.effort: "xhigh"` to `high`
+     in place. pi-ai 0.73+ may emit `xhigh` natively; the shim collapses
+     it before LiteLLM's validator sees the payload so users picking pi's
+     `xhigh` thinking level still get a successful upstream call.
    - Strips `temperature`. Anthropic returns 400 (
      _"`temperature` may only be set to 1 when thinking is enabled or in
      adaptive mode"_) for any value ≠ 1 when adaptive thinking is on.
@@ -400,7 +423,8 @@ Examples:
 ```text
 /sf-llm-gateway-internal debug claude-opus-4-7 adaptive reasoning=xhigh
   → Upstream: https://api.anthropic.com/v1/messages
-    Body:     { thinking: { type: "adaptive" }, output_config: { effort: "xhigh" }, max_tokens: 64000, ... }
+    Body:     { thinking: { type: "adaptive" }, output_config: { effort: "high" }, max_tokens: 64000, ... }
+    Note:     pi `xhigh` collapses to gateway-accepted `high` for Opus 4.7.
 
 /sf-llm-gateway-internal debug gpt-5 reasoning=high
   → Body:     { reasoning_effort: "high", allowed_openai_params: ["reasoning_effort"], ... }

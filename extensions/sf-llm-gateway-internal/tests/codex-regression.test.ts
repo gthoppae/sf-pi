@@ -13,7 +13,7 @@
 import { describe, expect, it } from "vitest";
 import { API_KEY_ENV, BASE_URL_ENV, normalizeBaseUrl } from "../lib/config.ts";
 import { toGatewayOpenAiBaseUrl } from "../lib/gateway-url.ts";
-import { flattenCodexTools, injectCodexGatewayParams } from "../lib/transport.ts";
+import { injectCodexGatewayParams } from "../lib/transport.ts";
 
 const LIVE_CODEX_MODEL_ENV = "SF_LLM_GATEWAY_INTERNAL_CODEX_TEST_MODEL";
 const LIVE_TIMEOUT_ENV = "SF_LLM_GATEWAY_INTERNAL_CODEX_TEST_TIMEOUT_MS";
@@ -29,8 +29,14 @@ const describeLive = hasLiveGatewayConfig ? describe : describe.skip;
 
 describeLive("sf-llm-gateway-internal Codex regression", () => {
   it(
-    "succeeds after flattening Codex tool definitions",
+    "accepts Chat Completions tool shape on /v1/chat/completions for Codex",
     async () => {
+      // Live-verified: the gateway now correctly handles pi-ai's native
+      // Chat Completions `{ type: "function", function: {...} }` tool
+      // shape on /v1/chat/completions for Codex models. The previously
+      // required Responses-API flattening (`flattenCodexTools`) was
+      // removed in v0.71.x — sending the flattened shape now triggers
+      // HTTP 500 (`'NoneType' object is not subscriptable`).
       const payload: Record<string, unknown> = {
         model: codexModel,
         messages: [
@@ -55,7 +61,6 @@ describeLive("sf-llm-gateway-internal Codex regression", () => {
         ],
       };
 
-      flattenCodexTools(payload);
       injectCodexGatewayParams(payload);
 
       const response = await postGatewayChatCompletions(payload);
@@ -64,15 +69,19 @@ describeLive("sf-llm-gateway-internal Codex regression", () => {
 
       expect(choice?.finish_reason).toBe("tool_calls");
       expect(toolCall?.function?.name).toBe("get_time");
+      // The shim no longer mutates `tools` — the original Chat
+      // Completions shape passes through unchanged.
       expect(payload.tools).toEqual([
         {
           type: "function",
-          name: "get_time",
-          description: "Return the current time.",
-          parameters: {
-            type: "object",
-            properties: {},
-            additionalProperties: false,
+          function: {
+            name: "get_time",
+            description: "Return the current time.",
+            parameters: {
+              type: "object",
+              properties: {},
+              additionalProperties: false,
+            },
           },
         },
       ]);

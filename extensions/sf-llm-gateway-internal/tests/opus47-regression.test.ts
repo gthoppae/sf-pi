@@ -7,10 +7,14 @@
  *   SF_LLM_GATEWAY_INTERNAL_API_KEY are set
  * - it talks to the real gateway over the network
  *
- * Goal: verify that the Gateway accepts the same Opus 4.7 adaptive-thinking
- * payload shape that sf-pi preserves after Pi 0.73 added native xhigh effort
- * support. Unit tests pin local request shaping; these tests prove the live
- * transform endpoint still accepts the shape.
+ * Goal: verify that the Gateway accepts the Opus 4.7 adaptive-thinking
+ * payload shape sf-pi sends. Opus 4.7's effort validator accepts only
+ * {low,medium,high} — raw `xhigh` returns `Invalid effort value` and
+ * `max` is restricted to Opus 4.6 (`effort='max' is only supported by
+ * Claude Opus 4.6`). The shim collapses pi's user-facing `xhigh` to
+ * `high` (Opus 4.7's strongest accepted tier). Unit tests pin local
+ * request shaping; these tests prove the live transform endpoint still
+ * accepts the shape.
  */
 import { describe, expect, it } from "vitest";
 import { API_KEY_ENV, BASE_URL_ENV, normalizeBaseUrl } from "../lib/config.ts";
@@ -31,8 +35,12 @@ const describeLive = hasLiveGatewayConfig ? describe : describe.skip;
 
 describeLive("sf-llm-gateway-internal Opus 4.7 transform regression", () => {
   it(
-    "preserves Pi-native xhigh adaptive thinking and strips incompatible temperature",
+    "normalizes Pi-native xhigh effort to high and strips incompatible temperature",
     async () => {
+      // pi-ai may emit `output_config: { effort: "xhigh" }` natively;
+      // the gateway rejects xhigh upstream and also rejects `max` on
+      // Opus 4.7 (only Opus 4.6 accepts max). The shim collapses xhigh
+      // → high so the strongest tier Opus 4.7 accepts is sent on the wire.
       const payload: Record<string, unknown> = {
         model: opusModel,
         messages: [{ role: "user", content: "debug probe — do not execute" }],
@@ -44,14 +52,14 @@ describeLive("sf-llm-gateway-internal Opus 4.7 transform regression", () => {
 
       applyOpus47MaxThinking(payload, "medium");
 
-      expect(payload.output_config).toEqual({ effort: "xhigh" });
+      expect(payload.output_config).toEqual({ effort: "high" });
       expect(payload.temperature).toBeUndefined();
       expect(payload.max_tokens).toBeLessThanOrEqual(OPUS_47_MODEL_MAX_TOKENS);
 
       const transformed = await postTransformRequest(payload);
 
       expect(transformed.raw_request_body?.thinking).toEqual({ type: "adaptive" });
-      expect(transformed.raw_request_body?.output_config).toEqual({ effort: "xhigh" });
+      expect(transformed.raw_request_body?.output_config).toEqual({ effort: "high" });
       expect(transformed.raw_request_body?.temperature).toBeUndefined();
       expect(transformed.raw_request_body?.max_tokens).toBe(64_000);
     },

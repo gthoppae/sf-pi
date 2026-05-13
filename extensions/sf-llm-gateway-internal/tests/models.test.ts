@@ -409,12 +409,14 @@ describe("toProviderModelConfig", () => {
     expect((config as any).thinkingLevelMap?.high).toBe("high");
   });
 
-  it("opts Opus 4.7 into the pi xhigh thinking level via thinkingLevelMap", () => {
+  it("opts Opus 4.7 into the pi xhigh thinking level via thinkingLevelMap (mapped to gateway-accepted high)", () => {
     // pi 0.72 hides `xhigh` from the /thinking selector unless the model's
-    // thinkingLevelMap.xhigh is explicitly set. Opus 4.7 supports xhigh as a
-    // real Anthropic effort tier, and DEFAULT_THINKING_LEVEL = "xhigh"
-    // silently clamps down to `high` without this opt-in. Regression test
-    // pins the opt-in for every Opus 4.7 preset id.
+    // thinkingLevelMap.xhigh is explicitly set. The gateway's LiteLLM
+    // rejects raw `xhigh` upstream, AND its model-specific guard rejects
+    // `max` on Opus 4.7 (`max` is exclusive to Opus 4.6). The strongest
+    // tier Opus 4.7 accepts is `high`, so pi's user-facing `xhigh`
+    // collapses to `high` on the wire. Regression test pins the opt-in
+    // for every Opus 4.7 preset id.
     for (const id of [
       "claude-opus-4-7",
       "claude-opus-4-7-v1",
@@ -422,7 +424,9 @@ describe("toProviderModelConfig", () => {
       "us.anthropic.claude-opus-4-7-v1",
     ]) {
       const config = toProviderModelConfig(id, null, new Set());
-      expect((config as any).thinkingLevelMap?.xhigh, `${id} should opt into xhigh`).toBe("xhigh");
+      expect((config as any).thinkingLevelMap?.xhigh, `${id} should opt into xhigh→high`).toBe(
+        "high",
+      );
     }
   });
 

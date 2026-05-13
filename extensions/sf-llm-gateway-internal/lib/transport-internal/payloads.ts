@@ -21,36 +21,13 @@ import {
   type PiReasoningLevel,
 } from "./shared.ts";
 
-/**
- * LiteLLM expects Codex tools in Responses API format even when the gateway
- * entrypoint is `/chat/completions`. Live-verified: without this flatten, the
- * gateway returns "Missing required parameter: tools[0].name".
- */
-export function flattenCodexTools(payload: Record<string, unknown>): void {
-  const tools = payload.tools as Array<Record<string, unknown>> | undefined;
-  if (!Array.isArray(tools) || tools.length === 0) {
-    return;
-  }
-
-  payload.tools = tools.map((tool) => {
-    if (tool.type !== "function") {
-      return tool;
-    }
-
-    const fn = tool.function as Record<string, unknown> | undefined;
-    if (!fn || typeof fn !== "object") {
-      return tool;
-    }
-
-    const { name, description, parameters } = fn;
-    return {
-      type: "function",
-      ...(name !== undefined ? { name } : {}),
-      ...(description !== undefined ? { description } : {}),
-      ...(parameters !== undefined ? { parameters } : {}),
-    };
-  });
-}
+// `flattenCodexTools` was removed in v0.71.x. The gateway used to require
+// Responses-API-shaped tools on `/v1/chat/completions` for Codex; live
+// probes confirm the gateway now correctly accepts the Chat Completions
+// `{ type: "function", function: {...} }` shape that pi-ai emits natively
+// and returns the flattened `Responses-API` shape with HTTP 500
+// (`'NoneType' object is not subscriptable`). Sending Chat Completions
+// shape unchanged is now the correct behavior.
 
 /**
  * The gateway's Codex path rejects missing reasoning_effort and currently
@@ -146,6 +123,14 @@ export function injectOpenAiReasoningEffort(
     return;
   }
 
+  // Defensive: if a caller (older pi-ai, direct override) pre-set the
+  // gateway-rejected `xhigh` value, normalize to the gateway-accepted
+  // `max` tier before LiteLLM sees it. The gateway's reasoning_effort
+  // validator now rejects xhigh with HTTP 400.
+  if (payload.reasoning_effort === "xhigh") {
+    payload.reasoning_effort = "max";
+  }
+
   if (typeof payload.reasoning_effort !== "string" || !payload.reasoning_effort.trim()) {
     const effort = resolveOpenAiReasoningEffort(modelId);
     if (effort) {
@@ -183,6 +168,17 @@ export function applyOpus47MaxThinking(
   }
   if (!payload.output_config) {
     payload.output_config = { effort: mapPiLevelToOpus47Effort(level) };
+  } else if (
+    typeof payload.output_config === "object" &&
+    payload.output_config !== null &&
+    (payload.output_config as Record<string, unknown>).effort === "xhigh"
+  ) {
+    // Defensive: pi-ai may emit `output_config.effort: "xhigh"` natively.
+    // The gateway's LiteLLM rejects xhigh with `Invalid effort value:
+    // xhigh`, AND its model-specific guard rejects `max` on Opus 4.7
+    // (`effort='max' is only supported by Claude Opus 4.6`). The strongest
+    // tier 4.7 accepts is `high`, so we collapse xhigh to high here.
+    (payload.output_config as Record<string, unknown>).effort = "high";
   }
 
   // Anthropic rejects any `temperature` != 1 with extended thinking.

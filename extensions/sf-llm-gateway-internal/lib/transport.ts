@@ -45,7 +45,6 @@ export {
 export {
   allowReasoningEffortParam,
   applyOpus47MaxThinking,
-  flattenCodexTools,
   injectCodexGatewayParams,
   injectOpenAiReasoningEffort,
   injectOpenAiServiceTier,

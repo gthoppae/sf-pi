@@ -27,7 +27,6 @@ import {
   OPUS_47_MODEL_MAX_TOKENS,
   allowReasoningEffortParam,
   applyOpus47MaxThinking,
-  flattenCodexTools,
   formatAnthropicStreamError,
   injectCodexGatewayParams,
   injectOpenAiReasoningEffort,
@@ -71,60 +70,13 @@ describe("formatAnthropicStreamError", () => {
   });
 });
 
-describe("flattenCodexTools", () => {
-  it("flattens Chat Completions function tools into Responses-style tools (gateway rejects nested shape with 'Missing required parameter: tools[0].name')", () => {
-    const payload: Record<string, unknown> = {
-      tools: [
-        {
-          type: "function",
-          function: {
-            name: "read_file",
-            description: "Read a file",
-            parameters: { type: "object", properties: { path: { type: "string" } } },
-            strict: true,
-          },
-        },
-      ],
-    };
-
-    flattenCodexTools(payload);
-
-    expect(payload.tools).toEqual([
-      {
-        type: "function",
-        name: "read_file",
-        description: "Read a file",
-        parameters: { type: "object", properties: { path: { type: "string" } } },
-      },
-    ]);
-  });
-
-  it("is a no-op on a payload with no tools (avoids injecting an empty array)", () => {
-    const payload: Record<string, unknown> = { model: "gpt-5.3-codex" };
-    flattenCodexTools(payload);
-    expect(payload).toEqual({ model: "gpt-5.3-codex" });
-  });
-
-  it("preserves multiple tools and flattens each", () => {
-    const payload: Record<string, unknown> = {
-      tools: [
-        { type: "function", function: { name: "a", parameters: {} } },
-        { type: "function", function: { name: "b", parameters: {} } },
-      ],
-    };
-    flattenCodexTools(payload);
-    expect((payload.tools as Array<{ name: string }>).map((t) => t.name)).toEqual(["a", "b"]);
-  });
-
-  it("leaves non-function tools untouched", () => {
-    const webSearchTool = { type: "web_search_preview", name: "search" };
-    const payload: Record<string, unknown> = { tools: [webSearchTool] };
-
-    flattenCodexTools(payload);
-
-    expect(payload.tools).toEqual([webSearchTool]);
-  });
-});
+// `flattenCodexTools` was removed in v0.71.x. The gateway now correctly
+// accepts pi-ai's native Chat Completions tool shape
+// `{ type: "function", function: {...} }` on /v1/chat/completions for
+// Codex models and HTTP 500s on the previously-required Responses-API
+// flattened shape (`'NoneType' object is not subscriptable`). The shim and
+// its unit tests were deleted; the live codex-regression test exercises
+// the Chat Completions shape end-to-end.
 
 describe("normalizeCodexReasoningEffort", () => {
   it("defaults missing values to high (gateway rejects 'reasoning.effort=none')", () => {
@@ -271,10 +223,13 @@ describe("OpenAI reasoning effort defaults", () => {
     expect(isOpenAiReasoningModelId("chatgpt-4o-latest")).toBe(false);
   });
 
-  it("uses xhigh only on GPT-5.2+ non-5.5 models, high elsewhere, and undefined for 5.5 (gateway forbids tools+effort)", () => {
+  it("uses max only on GPT-5.2+ non-5.5 models, high elsewhere, and undefined for 5.5 (gateway forbids tools+effort)", () => {
     expect(resolveOpenAiReasoningEffort("gpt-5")).toBe("high");
     expect(resolveOpenAiReasoningEffort("gpt-5-mini")).toBe("high");
-    expect(resolveOpenAiReasoningEffort("gpt-5.2")).toBe("xhigh");
+    // The gateway's reasoning_effort validator was tightened to
+    // {low,medium,high,max}; `xhigh` is rejected with HTTP 400. `max` is
+    // the strongest accepted tier on GPT-5.2+ models.
+    expect(resolveOpenAiReasoningEffort("gpt-5.2")).toBe("max");
     // gpt-5.5 is intentionally undefined — the gateway rejects
     // reasoning_effort + function tools on /v1/chat/completions for this
     // model, and /v1/responses is not exposed on this gateway.
@@ -310,10 +265,20 @@ describe("OpenAI reasoning effort defaults", () => {
     expect(payload.allowed_openai_params).toEqual(["service_tier"]);
   });
 
-  it("injects xhigh on GPT-5.2+ non-5.5 variants and allow-lists it", () => {
+  it("injects max on GPT-5.2+ non-5.5 variants and allow-lists it", () => {
     const payload: Record<string, unknown> = {};
     injectOpenAiReasoningEffort(payload, "gpt-5.2");
-    expect(payload.reasoning_effort).toBe("xhigh");
+    // `max` was `xhigh` before the gateway tightened its validator;
+    // see resolveOpenAiReasoningEffort tests above for the upstream
+    // change that drove the remap.
+    expect(payload.reasoning_effort).toBe("max");
+    expect(payload.allowed_openai_params).toEqual(["reasoning_effort"]);
+  });
+
+  it("normalizes a caller-provided xhigh to max (gateway rejects xhigh upstream)", () => {
+    const payload: Record<string, unknown> = { reasoning_effort: "xhigh" };
+    injectOpenAiReasoningEffort(payload, "gpt-5");
+    expect(payload.reasoning_effort).toBe("max");
     expect(payload.allowed_openai_params).toEqual(["reasoning_effort"]);
   });
 
@@ -400,7 +365,14 @@ describe("isOpus47ModelId", () => {
 });
 
 describe("applyOpus47GatewayPolicy", () => {
-  it("does not overwrite Pi-native adaptive effort mapping when Pi already supplied output_config", () => {
+  it("normalizes a Pi-native xhigh effort to high in place (gateway rejects xhigh, and rejects max on Opus 4.7)", () => {
+    // pi-ai 0.73+ may emit `output_config: { effort: "xhigh" }` natively
+    // when the user picks pi's `xhigh` thinking level. The gateway's
+    // LiteLLM validator now rejects `xhigh` (`Invalid effort value:
+    // xhigh`), AND its model-specific guard rejects `max` on Opus 4.7
+    // (`effort='max' is only supported by Claude Opus 4.6`). The strongest
+    // tier Opus 4.7 accepts is `high`, so the shim collapses xhigh → high
+    // in place rather than promoting to max.
     const payload: Record<string, unknown> = {
       max_tokens: 32_000,
       thinking: { type: "adaptive" },
@@ -412,7 +384,7 @@ describe("applyOpus47GatewayPolicy", () => {
 
     expect(payload.max_tokens).toBe(32_000);
     expect(payload.thinking).toEqual({ type: "adaptive" });
-    expect(payload.output_config).toEqual({ effort: "xhigh" });
+    expect(payload.output_config).toEqual({ effort: "high" });
     expect(payload.temperature).toBeUndefined();
   });
 
@@ -422,7 +394,7 @@ describe("applyOpus47GatewayPolicy", () => {
     applyOpus47MaxThinking(payload, "xhigh");
 
     expect(payload.thinking).toEqual({ type: "adaptive" });
-    expect(payload.output_config).toEqual({ effort: "xhigh" });
+    expect(payload.output_config).toEqual({ effort: "high" });
     expect(payload.max_tokens).toBe(64_000);
   });
 
@@ -486,10 +458,14 @@ describe("applyOpus47GatewayPolicy", () => {
     }
   });
 
-  it("xhigh pi level maps to xhigh Anthropic effort (not promoted to max)", () => {
+  it("xhigh pi level maps to high Anthropic effort on Opus 4.7 (gateway rejects both xhigh and max for this model)", () => {
+    // Opus 4.7 effort validator accepts only {low,medium,high}: raw
+    // `xhigh` is invalid and `max` is restricted to Opus 4.6. The
+    // strongest tier 4.7 accepts is `high`, so pi's user-facing `xhigh`
+    // collapses to `high` on the wire.
     const payload: Record<string, unknown> = {};
     applyOpus47MaxThinking(payload, "xhigh");
-    expect(payload.output_config).toEqual({ effort: "xhigh" });
+    expect(payload.output_config).toEqual({ effort: "high" });
   });
 
   it("overrides a caller-provided budget-based thinking block with adaptive (4.7 rejects budget-based)", () => {
@@ -541,7 +517,9 @@ describe("applyOpus47GatewayPolicy", () => {
       messages: [{ role: "user", content: "multi-step reasoning" }],
       max_tokens: 64_000,
       thinking: { type: "adaptive" },
-      output_config: { effort: "xhigh" },
+      // Opus 4.7 only accepts {low,medium,high}; pi-level xhigh
+      // collapses to `high` (the strongest tier 4.7 accepts).
+      output_config: { effort: "high" },
     });
   });
 

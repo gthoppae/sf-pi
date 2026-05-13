@@ -28,17 +28,20 @@ const DEFAULT_ANTHROPIC_BETA_HEADERS = [
 ] as const;
 
 /**
- * Opus 4.7 thinking-level map. Pi 0.73+ routes pi's `xhigh` straight
- * through as the Anthropic `xhigh` effort value. Without this map, users
- * who set `DEFAULT_THINKING_LEVEL = "xhigh"` get silently clamped to
- * `high` because xhigh never appears in the selector.
+ * Opus 4.7 thinking-level map. Pi 0.73+ routes pi's `xhigh` selector
+ * through this map onto the wire. Without this entry, the `/thinking`
+ * selector hides `xhigh` entirely.
  *
- * We do NOT expose `max` here: Anthropic's native API honors it, but
- * Bedrock Converse drops it the same way as `xhigh`, so adding it would
- * only create a false sense of user control.
+ * The gateway's LiteLLM tightened its Anthropic effort validator to
+ * {low,medium,high,max}, AND its model-specific guard restricts `max` to
+ * Opus 4.6 only. Opus 4.7 therefore accepts only {low,medium,high} —
+ * raw `xhigh` returns `Invalid effort value`, and `max` returns
+ * `effort='max' is only supported by Claude Opus 4.6`. Map pi's user-
+ * facing `xhigh` to the strongest tier 4.7 accepts (`high`) so the
+ * selector stays visible without breaking the wire request.
  */
 const OPUS_47_THINKING_LEVEL_MAP: ProviderModelConfig["thinkingLevelMap"] = {
-  xhigh: "xhigh",
+  xhigh: "high",
 };
 
 /**

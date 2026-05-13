@@ -26,7 +26,12 @@ import { formatRetryGuidanceFooter } from "../retry-telemetry.ts";
 
 export const DEFAULT_CODEX_REASONING_EFFORT = "high";
 export const DEFAULT_OPENAI_REASONING_EFFORT = "high";
-export const MAX_OPENAI_REASONING_EFFORT = "xhigh";
+// The gateway's LiteLLM tightened its OpenAI reasoning_effort validator to
+// {low,medium,high,max}; "xhigh" is now rejected with HTTP 400
+// (`reasoning_effort=xhigh is not supported for this model`). "max" is
+// accepted on every reasoning-capable family probed (gpt-5.x, codex). Keep
+// the constant name for callers that want "strongest safe effort" semantics.
+export const MAX_OPENAI_REASONING_EFFORT = "max";
 
 /**
  * How many additional attempts to make after the initial upstream request when
@@ -164,11 +169,18 @@ export function isOpus47ModelId(modelId: string): boolean {
 
 /**
  * Map a pi-ai thinking level to the Anthropic `output_config.effort` value
- * for Opus 4.7. xhigh maps to "xhigh" (a real Anthropic effort tier on 4.7).
+ * for Opus 4.7.
+ *
+ * The gateway's LiteLLM tightened its Anthropic effort validator to
+ * {low,medium,high,max}, AND its model-specific guard restricts `max` to
+ * Opus 4.6 only. Opus 4.7 therefore accepts only {low,medium,high} —
+ * raw `xhigh` returns `Invalid effort value: xhigh`, and `max` returns
+ * `effort='max' is only supported by Claude Opus 4.6`. Pi's user-facing
+ * `xhigh` collapses to `high` (Opus 4.7's strongest accepted tier).
  */
 export function mapPiLevelToOpus47Effort(
   level: PiReasoningLevel | undefined,
-): "low" | "medium" | "high" | "xhigh" {
+): "low" | "medium" | "high" {
   switch (level) {
     case "minimal":
     case "low":
@@ -176,7 +188,6 @@ export function mapPiLevelToOpus47Effort(
     case "medium":
       return "medium";
     case "xhigh":
-      return "xhigh";
     case "high":
     default:
       return "high";

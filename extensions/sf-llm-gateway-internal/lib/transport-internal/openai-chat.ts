@@ -21,7 +21,6 @@ import {
   type SimpleStreamOptions,
 } from "@earendil-works/pi-ai";
 import {
-  flattenCodexTools,
   injectCodexGatewayParams,
   injectOpenAiReasoningEffort,
   injectOpenAiServiceTier,
@@ -44,7 +43,11 @@ export function streamSfGatewayOpenAI(
         const objectPayload = payload as Record<string, unknown>;
 
         if (isCodexModelId(model.id)) {
-          flattenCodexTools(objectPayload);
+          // The gateway now accepts pi-ai's native Chat Completions tool
+          // shape `{ type: "function", function: {...} }` directly. The old
+          // `flattenCodexTools` workaround that produced the Responses-API
+          // shape was removed in v0.71.x — it now triggers HTTP 500 from
+          // LiteLLM.
           injectCodexGatewayParams(objectPayload);
           // Codex is an OpenAI-family model — honor the gateway's priority
           // tier the same way gpt-5 does, even though Codex's Responses
