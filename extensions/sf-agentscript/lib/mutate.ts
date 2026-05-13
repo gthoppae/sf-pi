@@ -348,6 +348,34 @@ async function applyAstSetField(
   if (parsed.ok === false) return parsed.error;
   const { doc } = parsed;
 
+  // ---- Layer 1: refuse to add new fields ---------------------------------
+  //
+  // set_field UPDATES an existing field. Adding a new field via property
+  // assignment on the AST node does NOT propagate to the SDK's emit() — the
+  // CST __children list is the source of truth for serialization. Without
+  // this guard, an `add` masquerades as a successful update: the tool
+  // reports ok=true, the file is unchanged except for whitespace round-trip,
+  // and the LLM ships a bundle silently missing the field. Refusing
+  // up-front routes the LLM to the generic `edit` tool (which handles new
+  // fields correctly) instead of letting it cascade into a broken publish.
+  // See docs/POSTMORTEM_E2E_DEMO.md for the original repro.
+  const beforeKeys = getTargetFieldKeys(
+    doc.ast as unknown as Record<string, unknown>,
+    op.component,
+  );
+  if (beforeKeys.ok === false) return beforeKeys.error;
+  if (!beforeKeys.keys.includes(op.field)) {
+    const known = beforeKeys.keys.length > 0 ? beforeKeys.keys.join(", ") : "<none>";
+    return {
+      ok: false,
+      reason: "field_not_present",
+      reason_detail:
+        `set_field updates an existing field. '${op.field}' is not present on '${op.component}' ` +
+        `(known fields: ${known}). To add a new field, use the generic edit tool — ` +
+        `or scaffold the field via agentscript_create with the appropriate job_spec.`,
+    };
+  }
+
   // The vendored SDK wraps scalar field values in nodes (StringLiteral,
   // NumberLiteral, BooleanLiteral, etc.) that carry an `__emit()` method.
   // Assigning a raw JS string to `entry.description` corrupts emit() because
@@ -380,13 +408,7 @@ async function applyAstSetField(
       head === "variables"
     ) {
       const entryName = componentParts[1];
-      if (!entryName) {
-        return {
-          ok: false,
-          reason: "bad_component",
-          reason_detail: `Component '${op.component}' missing an entry name (e.g. 'topic.billing').`,
-        };
-      }
+      // Layer 1 validated entryName is non-empty and the entry exists.
       doc.mutate((ast: Record<string, unknown>) => {
         const map = ast[head];
         if (!map || typeof (map as { get?: unknown }).get !== "function") return;
@@ -395,13 +417,9 @@ async function applyAstSetField(
         );
         if (entry) entry[op.field] = valueNode;
       });
-    } else {
-      return {
-        ok: false,
-        reason: "unknown_component_kind",
-        reason_detail: `Unknown component kind '${head}'. Supported: config, system, topic.<name>, subagent.<name>, actions.<name>, variables.<name>.`,
-      };
     }
+    // No `else` branch: Layer 1's getTargetFieldKeys already returned
+    // unknown_component_kind for any other head value.
 
     if (!doc.isDirty) {
       return {
@@ -414,6 +432,17 @@ async function applyAstSetField(
     if (after === sourceBefore) {
       return { ok: false, reason: "noop", reason_detail: "Mutation did not change source." };
     }
+
+    // ---- Layer 2: post-emit verification -------------------------------
+    //
+    // Catches any future regression in the SDK's mutate-then-emit path.
+    // Re-parses the emitted source and confirms `op.field` is still
+    // addressable on the target component. Costs one extra parse per
+    // mutate (~1ms on a typical bundle); skipped neither for normal nor
+    // for dry_run paths because a dry-run that lies is just as bad.
+    const verify = await verifyFieldPresentAfterEmit(after, op.component, op.field, sdk);
+    if (verify.ok === false) return verify.error;
+
     return await commitOrPreview(op, sourceBefore, after, "ast", `set ${op.component}.${op.field}`);
   } catch (err) {
     return {
@@ -606,4 +635,144 @@ function parseDocument(
     };
   }
   return { ok: true, doc };
+}
+
+// -------------------------------------------------------------------------------------------------
+// Field-key snapshot + post-emit verification (Issue 3 hotfix — see
+// docs/POSTMORTEM_E2E_DEMO.md). These two helpers exist so set_field can
+// (a) refuse to add fields it can't actually serialize, and (b) catch the
+// silent-no-op class of bug if it ever resurfaces from the SDK side.
+// -------------------------------------------------------------------------------------------------
+
+/**
+ * Resolve a `component` reference (e.g. 'config', 'system', 'topic.faq')
+ * to the list of field keys present on that block/entry in the AST.
+ *
+ * CST internals (keys starting with `__`) are filtered out — only real,
+ * serializable field names are returned. Used for both the pre-mutation
+ * sanity check and the post-emit verification.
+ */
+export function getTargetFieldKeys(
+  ast: Record<string, unknown>,
+  component: string,
+): { ok: true; keys: string[] } | { ok: false; error: MutateResult } {
+  const parts = component.split(".");
+  const head = parts[0];
+  if (head === "config" || head === "system") {
+    const block = ast[head];
+    if (!block || typeof block !== "object") {
+      return {
+        ok: false,
+        error: {
+          ok: false,
+          reason: "block_not_found",
+          reason_detail: `Block '${head}' not present in document.`,
+        },
+      };
+    }
+    return { ok: true, keys: keysExcludingCst(block as Record<string, unknown>) };
+  }
+  if (head === "topic" || head === "subagent" || head === "actions" || head === "variables") {
+    const entryName = parts[1];
+    if (!entryName) {
+      return {
+        ok: false,
+        error: {
+          ok: false,
+          reason: "bad_component",
+          reason_detail: `Component '${component}' missing an entry name (e.g. 'topic.billing').`,
+        },
+      };
+    }
+    const map = ast[head] as { get?: (n: string) => unknown } | undefined;
+    if (!map || typeof map.get !== "function") {
+      return {
+        ok: false,
+        error: {
+          ok: false,
+          reason: "block_not_found",
+          reason_detail: `Named-map block '${head}' is missing or not iterable.`,
+        },
+      };
+    }
+    const entry = map.get(entryName);
+    if (!entry || typeof entry !== "object") {
+      return {
+        ok: false,
+        error: {
+          ok: false,
+          reason: "entry_not_found",
+          reason_detail: `Entry '${component}' not found in '${head}' map.`,
+        },
+      };
+    }
+    return { ok: true, keys: keysExcludingCst(entry as Record<string, unknown>) };
+  }
+  return {
+    ok: false,
+    error: {
+      ok: false,
+      reason: "unknown_component_kind",
+      reason_detail:
+        `Unknown component kind '${head}'. Supported: config, system, ` +
+        `topic.<name>, subagent.<name>, actions.<name>, variables.<name>.`,
+    },
+  };
+}
+
+function keysExcludingCst(obj: Record<string, unknown>): string[] {
+  return Object.keys(obj).filter((k) => !k.startsWith("__"));
+}
+
+/**
+ * Re-parse the emitted source and confirm the target field is still
+ * addressable. Catches the class of SDK regression where mutate-then-emit
+ * silently drops a field. We refuse to write rather than corrupt the
+ * caller's file with a half-applied mutation.
+ */
+async function verifyFieldPresentAfterEmit(
+  emittedSource: string,
+  component: string,
+  field: string,
+  sdk: unknown,
+): Promise<{ ok: true } | { ok: false; error: MutateResult }> {
+  const parsed = parseDocument(emittedSource, sdk);
+  if (parsed.ok === false) {
+    return {
+      ok: false,
+      error: {
+        ok: false,
+        reason: "emit_unparseable",
+        reason_detail:
+          `AST mutation produced source that no longer parses. This is an SDK bug. ` +
+          `Refusing to write — the on-disk file is unchanged.`,
+      },
+    };
+  }
+  const keys = getTargetFieldKeys(parsed.doc.ast as unknown as Record<string, unknown>, component);
+  if (keys.ok === false) {
+    return {
+      ok: false,
+      error: {
+        ok: false,
+        reason: "emit_verify_failed",
+        reason_detail:
+          `After mutation, component '${component}' is no longer addressable. ` +
+          `This is an SDK bug — refusing to write.`,
+      },
+    };
+  }
+  if (!keys.keys.includes(field)) {
+    return {
+      ok: false,
+      error: {
+        ok: false,
+        reason: "emit_verify_failed",
+        reason_detail:
+          `AST mutation reported success but emit() did not include '${component}.${field}'. ` +
+          `This is an SDK bug — refusing to write the silently-empty mutation.`,
+      },
+    };
+  }
+  return { ok: true };
 }

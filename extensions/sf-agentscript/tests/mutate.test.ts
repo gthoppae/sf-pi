@@ -139,6 +139,85 @@ describe("applyMutation: set_field", () => {
     expect(result.reason).toBe("bad_component");
   });
 
+  test("refuses to add a NEW field on config (field_not_present)", async () => {
+    // Repro of the original Issue 3 from docs/POSTMORTEM_E2E_DEMO.md:
+    // set_field on a missing field used to silently report success while
+    // emit() dropped the new field on the floor. Now it returns a clean
+    // error so the LLM falls back to the generic edit tool.
+    const filePath = await writeAgent("bot.agent", FULL_FIXTURE);
+    const before = await readFile(filePath, "utf8");
+    const result = await applyMutation({
+      op: "set_field",
+      path: filePath,
+      component: "config",
+      field: "agent_type", // not present in FULL_FIXTURE
+      value: "AgentforceEmployeeAgent",
+    });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("field_not_present");
+    expect(result.reason_detail).toMatch(/known fields:/i);
+    expect(result.reason_detail).toMatch(/edit tool/i);
+    // File on disk MUST be untouched (no whitespace round-trip leaks).
+    expect(await readFile(filePath, "utf8")).toBe(before);
+  });
+
+  test("refuses to add a NEW field on system (field_not_present)", async () => {
+    const filePath = await writeAgent("bot.agent", FULL_FIXTURE);
+    const result = await applyMutation({
+      op: "set_field",
+      path: filePath,
+      component: "system",
+      field: "agent_type", // system has only `instructions`
+      value: "AgentforceEmployeeAgent",
+    });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("field_not_present");
+  });
+
+  test("refuses to add a NEW field on topic.<name> (field_not_present)", async () => {
+    const filePath = await writeAgent("bot.agent", FULL_FIXTURE);
+    const result = await applyMutation({
+      op: "set_field",
+      path: filePath,
+      component: "topic.faq",
+      field: "reasoning", // topic.faq has only `description`
+      value: "x",
+    });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("field_not_present");
+  });
+
+  test("returns entry_not_found when the named entry doesn't exist", async () => {
+    const filePath = await writeAgent("bot.agent", FULL_FIXTURE);
+    const result = await applyMutation({
+      op: "set_field",
+      path: filePath,
+      component: "topic.does_not_exist",
+      field: "description",
+      value: "x",
+    });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("entry_not_found");
+  });
+
+  test("dry_run on a missing field also refuses (no diff produced)", async () => {
+    // Dry-runs that lie are just as bad as wet-runs that lie. The Layer 1
+    // guard fires before commitOrPreview is reached.
+    const filePath = await writeAgent("bot.agent", FULL_FIXTURE);
+    const result = await applyMutation({
+      op: "set_field",
+      path: filePath,
+      component: "config",
+      field: "agent_type",
+      value: "AgentforceEmployeeAgent",
+      dry_run: true,
+    });
+    expect(result.ok).toBe(false);
+    expect(result.reason).toBe("field_not_present");
+    expect(result.diff).toBeUndefined();
+    expect(result.preview_source).toBeUndefined();
+  });
+
   test("returns unknown_component_kind for unrecognized heads", async () => {
     const filePath = await writeAgent(
       "bot.agent",
