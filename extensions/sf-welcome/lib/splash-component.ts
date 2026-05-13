@@ -509,10 +509,14 @@ function formatPrivacyStatusValue(privacy: NonNullable<SplashData["privacy"]>): 
       : privacy.source === "user-override"
         ? "user override"
         : "unset";
+  // Lead with a ✓ glyph so this row aligns visually with the Slack /
+  // LLM Gateway / SF CLI rows above it. Color carries the semantics:
+  // green when telemetry is off (privacy-preserving), muted when on
+  // (informational, not a warning — see comment at call site).
   if (privacy.telemetryEnabled) {
-    return `${MUTED("telemetry on")} ${MUTED(`(${sourceLabel})`)}`;
+    return `${MUTED("✓")} ${MUTED("telemetry on")} ${MUTED(`(${sourceLabel})`)}`;
   }
-  return `${SF_GREEN("telemetry off")} ${MUTED(`(${sourceLabel})`)}`;
+  return `${SF_GREEN("✓")} ${SF_GREEN("telemetry off")} ${MUTED(`(${sourceLabel})`)}`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
