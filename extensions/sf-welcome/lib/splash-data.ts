@@ -29,6 +29,7 @@ import {
 import { collectRecommendationsStatus } from "./recommendations-status.ts";
 import { readWelcomeState } from "./state-store.ts";
 import { summarizeAvailableSkillSources } from "../../../lib/common/skill-sources/skill-sources.ts";
+import { getTelemetryState } from "../../../lib/common/privacy/state.ts";
 import {
   runDoctorDiagnostics,
   summarizeStartupDoctorNudge,
@@ -36,7 +37,13 @@ import {
 // Only the types actually referenced in this module's function bodies are
 // imported here; the rest are re-exported for convenience via the
 // `export type` block below, which does not require a local import.
-import type { AnnouncementsSummary, LoadedCounts, SplashData, WhatsNewSummary } from "./types.ts";
+import type {
+  AnnouncementsSummary,
+  LoadedCounts,
+  PrivacyStatusSummary,
+  SplashData,
+  WhatsNewSummary,
+} from "./types.ts";
 
 export type {
   AnnouncementLine,
@@ -318,6 +325,7 @@ export function collectInitialSplashData(
     recentSessionsLoading: true,
     sfCli: { installed: false, freshness: "checking", loading: true },
     doctor: summarizeStartupDoctorNudge(runDoctorDiagnostics()) ?? undefined,
+    privacy: collectPrivacyStatus(),
   };
 }
 
@@ -372,6 +380,7 @@ export function collectSplashData(
       : undefined;
 
   const doctor = summarizeStartupDoctorNudge(runDoctorDiagnostics({ cwd })) ?? undefined;
+  const privacy = collectPrivacyStatus();
 
   return {
     modelName,
@@ -392,6 +401,7 @@ export function collectSplashData(
     recommendations: collectRecommendationsStatus(cwd),
     skillSources: summarizeAvailableSkillSources() ?? undefined,
     doctor,
+    privacy,
     sfCli: undefined,
     whatsNew,
     announcements,
@@ -429,4 +439,19 @@ export async function refreshAnnouncementsSummary(
   } catch {
     return undefined;
   }
+}
+
+/**
+ * Snapshot the live telemetry posture for the splash row.
+ *
+ * Pure read: combines pi's `enableInstallTelemetry` setting with sf-pi's
+ * own assertion record (see lib/common/privacy/state.ts) into a stable
+ * shape the splash component can render without touching the FS again.
+ */
+export function collectPrivacyStatus(): PrivacyStatusSummary {
+  const state = getTelemetryState();
+  return {
+    telemetryEnabled: state.effectivelyEnabled,
+    source: state.source,
+  };
 }

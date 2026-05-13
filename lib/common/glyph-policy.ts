@@ -166,6 +166,7 @@ export const GLYPH_TABLE = {
   hourglass: { emoji: "⏳", ascii: "..." },
   bug: { emoji: "🐛", ascii: "!" },
   pr: { emoji: "🔀", ascii: "><" },
+  privacy: { emoji: "🔒", ascii: "#" },
   warn: { emoji: "⚠️", ascii: "!" }, // note: VS16 variation selector
   // Inline bullets that already render fine in Terminal.app but we want a
   // single switchable source of truth for custom renderers.

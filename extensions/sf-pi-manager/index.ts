@@ -91,6 +91,9 @@ import {
 } from "./lib/announcements.ts";
 import { handleSkills, parseSkillsArgs } from "./lib/skill-sources-command.ts";
 import { handleDoctor, parseDoctorArgs } from "./lib/doctor-command.ts";
+import { handleTelemetry, parseTelemetryArgs } from "./lib/telemetry-command.ts";
+import { assertTelemetryDefault } from "../../lib/common/privacy/assert-default.ts";
+import { getTelemetryState } from "../../lib/common/privacy/state.ts";
 import {
   runDoctorDiagnostics,
   summarizeStartupDoctorNudge,
@@ -151,6 +154,7 @@ type CommandArgs = {
     | "announcements"
     | "skills"
     | "doctor"
+    | "telemetry"
     | "help";
   /**
    * Explicit scope from the command tokens, or `undefined` to mean
@@ -186,6 +190,7 @@ export default function sfPiManagerExtension(pi: ExtensionAPI) {
         "announcements",
         "skills",
         "doctor",
+        "telemetry",
         "help",
       ];
       const tokens = prefix.trim().split(/\s+/);
@@ -200,6 +205,15 @@ export default function sfPiManagerExtension(pi: ExtensionAPI) {
       }
 
       const sub = tokens[0]?.toLowerCase();
+
+      // Second token for telemetry: status / on / off
+      if (sub === "telemetry" && tokens.length <= 2) {
+        const subActions = ["status", "on", "off"];
+        const matches = subActions
+          .filter((s) => s.startsWith(current.toLowerCase()))
+          .map((s) => ({ value: s, label: s }));
+        return matches.length > 0 ? matches : null;
+      }
 
       // Second token for display: profile names
       if (sub === "display" && tokens.length <= 2) {
@@ -243,6 +257,27 @@ export default function sfPiManagerExtension(pi: ExtensionAPI) {
   });
 
   pi.on("session_start", async (_event, ctx) => {
+    // Idempotent: writes pi setting + audit record only when the key is
+    // currently undefined. Respects an explicit `true` user opt-in.
+    // Emits a one-time pi.appendEntry notice on the session that flips it.
+    try {
+      const result = assertTelemetryDefault({ sfPiVersion: PACKAGE_VERSION });
+      if (result.shouldNotify && ctx.hasUI) {
+        // Surface the one-time notice as a passive notification. We use
+        // notify rather than appendEntry-driven output so the user sees
+        // it immediately on the session that flipped the default; the
+        // setting itself is now persisted, so subsequent sessions stay
+        // silent.
+        ctx.ui.notify(
+          "\u{1F512} sf-pi disabled pi's anonymous install/update telemetry by default. " +
+            "Version-update checks remain enabled. Run /sf-pi telemetry on to opt back in, " +
+            "or /sf-pi telemetry status for details.",
+          "info",
+        );
+      }
+    } catch {
+      // Privacy default is best-effort — must never break session_start.
+    }
     updateFooterStatus(ctx);
     updateRecommendationsNudge(ctx);
     updateAnnouncementsNudge(ctx);
@@ -292,6 +327,10 @@ export function parseCommandArgs(raw: string): CommandArgs {
   if (sub === "doctor" || sub === "dr") {
     const rest = tokens.slice(1).join(" ");
     return { subcommand: "doctor", scope, rest };
+  }
+  if (sub === "telemetry" || sub === "tel") {
+    const rest = tokens.slice(1).join(" ");
+    return { subcommand: "telemetry", scope, rest };
   }
   if (sub === "display") {
     const target =
@@ -386,6 +425,11 @@ async function handleCommand(
       const doctorArgs = parseDoctorArgs(args.rest ?? "");
       await handleDoctor(ctx, doctorArgs);
       updateDoctorNudge(ctx);
+      break;
+    }
+    case "telemetry": {
+      const telArgs = parseTelemetryArgs(args.rest ?? "");
+      await handleTelemetry(ctx, telArgs, PACKAGE_VERSION);
       break;
     }
     case "help":
@@ -591,6 +635,10 @@ async function handleStatus(
 
   const enabledCount = states.filter((e) => e.enabled).length;
   const display = readEffectiveSfPiDisplaySettings(ctx.cwd);
+  const telemetry = getTelemetryState();
+  const telemetryLine = telemetry.effectivelyEnabled
+    ? `Privacy: telemetry on (${telemetry.source === "user-override" ? "user override" : "unset"})`
+    : `Privacy: telemetry off (${telemetry.source === "sf-pi-default" ? "sf-pi default" : "user override"})`;
 
   const lines = [
     "sf-pi Extension Suite",
@@ -599,6 +647,7 @@ async function handleStatus(
     `Package root: ${PACKAGE_ROOT}`,
     `Extensions: ${enabledCount}/${states.length} enabled`,
     `Display profile: ${display.profile} (${describeDisplaySettingsSource(display)})`,
+    telemetryLine,
     `Settings scope: ${scope}`,
     `Package in settings: ${match ? "yes" : "no"}`,
     match ? `Settings file: ${match.settingsPath}` : "",
@@ -675,6 +724,7 @@ function handleHelp(ctx: ExtensionCommandContext): void {
     `  /${COMMAND_NAME} announcements [...]       List/dismiss/reset sf-pi announcements`,
     `  /${COMMAND_NAME} skills [...]              Wire Claude Code / Codex / Cursor skill dirs`,
     `  /${COMMAND_NAME} doctor [fix ...]          Diagnose and repair startup/skill setup`,
+    `  /${COMMAND_NAME} telemetry [status|on|off] Show or change pi anonymous-telemetry posture`,
     `  /${COMMAND_NAME} help                      Show this help`,
     "",
     "Available extensions:",

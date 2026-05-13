@@ -12,6 +12,11 @@ Salesforce-branded splash screen that displays on startup with an animated Pi + 
 - sf-pi extension health grid (active/disabled/locked indicators)
 - Optional Slack and auth-gated LLM Gateway status only when enabled/configured,
   plus lightweight SF CLI install/latest status
+- **Privacy row** showing pi's anonymous-telemetry posture
+  (`telemetry off (sf-pi default)` / `(user override)` / `telemetry on (user
+override)`). Driven by `lib/common/privacy/state.ts` — see
+  [`extensions/sf-pi-manager/README.md`](../sf-pi-manager/README.md) for the
+  full decision matrix and the `/sf-pi telemetry` command surface.
 
 **Right column:**
 
@@ -169,6 +174,7 @@ extensions/sf-welcome/
     sdk-migration.test.ts   ← unit / smoke test
     sf-cli-status.test.ts   ← unit / smoke test
     smoke.test.ts           ← unit / smoke test
+    splash-privacy.test.ts  ← unit / smoke test
     startup-mode.test.ts    ← unit / smoke test
     state-store.test.ts     ← unit / smoke test
     whats-new.test.ts       ← unit / smoke test

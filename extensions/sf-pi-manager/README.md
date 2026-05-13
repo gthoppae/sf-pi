@@ -63,7 +63,31 @@ Extension enable/disable requires a full reload (`ctx.reload()`) because Pi
 reads the package filter at startup time. The manager notifies the user before
 triggering the reload.
 
-### 5. Doctor repairs are non-destructive
+### 5. Privacy defaults
+
+`session_start` calls
+[`assertTelemetryDefault()`](../../lib/common/privacy/assert-default.ts) which
+idempotently writes `enableInstallTelemetry: false` to pi's global
+`settings.json` **only when the key is currently unset**. The pi setting
+controls the anonymous install/update version ping to
+`https://pi.dev/api/report-install`; turning it off does not affect the
+latest-version probe (`PI_SKIP_VERSION_CHECK`) or any LLM provider
+traffic.
+
+Decision matrix on every `session_start`:
+
+| pi `enableInstallTelemetry` | Action                                                  |
+| --------------------------- | ------------------------------------------------------- |
+| `undefined` (missing)       | write `false`, record assertion, emit one-time notice   |
+| `false`                     | no-op (refresh assertion record silently if missing)    |
+| `true`                      | no-op, clear stale assertion (user explicitly opted in) |
+
+State lives at `<globalAgentDir>/sf-pi/privacy/telemetry-default.json` and
+distinguishes "sf-pi default" from "user override" so the sf-welcome
+splash can label the row correctly. `/sf-pi telemetry on|off|status`
+manages the setting without touching the user's shell rc files.
+
+### 6. Doctor repairs are non-destructive
 
 `/sf-pi doctor` scans local settings and skill roots for startup issues such
 as duplicate skill names, stale `settings.skills[]` entries, unwired external
@@ -76,28 +100,31 @@ moved to `~/.pi/agent/skills-quarantine/` instead of being deleted.
 
 ## Behavior Matrix
 
-| Trigger               | Condition                 | Result                               |
-| --------------------- | ------------------------- | ------------------------------------ |
-| /sf-pi (no args)      | has UI                    | Open TUI overlay                     |
-| /sf-pi (no args)      | no UI                     | Fall back to list                    |
-| /sf-pi list           | package in settings       | Show extension states                |
-| /sf-pi list           | package NOT in settings   | Show states (all enabled assumed)    |
-| /sf-pi enable \<id\>  | valid, currently disabled | Remove exclusion, reload             |
-| /sf-pi enable \<id\>  | valid, already enabled    | Notify "already enabled"             |
-| /sf-pi enable \<id\>  | alwaysActive              | Notify "cannot toggle"               |
-| /sf-pi disable \<id\> | valid, currently enabled  | Add exclusion, reload                |
-| /sf-pi disable-all    | —                         | Exclude all non-alwaysActive, reload |
-| /sf-pi enable-all     | —                         | Remove all exclusions, reload        |
-| /sf-pi display        | no profile                | Show effective display profile       |
-| /sf-pi display <name> | compact/balanced/verbose  | Save shared display profile          |
-| /sf-pi doctor         | —                         | Show setup diagnostics               |
-| /sf-pi doctor runtime | —                         | Show Pi/Node/npm runtime preflight   |
-| /sf-pi doctor fix     | user confirms             | Apply safe repairs and reload        |
-| TUI list → Enter      | —                         | Open extension detail/config view    |
-| TUI list → Esc        | changes pending           | Apply exclusions, reload if needed   |
-| TUI detail → Esc      | —                         | Return to extension list             |
-| session_start         | —                         | Update footer status                 |
-| session_shutdown      | —                         | Clear footer status                  |
+| Trigger               | Condition                 | Result                                |
+| --------------------- | ------------------------- | ------------------------------------- |
+| /sf-pi (no args)      | has UI                    | Open TUI overlay                      |
+| /sf-pi (no args)      | no UI                     | Fall back to list                     |
+| /sf-pi list           | package in settings       | Show extension states                 |
+| /sf-pi list           | package NOT in settings   | Show states (all enabled assumed)     |
+| /sf-pi enable \<id\>  | valid, currently disabled | Remove exclusion, reload              |
+| /sf-pi enable \<id\>  | valid, already enabled    | Notify "already enabled"              |
+| /sf-pi enable \<id\>  | alwaysActive              | Notify "cannot toggle"                |
+| /sf-pi disable \<id\> | valid, currently enabled  | Add exclusion, reload                 |
+| /sf-pi disable-all    | —                         | Exclude all non-alwaysActive, reload  |
+| /sf-pi enable-all     | —                         | Remove all exclusions, reload         |
+| /sf-pi display        | no profile                | Show effective display profile        |
+| /sf-pi display <name> | compact/balanced/verbose  | Save shared display profile           |
+| /sf-pi doctor         | —                         | Show setup diagnostics                |
+| /sf-pi doctor runtime | —                         | Show Pi/Node/npm runtime preflight    |
+| /sf-pi doctor fix     | user confirms             | Apply safe repairs and reload         |
+| /sf-pi telemetry      | no arg / `status`         | Show pi anonymous-telemetry posture   |
+| /sf-pi telemetry off  | —                         | Write `enableInstallTelemetry: false` |
+| /sf-pi telemetry on   | —                         | Write `enableInstallTelemetry: true`  |
+| TUI list → Enter      | —                         | Open extension detail/config view     |
+| TUI list → Esc        | changes pending           | Apply exclusions, reload if needed    |
+| TUI detail → Esc      | —                         | Return to extension list              |
+| session_start         | —                         | Update footer status                  |
+| session_shutdown      | —                         | Clear footer status                   |
 
 ## File Structure
 
@@ -117,6 +144,7 @@ extensions/sf-pi-manager/
     render.ts               ← implementation module
     skill-sources-command.ts← implementation module
     skill-sources-overlay.ts← implementation module
+    telemetry-command.ts    ← implementation module
   tests/
     announcements-command.test.ts← unit / smoke test
     command-parsing.test.ts ← unit / smoke test

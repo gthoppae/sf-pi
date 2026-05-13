@@ -130,6 +130,33 @@ sf-pi does **not** collect active runtime telemetry. No bundled extension sends
 prompts, responses, tool calls, file paths, Salesforce org identifiers, Slack
 identifiers, environment variables, or command usage from your machine.
 
+### Pi runtime defaults
+
+The pi runtime itself emits one anonymous install/update version ping to
+`https://pi.dev/api/report-install` after a fresh install or changelog-detected
+update. **sf-pi opts you out of this ping by default**: on the first session
+after installing sf-pi, `enableInstallTelemetry: false` is written to pi's
+global `settings.json` if (and only if) the key is currently unset. An explicit
+user opt-in (`true`) is always preserved.
+
+The sf-welcome splash shows a `Privacy: telemetry off (sf-pi default)` row at
+every launch so the posture is auditable at a glance. Manage it via:
+
+```text
+/sf-pi telemetry status     # show the current state and source
+/sf-pi telemetry on         # opt back in (writes enableInstallTelemetry: true)
+/sf-pi telemetry off        # opt out (writes enableInstallTelemetry: false)
+```
+
+What sf-pi's default does **not** touch (intentional):
+
+- **Latest-version probe** to `https://pi.dev/api/latest-version` stays
+  enabled so users still see security/feature update nudges. Disable
+  separately with `PI_SKIP_VERSION_CHECK=1` or master-kill with `PI_OFFLINE=1`.
+- **`PI_OFFLINE` / `PI_TELEMETRY` env vars or shell rc files** — sf-pi never
+  edits your shell environment. The default lives only in pi's `settings.json`.
+- **LLM provider traffic** — always determined by the provider you configure.
+
 Maintainers archive aggregate GitHub metrics, such as repository views,
 repository clones, and release download counts, through a scheduled GitHub
 Actions workflow. These platform metrics help measure discovery and distribution

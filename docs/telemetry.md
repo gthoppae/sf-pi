@@ -36,6 +36,40 @@ platform APIs:
 These metrics help maintainers understand discovery and distribution trends
 without adding client-side telemetry.
 
+## Pi runtime install/update telemetry
+
+The upstream pi runtime (separate from sf-pi) emits one anonymous
+install/update version ping to `https://pi.dev/api/report-install` after
+a fresh install or changelog-detected update, and a periodic
+latest-version probe to `https://pi.dev/api/latest-version`. Neither is
+an sf-pi feature.
+
+**sf-pi opts users out of the install/update ping by default.** On the
+first session after sf-pi is installed, the manager extension writes
+`enableInstallTelemetry: false` to pi's global `settings.json` _if and
+only if the key is currently unset_. An explicit user opt-in (`true`)
+is always preserved across sessions.
+
+Intentional non-goals of this default:
+
+- The latest-version probe is **not** disabled — users continue to see
+  security and feature update nudges. Disable separately with
+  `PI_SKIP_VERSION_CHECK=1` or master-kill with `PI_OFFLINE=1`.
+- sf-pi never edits the user's shell environment, `~/.zshrc`, or
+  exported env vars. The default lives only in pi's `settings.json`.
+
+Manage the setting via the standard `/sf-pi` surface:
+
+```text
+/sf-pi telemetry status     # show the current value and source
+/sf-pi telemetry on         # opt back in (writes true)
+/sf-pi telemetry off        # opt out (writes false)
+```
+
+The live state is also rendered on the sf-welcome splash as a `Privacy:
+telemetry off (sf-pi default)` row — see
+[`extensions/sf-welcome/`](../extensions/sf-welcome/README.md).
+
 ## Active telemetry policy
 
 Active telemetry means an installed copy of sf-pi sends events while running on a

@@ -72,6 +72,15 @@ export interface DoctorNudgeSummary {
   command: string;
 }
 
+/** Compact splash payload for the Privacy row.
+ *  Computed from lib/common/privacy/state.ts at every collect call. */
+export interface PrivacyStatusSummary {
+  /** True when pi will currently send the anonymous install/update ping. */
+  telemetryEnabled: boolean;
+  /** Where the current value comes from. Drives the row label and color. */
+  source: "sf-pi-default" | "user-override" | "unset";
+}
+
 export interface SplashData {
   modelName: string;
   providerName: string;
@@ -111,6 +120,9 @@ export interface SplashData {
    * welcome screen nudges the user toward `/sf-pi doctor` and safe-start
    * mode avoids the blocking overlay. */
   doctor?: DoctorNudgeSummary;
+  /** Telemetry posture (sf-pi default opts users out of pi's anonymous
+   *  install/update ping). Always present after the first collect. */
+  privacy?: PrivacyStatusSummary;
   /** True while the first full filesystem/settings hydration pass is pending. */
   loading?: boolean;
   /** True while Slack auth status is still being checked. */

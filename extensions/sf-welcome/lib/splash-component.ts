@@ -487,9 +487,32 @@ function buildLeftColumn(
   // the welcome splash. Keep this directly under the gateway row so both
   // environment statuses read as one aligned block.
   lines.push(formatGlyphInfoRow("cli", mode, "SF CLI", formatSfCliStatusValue(data, mode)));
+
+  // Privacy / telemetry posture. sf-pi opts users out of pi's anonymous
+  // install/update ping by default. The row is always rendered so the
+  // posture is auditable at a glance — colored green for off, dim gray
+  // for on (informational, not a warning).
+  if (data.privacy) {
+    lines.push(
+      formatGlyphInfoRow("privacy", mode, "Privacy", formatPrivacyStatusValue(data.privacy)),
+    );
+  }
   lines.push("");
 
   return lines;
+}
+
+function formatPrivacyStatusValue(privacy: NonNullable<SplashData["privacy"]>): string {
+  const sourceLabel =
+    privacy.source === "sf-pi-default"
+      ? "sf-pi default"
+      : privacy.source === "user-override"
+        ? "user override"
+        : "unset";
+  if (privacy.telemetryEnabled) {
+    return `${MUTED("telemetry on")} ${MUTED(`(${sourceLabel})`)}`;
+  }
+  return `${SF_GREEN("telemetry off")} ${MUTED(`(${sourceLabel})`)}`;
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
