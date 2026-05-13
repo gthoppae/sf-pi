@@ -244,6 +244,55 @@ function buildUnusedVariableFix(
   };
 }
 
+/**
+ * Detect the `transition to @topic.X when "..."` footgun and offer to
+ * strip the unsupported `when` clause.
+ *
+ * Agent Script supports two transition shapes:
+ *   - `transition to @topic.X`            — deterministic
+ *   - `@utils.transition to @topic.X` (in instructions) — LLM-discretionary
+ *
+ * Guarded transitions don't exist; the `when` keyword turns the line into
+ * a parse error (`missing-token`). The SDK message correctly says "missing
+ * token" but doesn't tell the author that the syntax just isn't a thing.
+ *
+ * This fix pattern-matches the surrounding line text on the diagnostic's
+ * line and, if it looks like the `when`-suffix shape, emits a single
+ * preferred quick fix that strips everything from `when` onward. We do
+ * NOT try to convert into the `@utils.transition` form because that
+ * requires moving the line into the parent node's `instructions:` block;
+ * the simple deterministic-transition form is the right default.
+ *
+ * See docs/POSTMORTEM_E2E_DEMO.md Issue 2.
+ */
+const TRANSITION_WHEN_RE = /^(?<keep>\s*transition\s+to\s+@[A-Za-z_][\w.]*)\s+when\b.*$/;
+
+function buildMissingTokenTransitionFix(
+  source: string,
+  diagnostic: AgentScriptDiagnostic,
+): AgentScriptQuickFix | null {
+  const lines = source.split("\n");
+  const lineText = lines[diagnostic.range.start.line];
+  if (!lineText) return null;
+  const m = TRANSITION_WHEN_RE.exec(lineText);
+  if (!m || !m.groups?.keep) return null;
+  return {
+    title: `Remove unsupported 'when ...' clause (transitions don't support guards)`,
+    preferred: true,
+    diagnosticLine: diagnostic.range.start.line,
+    diagnosticCode: diagnostic.code,
+    edits: [
+      {
+        range: {
+          start: { line: diagnostic.range.start.line, character: 0 },
+          end: { line: diagnostic.range.start.line, character: lineText.length },
+        },
+        newText: m.groups.keep,
+      },
+    ],
+  };
+}
+
 function buildInvalidVersionFixes(diagnostic: AgentScriptDiagnostic): AgentScriptQuickFix[] {
   const data = (diagnostic.data ?? {}) as SuggestedVersionsData;
   const suggestions = data.suggestedVersions;
@@ -306,6 +355,13 @@ export function buildQuickFixes(
       }
       case "invalid-version": {
         fixes.push(...buildInvalidVersionFixes(diagnostic));
+        break;
+      }
+      case "missing-token": {
+        // Pattern-aware fix for `transition to @topic.X when "..."`. Other
+        // missing-token diagnostics are not auto-fixable.
+        const fix = buildMissingTokenTransitionFix(source, diagnostic);
+        if (fix) fixes.push(fix);
         break;
       }
       default:

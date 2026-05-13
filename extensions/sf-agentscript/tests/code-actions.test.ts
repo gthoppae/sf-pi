@@ -171,4 +171,73 @@ describe("buildQuickFixes", () => {
       expect(fixes[1].preferred).toBe(false);
     });
   });
+
+  describe('missing-token (transition ... when "...")', () => {
+    // Issue 2: the natural-looking but unsupported guarded-transition
+    // syntax. Compile reports `missing-token`; the fix strips the
+    // `when ...` clause.
+
+    it("strips the when-clause from a deterministic transition line", () => {
+      const source =
+        "topic greeting:\n" +
+        '    description: "hi"\n' +
+        '    transition to @topic.faq when "the user asks about Agentforce"\n';
+      const diagnostic = makeDiagnostic({
+        code: "missing-token",
+        severity: 1,
+        range: {
+          start: { line: 2, character: 33 },
+          end: { line: 2, character: 33 },
+        },
+      });
+      const [fix] = buildQuickFixes(source, [diagnostic]);
+      expect(fix).toBeDefined();
+      expect(fix.title).toMatch(/transitions don't support guards/i);
+      expect(fix.preferred).toBe(true);
+      expect(fix.edits).toHaveLength(1);
+      expect(fix.edits[0].newText).toBe("    transition to @topic.faq");
+      // The edit covers the whole line so the leftover quote/text is gone.
+      expect(fix.edits[0].range.start).toEqual({ line: 2, character: 0 });
+    });
+
+    it("handles deeper @-paths and unquoted condition text", () => {
+      const source = "    transition to @topic.foo.bar when something\n";
+      const diagnostic = makeDiagnostic({
+        code: "missing-token",
+        range: { start: { line: 0, character: 30 }, end: { line: 0, character: 30 } },
+      });
+      const [fix] = buildQuickFixes(source, [diagnostic]);
+      expect(fix).toBeDefined();
+      expect(fix.edits[0].newText).toBe("    transition to @topic.foo.bar");
+    });
+
+    it("does NOT trigger on plain transition lines (no when keyword)", () => {
+      const source = "    transition to @topic.faq\n";
+      const diagnostic = makeDiagnostic({
+        code: "missing-token",
+        range: { start: { line: 0, character: 4 }, end: { line: 0, character: 4 } },
+      });
+      expect(buildQuickFixes(source, [diagnostic])).toEqual([]);
+    });
+
+    it("does NOT trigger on a missing-token error elsewhere in the file", () => {
+      const source = 'config:\n    agent_name "X"\n'; // colon missing
+      const diagnostic = makeDiagnostic({
+        code: "missing-token",
+        range: { start: { line: 1, character: 14 }, end: { line: 1, character: 14 } },
+      });
+      expect(buildQuickFixes(source, [diagnostic])).toEqual([]);
+    });
+
+    it("does NOT match a comment containing the word 'when'", () => {
+      // The line starts with whitespace + a `#` comment; the regex anchors on
+      // "transition\s+to\s+@" so it cannot match here. Belt + suspenders.
+      const source = "    # transition to @topic.x when comment\n";
+      const diagnostic = makeDiagnostic({
+        code: "missing-token",
+        range: { start: { line: 0, character: 0 }, end: { line: 0, character: 0 } },
+      });
+      expect(buildQuickFixes(source, [diagnostic])).toEqual([]);
+    });
+  });
 });
