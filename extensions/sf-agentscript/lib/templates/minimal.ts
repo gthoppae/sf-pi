@@ -25,7 +25,9 @@ export function generateMinimal(bundleName: string, jobSpec?: AgentJobSpec): str
     `    description: "Minimal scaffold for ${safeName}."`,
   ];
   if (default_agent_user) {
-    const safeUser = default_agent_user.replace(/"/g, '\\"');
+    // Escape `\` first, then `"`, so a literal backslash in the username
+    // can't sneak past the quote-escape pass and break the agent-script string.
+    const safeUser = default_agent_user.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
     lines.push(`    default_agent_user: "${safeUser}"`);
   }
   lines.push(

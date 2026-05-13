@@ -99,7 +99,9 @@ export async function readAgentConfigSliceFromSource(
  */
 function unwrapScalar(node: unknown): unknown {
   if (node == null) return undefined;
-  if (typeof node === "object" && node !== null && "value" in node) {
+  // The `node == null` guard above already returned for both null and
+  // undefined, so a second `node !== null` check here is provably true.
+  if (typeof node === "object" && "value" in node) {
     return (node as { value: unknown }).value;
   }
   return node;

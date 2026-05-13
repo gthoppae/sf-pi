@@ -117,5 +117,8 @@ export async function checkBundleVsBotDivergence(
 }
 
 function escapeSoql(s: string): string {
-  return s.replace(/'/g, "\\'");
+  // Escape `\` first, then `'`, so a literal backslash in `s` can't pair
+  // with the inserted `\` from the quote-escape pass and re-enable the
+  // closing quote of the SOQL string literal.
+  return s.replace(/\\/g, "\\\\").replace(/'/g, "\\'");
 }
