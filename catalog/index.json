@@ -65,7 +65,7 @@
     "entry": "extensions/sf-agentscript/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 15915
+    "srcLoc": 15923
   },
   {
     "id": "sf-brain",
@@ -146,7 +146,7 @@
     "entry": "extensions/sf-data360/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 1955
+    "srcLoc": 1960
   },
   {
     "id": "sf-devbar",

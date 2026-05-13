@@ -33,9 +33,8 @@
  *   node scripts/recipes/harness.mjs --verbose
  */
 
-import { execSync } from "node:child_process";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { performance } from "node:perf_hooks";
 import { fileURLToPath } from "node:url";
@@ -141,13 +140,27 @@ async function loadSdk() {
 // Recipe discovery
 // -----------------------------------------------------------------------------
 
+// Recursively walk a directory and yield every `.agent` file. Pure-JS — no
+// shell, so the user-supplied `root` path can't be interpreted as a command.
+function* walkAgentFiles(dir) {
+  let entries;
+  try {
+    entries = readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return;
+  }
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      yield* walkAgentFiles(full);
+    } else if (entry.isFile() && entry.name.endsWith(".agent")) {
+      yield full;
+    }
+  }
+}
+
 function discoverRecipes(root, filter) {
-  const out = execSync(`find ${root}/force-app -name "*.agent" -type f`, {
-    encoding: "utf-8",
-  })
-    .trim()
-    .split("\n")
-    .filter(Boolean);
+  const out = Array.from(walkAgentFiles(path.join(root, "force-app")));
   let recipes = out.map((agentPath) => {
     const baseName = path.basename(agentPath, ".agent");
     const bundleDir = path.dirname(agentPath);

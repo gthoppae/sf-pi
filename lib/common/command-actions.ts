@@ -180,7 +180,12 @@ export function formatReadmeTableFromActions<T extends string>(
     "| --- | --- |",
     ...visible.map(
       (action) =>
-        `| \`/${commandName} ${action.value}\` | ${action.description.replace(/\|/g, "\\|")} |`,
+        // Escape `\` first, then `|`, so a literal backslash in the description
+        // can't pair with the inserted `\` from the pipe-escape pass and break
+        // the markdown table cell.
+        `| \`/${commandName} ${action.value}\` | ${action.description
+          .replace(/\\/g, "\\\\")
+          .replace(/\|/g, "\\|")} |`,
     ),
   ];
   return rows.join("\n");

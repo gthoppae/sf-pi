@@ -107,7 +107,10 @@ function defaultTopicName(bundleName: string): string {
 }
 
 function escapeString(s: string): string {
-  return s.replace(/"/g, '\\"');
+  // Escape `\` first, then `"`, so a literal backslash in user-supplied
+  // bundle / topic / variable strings can't slip past the quote-escape pass
+  // and break the surrounding agent-script string literal.
+  return s.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
 }
 
 function formatVariableDefault(value: unknown): string {

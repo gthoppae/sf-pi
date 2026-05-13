@@ -438,7 +438,10 @@ function parseJson(text: string): unknown {
 }
 
 function escapeTable(value: string): string {
-  return value.replace(/\|/g, "\\|").replace(/\n/g, " ");
+  // Escape `\` first, then `|`, so a literal backslash in the cell value
+  // can't pair with the inserted `\` from the pipe-escape pass and break
+  // the markdown table column separator.
+  return value.replace(/\\/g, "\\\\").replace(/\|/g, "\\|").replace(/\n/g, " ");
 }
 
 function assertNever(value: never): never {

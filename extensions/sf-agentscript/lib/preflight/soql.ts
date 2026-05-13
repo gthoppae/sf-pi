@@ -28,7 +28,10 @@ export async function safeNamesQuery(
 ): Promise<Set<string> | null> {
   if (names.length === 0) return new Set();
   const unique = Array.from(new Set(names));
-  const inList = unique.map((n) => `'${n.replace(/'/g, "\\'")}'`).join(",");
+  // SOQL string literals require `\` and `'` to be escaped. Escape `\`
+  // first so a literal backslash in `n` can't pair with the inserted `\`
+  // from the quote-escape pass and re-enable the closing quote.
+  const inList = unique.map((n) => `'${n.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`).join(",");
   const soql = `SELECT ${nameField} FROM ${sobject} WHERE ${nameField} IN (${inList})`;
   try {
     const url = `${endpoint}?q=${encodeURIComponent(soql)}`;

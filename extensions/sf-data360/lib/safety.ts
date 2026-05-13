@@ -54,7 +54,9 @@ const ALWAYS_CONFIRM_POST_PATTERNS: Array<{ pattern: RegExp; level: D360SafetyLe
   { pattern: /\/run-now(?:$|\/)/i, level: "run" },
   { pattern: /\/run(?:$|\/)/i, level: "run" },
   { pattern: /\/undeploy(?:$|\/)/i, level: "deploy" },
-  { pattern: /\/deployment|\/update-components$/i, level: "deploy" },
+  // Group the alternatives so the trailing `$` anchor applies to BOTH
+  // `/deployment` and `/update-components`, not just the second branch.
+  { pattern: /\/(?:deployment|update-components)$/i, level: "deploy" },
   { pattern: /\/ssot\/data-kits\/[^/]+$/i, level: "deploy" },
   { pattern: /\/signing-key$/i, level: "update" },
 ];

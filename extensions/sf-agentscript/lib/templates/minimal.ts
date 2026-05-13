@@ -13,7 +13,9 @@ import type { AgentJobSpec } from "../create.ts";
 
 export function generateMinimal(bundleName: string, jobSpec?: AgentJobSpec): string {
   const description = jobSpec?.description ?? "You are a helpful agent.";
-  const safeName = bundleName.replace(/"/g, '\\"');
+  // Escape `\` first, then `"`, so a literal backslash in the bundle name
+  // can't sneak past the quote-escape pass and break the agent-script string.
+  const safeName = bundleName.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
   const topicName = bundleName.toLowerCase().replace(/[^a-z0-9_]/g, "_") || "main";
   const { agent_type, default_agent_user } = chooseAgentTypeFromSpec(jobSpec);
   const lines = [
