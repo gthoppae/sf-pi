@@ -13,6 +13,29 @@ import { connRequest } from "../../../../lib/common/sf-conn/request.ts";
 
 export type QueryEndpoint = "/query" | "/tooling/query";
 
+export function soqlInList(names: readonly string[]): string {
+  const unique = Array.from(new Set(names));
+  // SOQL string literals require `\` and `'` to be escaped. Escape `\`
+  // first so a literal backslash in `n` can't pair with the inserted `\`
+  // from the quote-escape pass and re-enable the closing quote.
+  return unique.map((n) => `'${n.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`).join(",");
+}
+
+export async function safeQueryRecords<T extends Record<string, unknown>>(
+  conn: Connection,
+  endpoint: QueryEndpoint,
+  soql: string,
+): Promise<T[] | null> {
+  try {
+    const url = `${endpoint}?q=${encodeURIComponent(soql)}`;
+    const res = await connRequest<{ records?: T[] }>(conn, { method: "GET", url });
+    if (res.status >= 400) return null;
+    return res.body?.records ?? [];
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Run a `SELECT <nameField> FROM <sobject> WHERE <nameField> IN (...)`
  * query and return the set of resolved name values. Returns `null` on
@@ -27,26 +50,13 @@ export async function safeNamesQuery(
   names: readonly string[],
 ): Promise<Set<string> | null> {
   if (names.length === 0) return new Set();
-  const unique = Array.from(new Set(names));
-  // SOQL string literals require `\` and `'` to be escaped. Escape `\`
-  // first so a literal backslash in `n` can't pair with the inserted `\`
-  // from the quote-escape pass and re-enable the closing quote.
-  const inList = unique.map((n) => `'${n.replace(/\\/g, "\\\\").replace(/'/g, "\\'")}'`).join(",");
-  const soql = `SELECT ${nameField} FROM ${sobject} WHERE ${nameField} IN (${inList})`;
-  try {
-    const url = `${endpoint}?q=${encodeURIComponent(soql)}`;
-    const res = await connRequest<{ records?: Array<Record<string, unknown>> }>(conn, {
-      method: "GET",
-      url,
-    });
-    if (res.status >= 400) return null;
-    const found = new Set<string>();
-    for (const r of res.body?.records ?? []) {
-      const v = r[nameField];
-      if (typeof v === "string") found.add(v);
-    }
-    return found;
-  } catch {
-    return null;
+  const soql = `SELECT ${nameField} FROM ${sobject} WHERE ${nameField} IN (${soqlInList(names)})`;
+  const records = await safeQueryRecords<Record<string, unknown>>(conn, endpoint, soql);
+  if (!records) return null;
+  const found = new Set<string>();
+  for (const r of records) {
+    const v = r[nameField];
+    if (typeof v === "string") found.add(v);
   }
+  return found;
 }

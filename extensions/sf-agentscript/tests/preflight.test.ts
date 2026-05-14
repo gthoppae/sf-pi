@@ -123,7 +123,15 @@ describe("checkActionTargets", () => {
   it("returns ok when all flows + apex classes resolve", async () => {
     const conn = fakeConn([
       { sobject: "FlowDefinitionView", rows: [{ ApiName: "LogEvent" }] },
-      { sobject: "ApexClass", rows: [{ Name: "IssueClassifier" }] },
+      {
+        sobject: "ApexClass",
+        rows: [
+          {
+            Name: "IssueClassifier",
+            Body: "public class IssueClassifier { @InvocableMethod public static void run() {} }",
+          },
+        ],
+      },
     ]);
     const result = await checkActionTargets(conn, [
       { name: "log", target: "flow://LogEvent" },
@@ -150,6 +158,9 @@ describe("checkActionTargets", () => {
     expect(result.missing).toBe(2);
     const missingNames = result.targets.filter((t) => t.status === "missing").map((t) => t.name);
     expect(missingNames.sort()).toEqual(["miss_apex", "miss_flow"]);
+    const byName = new Map(result.targets.map((t) => [t.name, t]));
+    expect(byName.get("miss_flow")?.detail).toMatch(/active Autolaunched Flow/);
+    expect(byName.get("miss_apex")?.detail).toMatch(/not found in the org/);
   });
 
   it("reports unverifiable schemes that have no resolver registered", async () => {

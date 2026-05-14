@@ -68,8 +68,19 @@ together through the SDK's `compileSource()` entry point. The returned
 
 This is intentional: we surface every issue either pass detects so the
 LLM (or human) sees the full picture even when the underlying compiler
-is willing to tolerate some of them. The summary line emits a short
-sample of diagnostic codes and line numbers —
+is willing to tolerate some of them.
+
+sf-pi also layers a small set of local hardening diagnostics on top of
+the vendored SDK for Agentforce publish/runtime footguns that are
+source-detectable but not always compiler errors: target-backed actions
+without `outputs:`, Employee Agent service-only wiring, scoped
+`@inputs` / `@outputs` misuse, connection route shape, prompt-template
+output flags, and literal-mode procedural text. Severity-1 hardening
+diagnostics block `agentscript_preview start` and
+`agentscript_lifecycle publish` before any org round trip.
+
+The summary line emits a short sample of diagnostic codes and line
+numbers —
 
 ```
 ❌ X.agent — 4 issue(s) (2E·2W), 4 fix(es) ready
@@ -87,18 +98,18 @@ tagged `E`, severity-2 issues `W`.
 
 ## Behavior Matrix
 
-| Trigger                                | Result                                                                                                                                                      |
-| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `session_start` / `session_shutdown`   | Reset assist state, drop cached `Connection`s                                                                                                               |
-| `tool_result` (write/edit on `.agent`) | Compile in-process, append `LSP feedback:` block                                                                                                            |
-| `agentscript_compile`                  | Same pipeline as on-save; quick fixes carry `apply_via`                                                                                                     |
-| `agentscript_create`                   | Validate template locally before writing; refuse to overwrite without `overwrite: true`                                                                     |
-| `agentscript_inspect`                  | One AST walk, JSON projection, line numbers 1-based                                                                                                         |
-| `agentscript_mutate`                   | AST primary (`set_field` / `rename` / `apply_quick_fix`); refuses to mutate files with severity-1 errors; auto-recompiles                                   |
-| `agentscript_preview start`            | Local-compile first; only hits `/authoring/scripts` on success                                                                                              |
-| `agentscript_preview send`             | POST message, fetch trace inline, write to session store                                                                                                    |
-| `agentscript_eval run`                 | Resolve `$active_*` if present → normalize (6 passes) → batch ≤ 5 tests → fan-out POST → HTML-decode → fetch traces (failed by default) → persist artifacts |
-| Any tool error                         | Returns `{ ok: false, error, suggestion?, recover_via? }` so the LLM can chain a follow-up tool call programmatically                                       |
+| Trigger                                | Result                                                                                                                                                                        |
+| -------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `session_start` / `session_shutdown`   | Reset assist state, drop cached `Connection`s                                                                                                                                 |
+| `tool_result` (write/edit on `.agent`) | Compile in-process, append `LSP feedback:` block                                                                                                                              |
+| `agentscript_compile`                  | Same pipeline as on-save; quick fixes carry `apply_via`                                                                                                                       |
+| `agentscript_create`                   | Validate template locally before writing; refuse to overwrite without `overwrite: true`                                                                                       |
+| `agentscript_inspect`                  | One AST walk, JSON projection, line numbers 1-based; `check_targets` verifies target readiness (active Autolaunched Flow, Active Prompt Template, invocable Apex + I/O names) |
+| `agentscript_mutate`                   | AST primary (`set_field` / `rename` / `apply_quick_fix`); refuses to mutate files with severity-1 errors; auto-recompiles                                                     |
+| `agentscript_preview start`            | Local-compile first; only hits `/authoring/scripts` on success                                                                                                                |
+| `agentscript_preview send`             | POST message, fetch trace inline, write to session store                                                                                                                      |
+| `agentscript_eval run`                 | Resolve `$active_*` if present → normalize (6 passes) → batch ≤ 5 tests → fan-out POST → HTML-decode → fetch traces (failed by default) → persist artifacts                   |
+| Any tool error                         | Returns `{ ok: false, error, suggestion?, recover_via? }` so the LLM can chain a follow-up tool call programmatically                                                         |
 
 ## File Structure
 
@@ -186,6 +197,7 @@ extensions/sf-agentscript/
     lifecycle-divergence.ts ← implementation module
     lifecycle-tool.ts       ← implementation module
     lifecycle.ts            ← implementation module
+    local-lints.ts          ← implementation module
     mutate-tool.ts          ← implementation module
     mutate.ts               ← implementation module
     preflight.ts            ← implementation module

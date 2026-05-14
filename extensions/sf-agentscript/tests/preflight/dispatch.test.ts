@@ -32,7 +32,12 @@ describe("checkActionTargets dispatch", () => {
   it("routes flow + apex + agentforce + externalService through their resolvers", async () => {
     const conn = fakeConn({
       FlowDefinitionView: [{ ApiName: "Foo" }],
-      ApexClass: [{ Name: "Bar" }],
+      ApexClass: [
+        {
+          Name: "Bar",
+          Body: "public class Bar { @InvocableMethod public static void run() {} }",
+        },
+      ],
       BotDefinition: [{ DeveloperName: "Sub_Agent" }],
       ExternalServiceRegistration: [{ DeveloperName: "Svc" }],
     });

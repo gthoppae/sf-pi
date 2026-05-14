@@ -18,6 +18,7 @@
 import fs from "node:fs/promises";
 import { loadAgentforceSDK, getSdkLoadError } from "./sdk.ts";
 import { buildQuickFixes } from "./code-actions.ts";
+import { buildLocalDiagnostics } from "./local-lints.ts";
 import type {
   AgentScriptCheckResult,
   AgentScriptDiagnostic,
@@ -184,11 +185,13 @@ export async function checkAgentScriptFile(filePath: string): Promise<AgentScrip
     .filter((diagnostic): diagnostic is AgentScriptDiagnostic => diagnostic !== null);
 
   const filtered = all.filter(isActionable);
-  const quickFixes = buildQuickFixes(source, filtered);
+  const localDiagnostics = buildLocalDiagnostics(source);
+  const diagnostics = [...filtered, ...localDiagnostics];
+  const quickFixes = buildQuickFixes(source, diagnostics);
 
   return {
     ok: true,
-    diagnostics: filtered,
+    diagnostics,
     dialect,
     quickFixes,
   };

@@ -22,6 +22,10 @@ export interface ActionTarget {
   scheme: string;
   /** Reference name — what comes after "://". */
   ref_name: string;
+  /** Declared action input names, when inspect can read them. */
+  input_names?: string[];
+  /** Declared action output names, when inspect can read them. */
+  output_names?: string[];
 }
 
 /**
@@ -51,6 +55,13 @@ export interface CheckActionTargetsResult {
   unverifiable: number;
 }
 
+export interface TargetResolution {
+  status: TargetStatus;
+  detail?: string;
+  reason?: string;
+  data?: Record<string, unknown>;
+}
+
 /**
  * One resolver per metadata type. The registry maps schemes to resolvers
  * 1:N — a single resolver may declare multiple schemes when the underlying
@@ -71,7 +82,28 @@ export interface TargetResolver {
    *   - "always available" → return Set containing every queried name
    *   - "couldn't verify" → return null
    */
-  resolve(conn: Connection, refNames: readonly string[]): Promise<Set<string> | null>;
+  resolve(
+    conn: Connection,
+    refNames: readonly string[],
+    targets?: readonly ActionTarget[],
+  ): Promise<Set<string> | null>;
+
+  /**
+   * Optional precise per-target verdicts. Resolvers should use this when the
+   * same referenced name can pass for one action but fail for another (e.g.
+   * Apex I/O exact-name matching).
+   */
+  resolveTargets?(
+    conn: Connection,
+    targets: readonly ActionTarget[],
+  ): Promise<TargetResolution[] | null>;
+
+  /**
+   * Optional: resolver-specific explanation for a missing verdict. Use this
+   * when "missing" also means present-but-not-ready (inactive Flow, Draft
+   * Prompt Template, non-invocable Apex, I/O mismatch, etc.).
+   */
+  missingDetail?(target: ActionTarget): string;
 
   /**
    * Optional: a deploy command (or doc pointer) that fixes a missing

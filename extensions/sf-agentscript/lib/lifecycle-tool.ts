@@ -33,6 +33,7 @@ import {
   type ProvisionReport,
   type ProvisionStep,
 } from "./agent-user/index.ts";
+import { checkAgentScriptFile } from "./diagnostics.ts";
 import { inspectFile } from "./inspect.ts";
 import { mapAgentApiError } from "./errors/agent-api-error-map.ts";
 import { sfap404Message } from "./errors/sfap-404.ts";
@@ -225,6 +226,23 @@ async function actionPublish(
   } catch (err) {
     return toolError(
       `Cannot read ${filePath}: ${err instanceof Error ? err.message : String(err)}`,
+    );
+  }
+
+  const localCheck = await checkAgentScriptFile(filePath);
+  if (!localCheck.ok) {
+    return toolError(
+      localCheck.unavailableReason ?? "Local Agent Script compile failed before publish.",
+      "Run agentscript_compile to see the full diagnostic details.",
+      { tool: "agentscript_compile", params: { path: filePath } },
+    );
+  }
+  const blocking = localCheck.diagnostics.filter((d) => d.severity === 1);
+  if (blocking.length > 0) {
+    return toolError(
+      `Local diagnostics rejected publish (${blocking.length} severity-1 issue${blocking.length === 1 ? "" : "s"}).`,
+      "Run agentscript_compile to see and fix the diagnostics before publishing.",
+      { tool: "agentscript_compile", params: { path: filePath } },
     );
   }
 

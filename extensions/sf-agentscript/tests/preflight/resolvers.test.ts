@@ -45,6 +45,8 @@ describe("flowResolver", () => {
     expect(decode(captured.url)).toContain("/query");
     expect(decode(captured.url)).toContain("FROM FlowDefinitionView");
     expect(decode(captured.url)).toContain("ApiName");
+    expect(decode(captured.url)).toContain("IsActive = true");
+    expect(decode(captured.url)).toContain("ProcessType = 'AutoLaunchedFlow'");
     // Dedup
     const matches = (decode(captured.url).match(/'MyFlow'/g) ?? []).length;
     expect(matches).toBe(1);
@@ -68,11 +70,113 @@ describe("apexResolver", () => {
   it("handles both apex:// and apexRest:// schemes against ApexClass.Name (Tooling)", async () => {
     expect(apexResolver.schemes).toContain("apex");
     expect(apexResolver.schemes).toContain("apexRest");
-    const { conn, captured } = fakeConn([{ Name: "MyClass" }]);
-    const found = await apexResolver.resolve(conn, ["MyClass"]);
+    const { conn, captured } = fakeConn([
+      {
+        Name: "MyClass",
+        Body: "public class MyClass { @InvocableMethod public static void run() {} }",
+      },
+    ]);
+    const found = await apexResolver.resolve(
+      conn,
+      ["MyClass"],
+      [{ name: "x", target: "apex://MyClass", scheme: "apex", ref_name: "MyClass" }],
+    );
     expect(found?.has("MyClass")).toBe(true);
     expect(decode(captured.url)).toContain("/tooling/query");
     expect(decode(captured.url)).toContain("FROM ApexClass");
+    expect(decode(captured.url)).toContain("Body");
+  });
+
+  it("requires @InvocableMethod for apex:// targets", async () => {
+    const { conn } = fakeConn([{ Name: "PlainClass", Body: "public class PlainClass {}" }]);
+    const found = await apexResolver.resolve(
+      conn,
+      ["PlainClass"],
+      [{ name: "x", target: "apex://PlainClass", scheme: "apex", ref_name: "PlainClass" }],
+    );
+    expect(found?.has("PlainClass")).toBe(false);
+    const detailed = await apexResolver.resolveTargets?.(conn, [
+      { name: "x", target: "apex://PlainClass", scheme: "apex", ref_name: "PlainClass" },
+    ]);
+    expect(detailed?.[0].reason).toBe("missing_invocable_method");
+    expect(detailed?.[0].detail).toMatch(/does not contain @InvocableMethod/);
+  });
+
+  it("checks Agent Script I/O names against @InvocableVariable fields", async () => {
+    const { conn } = fakeConn([
+      {
+        Name: "OrderAction",
+        Body: [
+          "public class OrderAction {",
+          "  public class Request { @InvocableVariable public String orderId; }",
+          "  public class Response { @InvocableVariable public String status; }",
+          "  @InvocableMethod public static List<Response> run(List<Request> reqs) { return null; }",
+          "}",
+        ].join("\n"),
+      },
+    ]);
+    const found = await apexResolver.resolve(
+      conn,
+      ["OrderAction"],
+      [
+        {
+          name: "ok",
+          target: "apex://OrderAction",
+          scheme: "apex",
+          ref_name: "OrderAction",
+          input_names: ["orderId"],
+          output_names: ["status"],
+        },
+      ],
+    );
+    expect(found?.has("OrderAction")).toBe(true);
+
+    const mismatch = await apexResolver.resolve(
+      conn,
+      ["OrderAction"],
+      [
+        {
+          name: "bad",
+          target: "apex://OrderAction",
+          scheme: "apex",
+          ref_name: "OrderAction",
+          input_names: ["order_id"],
+          output_names: ["status"],
+        },
+      ],
+    );
+    expect(mismatch?.has("OrderAction")).toBe(false);
+    const detailed = await apexResolver.resolveTargets?.(conn, [
+      {
+        name: "bad",
+        target: "apex://OrderAction",
+        scheme: "apex",
+        ref_name: "OrderAction",
+        input_names: ["order_id"],
+        output_names: ["status"],
+      },
+    ]);
+    expect(detailed?.[0].reason).toBe("io_mismatch");
+    expect(detailed?.[0].detail).toMatch(/order_id/);
+    expect(detailed?.[0].detail).toMatch(/orderId/);
+  });
+
+  it("requires @RestResource for apexRest:// targets", async () => {
+    const { conn } = fakeConn([
+      { Name: "RestClass", Body: "@RestResource public class RestClass {}" },
+    ]);
+    const found = await apexResolver.resolve(
+      conn,
+      ["RestClass"],
+      [{ name: "x", target: "apexRest://RestClass", scheme: "apexRest", ref_name: "RestClass" }],
+    );
+    expect(found?.has("RestClass")).toBe(true);
+
+    const { conn: badConn } = fakeConn([{ Name: "RestClass", Body: "public class RestClass {}" }]);
+    const detailed = await apexResolver.resolveTargets?.(badConn, [
+      { name: "x", target: "apexRest://RestClass", scheme: "apexRest", ref_name: "RestClass" },
+    ]);
+    expect(detailed?.[0].reason).toBe("missing_rest_resource");
   });
 
   it("fixHint suggests deploying the ApexClass", () => {
@@ -109,6 +213,7 @@ describe("promptTemplateResolver", () => {
     expect(found?.has("Generate_Schedule")).toBe(true);
     expect(decode(captured.url)).toContain("/tooling/query");
     expect(decode(captured.url)).toContain("FROM Prompt");
+    expect(decode(captured.url)).toContain("Status = 'Active'");
   });
 });
 

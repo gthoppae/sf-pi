@@ -208,9 +208,10 @@ function buildDeprecatedFieldFix(diagnostic: AgentScriptDiagnostic): AgentScript
   };
 }
 
-function buildUnusedVariableFix(
+function buildRemovalRangeFix(
   source: string,
   diagnostic: AgentScriptDiagnostic,
+  title: string,
 ): AgentScriptQuickFix | null {
   const data = (diagnostic.data ?? {}) as RemovalRangeData;
   const removal = data.removalRange;
@@ -228,7 +229,7 @@ function buildUnusedVariableFix(
       : { line: endLine, character: endLineLength };
 
   return {
-    title: `Remove unused variable`,
+    title,
     preferred: true,
     diagnosticLine: diagnostic.range.start.line,
     diagnosticCode: diagnostic.code,
@@ -242,6 +243,24 @@ function buildUnusedVariableFix(
       },
     ],
   };
+}
+
+function buildUnusedVariableFix(
+  source: string,
+  diagnostic: AgentScriptDiagnostic,
+): AgentScriptQuickFix | null {
+  return buildRemovalRangeFix(source, diagnostic, "Remove unused variable");
+}
+
+function buildEmployeeDefaultUserFix(
+  source: string,
+  diagnostic: AgentScriptDiagnostic,
+): AgentScriptQuickFix | null {
+  return buildRemovalRangeFix(
+    source,
+    diagnostic,
+    "Remove default_agent_user from Employee Agent config",
+  );
 }
 
 /**
@@ -350,6 +369,11 @@ export function buildQuickFixes(
       }
       case "unused-variable": {
         const fix = buildUnusedVariableFix(source, diagnostic);
+        if (fix) fixes.push(fix);
+        break;
+      }
+      case "employee-agent-default-user": {
+        const fix = buildEmployeeDefaultUserFix(source, diagnostic);
         if (fix) fixes.push(fix);
         break;
       }

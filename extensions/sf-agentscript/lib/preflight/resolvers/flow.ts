@@ -10,14 +10,27 @@
  */
 
 import type { Connection } from "@salesforce/core";
-import { safeNamesQuery } from "../soql.ts";
+import { safeQueryRecords, soqlInList } from "../soql.ts";
 import type { TargetResolver } from "../types.ts";
 
 export const flowResolver: TargetResolver = {
   schemes: ["flow"],
   metadataLabel: "Flow",
-  resolve(conn: Connection, names: readonly string[]) {
-    return safeNamesQuery(conn, "/query", "FlowDefinitionView", "ApiName", names);
+  async resolve(conn: Connection, names: readonly string[]) {
+    if (names.length === 0) return new Set();
+    const soql =
+      `SELECT ApiName FROM FlowDefinitionView WHERE ApiName IN (${soqlInList(names)}) ` +
+      `AND IsActive = true AND ProcessType = 'AutoLaunchedFlow'`;
+    const rows = await safeQueryRecords<{ ApiName?: string }>(conn, "/query", soql);
+    if (!rows) return null;
+    const found = new Set<string>();
+    for (const row of rows) {
+      if (typeof row.ApiName === "string") found.add(row.ApiName);
+    }
+    return found;
+  },
+  missingDetail(target) {
+    return `Flow '${target.ref_name}' not found as an active Autolaunched Flow in the org.`;
   },
   fixHint(name) {
     return `sf project deploy start -m Flow:${name}`;

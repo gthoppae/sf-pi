@@ -89,4 +89,371 @@ describe("checkAgentScriptFile (integration)", () => {
     expect(unusedFix, "expected unused-variable fix").toBeDefined();
     expect(unusedFix?.edits[0].newText).toBe("");
   });
+
+  it("flags target-backed actions that omit outputs", async () => {
+    const file = writeTempAgent(
+      [
+        "system:",
+        '    instructions: "You are helpful."',
+        "",
+        "config:",
+        '    agent_name: "HelloWorldBot"',
+        '    default_agent_user: "hello@world.com"',
+        "",
+        "start_agent hello_world:",
+        '    description: "Entry topic."',
+        "    actions:",
+        "        lookup_order:",
+        '            description: "Look up order details."',
+        '            target: "flow://Lookup_Order"',
+        "    reasoning:",
+        "        actions:",
+        "            lookup: @actions.lookup_order",
+        "",
+      ].join("\n"),
+    );
+
+    const result = await checkAgentScriptFile(file);
+    const missing = result.diagnostics.find((d) => d.code === "action-missing-outputs");
+    expect(missing, "expected action-missing-outputs diagnostic").toBeDefined();
+    expect(missing?.severity).toBe(1);
+  });
+
+  it("flags bare numeric action inputs and outputs", async () => {
+    const file = writeTempAgent(
+      [
+        "system:",
+        '    instructions: "You are helpful."',
+        "",
+        "config:",
+        '    agent_name: "HelloWorldBot"',
+        '    default_agent_user: "hello@world.com"',
+        "",
+        "start_agent hello_world:",
+        '    description: "Entry topic."',
+        "    actions:",
+        "        calculate_discount:",
+        '            description: "Calculate discount."',
+        "            inputs:",
+        "                orderAmount: number",
+        "            outputs:",
+        "                finalAmount: number",
+        '            target: "apex://CalculateDiscountAction"',
+        "    reasoning:",
+        "        actions:",
+        "            calculate: @actions.calculate_discount",
+        "",
+      ].join("\n"),
+    );
+
+    const result = await checkAgentScriptFile(file);
+    const numeric = result.diagnostics.filter((d) => d.code === "numeric-action-io");
+    expect(numeric).toHaveLength(2);
+    expect(numeric.every((d) => d.severity === 2)).toBe(true);
+  });
+
+  it("flags invalid connection messaging route config", async () => {
+    const file = writeTempAgent(
+      [
+        "system:",
+        '    instructions: "You are helpful."',
+        "",
+        "config:",
+        '    agent_name: "ServiceBot"',
+        '    agent_type: "AgentforceServiceAgent"',
+        '    default_agent_user: "service@example.com"',
+        "",
+        "connection messaging:",
+        '    outbound_route_type: "OmniChannelFlow"',
+        '    outbound_route_name: "Route_To_Agent"',
+        "",
+        "start_agent hello_world:",
+        '    description: "Entry topic."',
+        "    reasoning:",
+        "        instructions: ->",
+        "            | respond to whatever the user says.",
+        "",
+      ].join("\n"),
+    );
+
+    const result = await checkAgentScriptFile(file);
+    const codes = new Set(result.diagnostics.map((d) => d.code));
+    expect(codes.has("connection-messaging-incomplete-route")).toBe(true);
+    expect(codes.has("connection-messaging-route-name-prefix")).toBe(true);
+  });
+
+  it("flags @inputs references outside action with-bindings", async () => {
+    const file = writeTempAgent(
+      [
+        "system:",
+        '    instructions: "You are helpful."',
+        "",
+        "config:",
+        '    agent_name: "InputScopeBot"',
+        '    default_agent_user: "hello@world.com"',
+        "",
+        "start_agent hello_world:",
+        '    description: "Entry topic."',
+        "    actions:",
+        "        get_status:",
+        '            description: "Get station status."',
+        "            inputs:",
+        "                station_name: string",
+        "            outputs:",
+        "                status: string",
+        '            target: "flow://Get_Station_Status"',
+        "    reasoning:",
+        "        instructions: ->",
+        "            run @actions.get_status",
+        "                with station_name = ...",
+        "                set @variables.station = @inputs.station_name",
+        "",
+      ].join("\n"),
+    );
+
+    const result = await checkAgentScriptFile(file);
+    const inputsScope = result.diagnostics.find((d) => d.code === "inputs-out-of-scope");
+    expect(inputsScope, "expected inputs-out-of-scope diagnostic").toBeDefined();
+    expect(inputsScope?.severity).toBe(1);
+  });
+
+  it("does not flag @inputs references inside action with-bindings or literal text", async () => {
+    const file = writeTempAgent(
+      [
+        "system:",
+        '    instructions: "You are helpful."',
+        "",
+        "config:",
+        '    agent_name: "InputScopeBot"',
+        '    default_agent_user: "hello@world.com"',
+        "",
+        "start_agent hello_world:",
+        '    description: "Entry topic."',
+        "    actions:",
+        "        get_status:",
+        '            description: "Get station status."',
+        "            inputs:",
+        "                station_name: string",
+        "            outputs:",
+        "                status: string",
+        '            target: "flow://Get_Station_Status"',
+        "    reasoning:",
+        "        instructions: ->",
+        "            | Literal docs may mention @inputs.station_name without executing it.",
+        "            run @actions.get_status",
+        "                with station_name = @inputs.station_name",
+        "                set @variables.status = @outputs.status",
+        "",
+      ].join("\n"),
+    );
+
+    const result = await checkAgentScriptFile(file);
+    expect(result.diagnostics.some((d) => d.code === "inputs-out-of-scope")).toBe(false);
+  });
+
+  it("flags @outputs references outside set/if post-action statements", async () => {
+    const file = writeTempAgent(
+      [
+        "system:",
+        '    instructions: "You are helpful."',
+        "",
+        "config:",
+        '    agent_name: "OutputScopeBot"',
+        '    default_agent_user: "hello@world.com"',
+        "",
+        "start_agent hello_world:",
+        '    description: "Entry topic."',
+        "    actions:",
+        "        get_status:",
+        '            description: "Get station status."',
+        "            inputs:",
+        "                station_name: string",
+        "            outputs:",
+        "                status: string",
+        '            target: "flow://Get_Station_Status"',
+        "    reasoning:",
+        "        instructions: ->",
+        "            | Literal docs should not rely on @outputs.status.",
+        "            run @actions.get_status",
+        "                with station_name = ...",
+        "                with previous_status = @outputs.status",
+        "                set @variables.status = @outputs.status",
+        "",
+      ].join("\n"),
+    );
+
+    const result = await checkAgentScriptFile(file);
+    const outputScope = result.diagnostics.filter((d) => d.code === "outputs-out-of-scope");
+    expect(outputScope).toHaveLength(2);
+    expect(outputScope.some((d) => d.severity === 1)).toBe(true);
+    expect(outputScope.some((d) => d.severity === 2)).toBe(true);
+  });
+
+  it("flags procedural statements inside literal instructions", async () => {
+    const file = writeTempAgent(
+      [
+        "system:",
+        '    instructions: "You are helpful."',
+        "",
+        "config:",
+        '    agent_name: "LiteralModeBot"',
+        '    default_agent_user: "hello@world.com"',
+        "",
+        "start_agent hello_world:",
+        '    description: "Entry topic."',
+        "    reasoning:",
+        "        instructions: |",
+        "            if @variables.verified == True:",
+        "                transition to @subagent.done",
+        "",
+        "subagent done:",
+        '    description: "Done."',
+        "    reasoning:",
+        "        instructions: ->",
+        "            | Done.",
+        "",
+      ].join("\n"),
+    );
+
+    const result = await checkAgentScriptFile(file);
+    const literal = result.diagnostics.filter((d) => d.code === "literal-mode-procedural-text");
+    expect(literal.length).toBeGreaterThanOrEqual(1);
+    expect(literal.every((d) => d.severity === 2)).toBe(true);
+  });
+
+  it("warns on run inside after_reasoning", async () => {
+    const file = writeTempAgent(
+      [
+        "system:",
+        '    instructions: "You are helpful."',
+        "",
+        "config:",
+        '    agent_name: "AfterReasoningBot"',
+        '    default_agent_user: "hello@world.com"',
+        "",
+        "start_agent hello_world:",
+        '    description: "Entry topic."',
+        "    actions:",
+        "        log_turn:",
+        '            description: "Log turn."',
+        "            outputs:",
+        "                logged: boolean",
+        '            target: "flow://Log_Turn"',
+        "    reasoning:",
+        "        instructions: ->",
+        "            | Help the user.",
+        "    after_reasoning:",
+        "        run @actions.log_turn",
+        "",
+      ].join("\n"),
+    );
+
+    const result = await checkAgentScriptFile(file);
+    const runAfter = result.diagnostics.find((d) => d.code === "run-in-after-reasoning");
+    expect(runAfter, "expected run-in-after-reasoning diagnostic").toBeDefined();
+    expect(runAfter?.severity).toBe(2);
+  });
+
+  it("warns when prompt template promptResponse lacks planner/display flags", async () => {
+    const file = writeTempAgent(
+      [
+        "system:",
+        '    instructions: "You are helpful."',
+        "",
+        "config:",
+        '    agent_name: "PromptTemplateBot"',
+        '    default_agent_user: "hello@world.com"',
+        "",
+        "start_agent hello_world:",
+        '    description: "Entry topic."',
+        "    actions:",
+        "        generate_reply:",
+        '            description: "Generate a reply."',
+        "            outputs:",
+        "                promptResponse: string",
+        '            target: "generatePromptResponse://Generate_Reply"',
+        "    reasoning:",
+        "        actions:",
+        "            reply: @actions.generate_reply",
+        "",
+      ].join("\n"),
+    );
+
+    const result = await checkAgentScriptFile(file);
+    const promptFlags = result.diagnostics.find((d) => d.code === "prompt-template-output-flags");
+    expect(promptFlags, "expected prompt-template-output-flags diagnostic").toBeDefined();
+    expect(promptFlags?.severity).toBe(2);
+  });
+
+  it("does not flag adaptive-only connection messaging config", async () => {
+    const file = writeTempAgent(
+      [
+        "system:",
+        '    instructions: "You are helpful."',
+        "",
+        "config:",
+        '    agent_name: "ServiceBot"',
+        '    agent_type: "AgentforceServiceAgent"',
+        '    default_agent_user: "service@example.com"',
+        "",
+        "connection messaging:",
+        "    adaptive_response_allowed: True",
+        "",
+        "start_agent hello_world:",
+        '    description: "Entry topic."',
+        "    reasoning:",
+        "        instructions: ->",
+        "            | respond to whatever the user says.",
+        "",
+      ].join("\n"),
+    );
+
+    const result = await checkAgentScriptFile(file);
+    const codes = new Set(result.diagnostics.map((d) => d.code));
+    expect(codes.has("connection-messaging-incomplete-route")).toBe(false);
+    expect(codes.has("connection-messaging-route-name-prefix")).toBe(false);
+  });
+
+  it("flags Employee Agent config that uses Service-Agent-only wiring", async () => {
+    const file = writeTempAgent(
+      [
+        "system:",
+        '    instructions: "You are helpful."',
+        "",
+        "config:",
+        '    agent_name: "EmployeeBot"',
+        '    agent_type: "AgentforceEmployeeAgent"',
+        '    default_agent_user: "service@example.com"',
+        "",
+        "connection messaging:",
+        "    adaptive_response_allowed: True",
+        "",
+        "start_agent hello_world:",
+        '    description: "Entry topic."',
+        "    reasoning:",
+        "        actions:",
+        '            escalate: @utils.escalate description="Escalate to a human"',
+        "",
+      ].join("\n"),
+    );
+
+    const result = await checkAgentScriptFile(file);
+    const codes = new Set(result.diagnostics.map((d) => d.code));
+    expect(codes.has("employee-agent-default-user")).toBe(true);
+    expect(codes.has("employee-agent-connection-messaging")).toBe(true);
+    expect(codes.has("employee-agent-escalate")).toBe(true);
+
+    const defaultUserFix = result.quickFixes.find(
+      (f) => f.diagnosticCode === "employee-agent-default-user",
+    );
+    expect(defaultUserFix?.title).toBe("Remove default_agent_user from Employee Agent config");
+    expect(defaultUserFix?.edits[0].newText).toBe("");
+
+    expect(
+      result.quickFixes.some((f) => f.diagnosticCode === "employee-agent-connection-messaging"),
+    ).toBe(false);
+    expect(result.quickFixes.some((f) => f.diagnosticCode === "employee-agent-escalate")).toBe(
+      false,
+    );
+  });
 });

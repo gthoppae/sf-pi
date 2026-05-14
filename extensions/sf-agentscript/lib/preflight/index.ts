@@ -17,7 +17,12 @@ import type { Connection } from "@salesforce/core";
 import type { ComponentSummary } from "../inspect.ts";
 import { extractActionTargets } from "./parse.ts";
 import { resolverForScheme } from "./registry.ts";
-import type { ActionTargetCheck, CheckActionTargetsResult } from "./types.ts";
+import type {
+  ActionTarget,
+  ActionTargetCheck,
+  CheckActionTargetsResult,
+  TargetResolution,
+} from "./types.ts";
 
 export { checkBundleType, type BundleTypeCheckResult } from "./bundle-type.ts";
 export { extractActionTargets } from "./parse.ts";
@@ -67,15 +72,30 @@ export async function checkActionTargets(
     bucket.indices.push(i);
   }
 
-  // Pre-resolve each bucket; we read out into the per-target output below.
+  // Pre-resolve each bucket; detailed resolvers can return a per-action
+  // verdict while simple resolvers return a Set of ref_names that exist.
   const bucketResults = new Map<string, Set<string> | null>();
+  const detailedResults = new Map<ActionTarget, TargetResolution>();
   for (const [scheme, bucket] of buckets) {
     if (!bucket.resolver) {
       bucketResults.set(scheme, null);
       continue;
     }
-    const refNames = bucket.indices.map((i) => targets[i].ref_name);
-    const found = await bucket.resolver.resolve(conn, refNames);
+    const bucketTargets = bucket.indices.map((i) => targets[i]);
+    if (bucket.resolver.resolveTargets) {
+      const detailed = await bucket.resolver.resolveTargets(conn, bucketTargets);
+      if (detailed === null) {
+        bucketResults.set(scheme, null);
+      } else {
+        for (let i = 0; i < bucketTargets.length; i++) {
+          const verdict = detailed[i];
+          if (verdict) detailedResults.set(bucketTargets[i], verdict);
+        }
+      }
+      continue;
+    }
+    const refNames = bucketTargets.map((t) => t.ref_name);
+    const found = await bucket.resolver.resolve(conn, refNames, bucketTargets);
     bucketResults.set(scheme, found);
   }
 
@@ -90,6 +110,20 @@ export async function checkActionTargets(
       unverifiable++;
       continue;
     }
+    const detailed = detailedResults.get(t);
+    if (detailed) {
+      out.push({
+        ...t,
+        status: detailed.status,
+        detail: detailed.detail,
+        metadata_label: resolver.metadataLabel,
+      });
+      if (detailed.status === "ok") resolved++;
+      else if (detailed.status === "missing") missing++;
+      else unverifiable++;
+      continue;
+    }
+
     const result = bucketResults.get(t.scheme);
     if (result === null) {
       out.push({
@@ -110,7 +144,9 @@ export async function checkActionTargets(
       out.push({
         ...t,
         status: "missing",
-        detail: `${resolver.metadataLabel} '${t.ref_name}' not found in org.`,
+        detail:
+          resolver.missingDetail?.(t) ??
+          `${resolver.metadataLabel} '${t.ref_name}' not found in org.`,
         metadata_label: resolver.metadataLabel,
       });
       missing++;

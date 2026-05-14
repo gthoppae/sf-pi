@@ -309,9 +309,8 @@ async function actionCheckTargets(
   ];
   for (const t of result.targets.slice(0, 8)) {
     const flag = t.status === "ok" ? "✓" : t.status === "missing" ? "✗" : "?";
-    summaryLines.push(
-      `  ${flag} ${t.name} → ${t.target}${t.status === "missing" ? " — not found" : ""}`,
-    );
+    const detail = t.status === "ok" ? "" : ` — ${t.detail ?? "not verified"}`;
+    summaryLines.push(`  ${flag} ${t.name} → ${t.target}${detail}`);
   }
   if (result.targets.length > 8) {
     summaryLines.push(`  …and ${result.targets.length - 8} more in details.targets`);

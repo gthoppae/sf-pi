@@ -21,6 +21,7 @@ import {
   startPreviewByApiName,
 } from "./preview/client.ts";
 import type { PreviewMetadata } from "./preview/session-store.ts";
+import { checkAgentScriptFile } from "./diagnostics.ts";
 import { fetchTrace } from "./eval/trace-client.ts";
 import { isAgentScriptFile } from "./file-classify.ts";
 import { safeResolveToolPath, toolError, toolOk, type ToolError } from "./tool-types.ts";
@@ -272,6 +273,23 @@ async function actionStart(
     );
   }
   const agentName = input.agent_name ?? path.basename(filePath, ".agent");
+
+  const localCheck = await checkAgentScriptFile(filePath);
+  if (!localCheck.ok) {
+    return toolError(
+      localCheck.unavailableReason ?? "Local Agent Script compile failed before preview.",
+      "Run agentscript_compile to see the full diagnostic details.",
+      { tool: "agentscript_compile", params: { path: filePath } },
+    );
+  }
+  const blocking = localCheck.diagnostics.filter((d) => d.severity === 1);
+  if (blocking.length > 0) {
+    return toolError(
+      `Local diagnostics rejected preview (${blocking.length} severity-1 issue${blocking.length === 1 ? "" : "s"}).`,
+      "Run agentscript_compile to see and fix the diagnostics before starting preview.",
+      { tool: "agentscript_compile", params: { path: filePath } },
+    );
+  }
 
   try {
     const { conn } = await connForAgentApi(input.target_org);

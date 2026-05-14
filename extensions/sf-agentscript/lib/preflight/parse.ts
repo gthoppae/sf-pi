@@ -20,7 +20,14 @@ export function extractActionTargets(actions: readonly ComponentSummary[]): Acti
     if (!a?.target) continue;
     const m = URI_RE.exec(a.target);
     if (!m) continue;
-    out.push({ name: a.name, target: a.target, scheme: m[1], ref_name: m[2] });
+    out.push({
+      name: a.name,
+      target: a.target,
+      scheme: m[1],
+      ref_name: m[2],
+      ...(a.input_names ? { input_names: a.input_names } : {}),
+      ...(a.output_names ? { output_names: a.output_names } : {}),
+    });
   }
   return out;
 }

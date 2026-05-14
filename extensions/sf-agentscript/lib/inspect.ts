@@ -64,6 +64,10 @@ export interface ComponentSummary {
    * Consumers can split on `://` to get scheme + name.
    */
   target?: string;
+  /** Action declaration input names, when present. */
+  input_names?: string[];
+  /** Action declaration output names, when present. */
+  output_names?: string[];
   /**
    * For action declarations only: the parent component when the action is
    * inline-declared inside a subagent or topic body (e.g. `subagent.triage`).
@@ -197,6 +201,13 @@ function collectAtRefs(
   }
 }
 
+function paramNames(value: unknown): string[] | undefined {
+  const names = namedMapEntries(value)
+    .map(([n]) => n)
+    .sort();
+  return names.length > 0 ? names : undefined;
+}
+
 function summarizeWithRefs(name: string, entry: unknown): ComponentSummary {
   const refs = {
     actions: new Set<string>(),
@@ -218,6 +229,10 @@ function summarizeWithRefs(name: string, entry: unknown): ComponentSummary {
   // re-parsing the AST.
   const target = unwrapScalar(e.target);
   if (typeof target === "string" && target.length > 0) summary.target = target;
+  const inputNames = paramNames(e.inputs);
+  if (inputNames) summary.input_names = inputNames;
+  const outputNames = paramNames(e.outputs);
+  if (outputNames) summary.output_names = outputNames;
   return summary;
 }
 
