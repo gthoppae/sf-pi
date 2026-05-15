@@ -604,9 +604,16 @@ export async function startPreviewByApiName(
   opts: PreviewStartByApiNameOptions,
 ): Promise<PreviewStartResult> {
   // Pre-flight: one SOQL covers BotDefinition existence + AgentType +
-  // BotUserId (for the bypassUser decision) + the latest BotVersion's
-  // Status. Lets us return clean diagnostics instead of the server's
-  // confusing 412 "No access to Einstein Copilot" / 404 / 500s.
+  // BotUserId (for the bypassUser decision) + the latest *Active*
+  // BotVersion's Status. Lets us return clean diagnostics instead of
+  // the server's confusing 412 "No access to Einstein Copilot" / 404 / 500s.
+  //
+  // Why filter on Status='Active' in the subquery (and not just take
+  // the latest of any status): a healthy production agent commonly has
+  // newer Inactive versions sitting on top of a serving Active version
+  // (e.g. v12 Inactive / v11 Inactive / v10 Active). The /v1/agents/{botId}/sessions
+  // endpoint serves whichever version is Active — not necessarily the
+  // latest one — so the preflight should reflect that.
   const r = await opts.conn.query<{
     Id: string;
     AgentType?: string;
@@ -622,7 +629,7 @@ export async function startPreviewByApiName(
   }>(
     `SELECT Id, AgentType, BotUserId, ` +
       `(SELECT Id, DeveloperName, Status, VersionNumber FROM BotVersions ` +
-      `ORDER BY VersionNumber DESC LIMIT 1) ` +
+      `WHERE Status='Active' ORDER BY VersionNumber DESC LIMIT 1) ` +
       `FROM BotDefinition WHERE DeveloperName='${soqlEscape(opts.agentApiName)}'`,
   );
   const bot = r.records[0];
@@ -632,23 +639,34 @@ export async function startPreviewByApiName(
       `Agent '${opts.agentApiName}' not found in the org. Use agentscript_lifecycle action='list_versions' to discover agents.`,
     );
   }
-  // Inactive latest version → SFAP returns a confusing 412 "No access to
-  // Einstein Copilot". Catch it here with an actionable message.
-  const latestVersion = bot.BotVersions?.records?.[0];
-  if (latestVersion && latestVersion.Status !== "Active") {
-    const v = latestVersion.VersionNumber ?? "?";
-    throw new Error(
-      `Agent '${opts.agentApiName}' has no active BotVersion ` +
-        `(latest is v${v}, Status='${latestVersion.Status ?? "unknown"}'). ` +
-        `Activate it first: agentscript_lifecycle action='activate' ` +
-        `agent_api_name='${opts.agentApiName}' version=${v}.`,
+  // No Active BotVersion at all — the /v1/agents/{botId}/sessions endpoint
+  // returns the confusing 412 "No access to Einstein Copilot". Catch it
+  // here with an actionable message that surfaces what versions DO exist.
+  const activeVersion = bot.BotVersions?.records?.[0];
+  if (!activeVersion) {
+    // Discover the latest version of any status so we can produce a
+    // useful error: "latest is v12 Inactive — activate it" beats a
+    // bare "no Active version".
+    const fallback = await opts.conn.query<{
+      VersionNumber: number;
+      Status: string;
+    }>(
+      `SELECT VersionNumber, Status FROM BotVersion ` +
+        `WHERE BotDefinitionId='${botId}' ORDER BY VersionNumber DESC LIMIT 1`,
     );
-  }
-  if (!latestVersion) {
+    const latest = fallback.records[0];
+    if (!latest) {
+      throw new Error(
+        `Agent '${opts.agentApiName}' exists but has no BotVersions. ` +
+          `Publish first: agentscript_lifecycle action='publish' ` +
+          `agent_file=<path to your .agent file>.`,
+      );
+    }
     throw new Error(
-      `Agent '${opts.agentApiName}' exists but has no BotVersions. ` +
-        `Publish first: agentscript_lifecycle action='publish' ` +
-        `agent_file=<path to your .agent file>.`,
+      `Agent '${opts.agentApiName}' has no Active BotVersion ` +
+        `(latest is v${latest.VersionNumber}, Status='${latest.Status}'). ` +
+        `Activate a version first: agentscript_lifecycle action='activate' ` +
+        `agent_api_name='${opts.agentApiName}' version=${latest.VersionNumber}.`,
     );
   }
 
