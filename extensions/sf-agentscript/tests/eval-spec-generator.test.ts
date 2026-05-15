@@ -172,6 +172,52 @@ describe("generateSpec", () => {
     }
   });
 
+  test("bot_response_rating carries every required wire field (regression: API rejects without actual + utterance, scores 0 with the wrong actual path)", () => {
+    // Verified against the live eval API on AVA_Vivint_Assistant:
+    //   - omitting actual + utterance → HTTP 422 'Field required'
+    //   - `actual: {turnId.response}` → HTTP 200 but score 0 with
+    //     'bot response is not provided'
+    //   - `actual: {stateId.response.planner_response.lastExecution.message.message}`
+    //     → HTTP 200 with a real LLM-judge score (5.0 polite/relevant)
+    const out = generateSpec({
+      inspect: fakeInspect({
+        subagents: [{ name: "billing", description: "Handles billing." }],
+      }),
+    });
+    for (const test of out.spec.tests) {
+      for (const step of test.steps) {
+        if (step.type !== "evaluator.bot_response_rating") continue;
+        expect(step).toMatchObject({
+          type: "evaluator.bot_response_rating",
+          utterance: expect.any(String),
+          actual: expect.stringMatching(
+            /^\{state\d+\.response\.planner_response\.lastExecution\.message\.message\}$/,
+          ),
+          expected: expect.any(String),
+          threshold: 3,
+        });
+        expect((step as unknown as { utterance: string }).utterance.length).toBeGreaterThan(0);
+        // operator is intentionally omitted — API defaults greater_than_or_equal.
+        expect((step as unknown as { operator?: unknown }).operator).toBeUndefined();
+      }
+    }
+  });
+
+  test("safety probes include a get_state step (so bot_response_rating has a state ref to read from)", () => {
+    const out = generateSpec({
+      inspect: fakeInspect(),
+      includeGuardrail: false,
+      includeSafetyProbes: true,
+    });
+    for (const t of out.spec.tests) {
+      const types = t.steps.map((s) => s.type);
+      expect(types).toContain("agent.create_session");
+      expect(types).toContain("agent.send_message");
+      expect(types).toContain("agent.get_state");
+      expect(types).toContain("evaluator.bot_response_rating");
+    }
+  });
+
   test("max_functional_tests caps subagent + action rows", () => {
     const subagents = Array.from({ length: 30 }, (_, i) => ({
       name: `sa_${i}`,

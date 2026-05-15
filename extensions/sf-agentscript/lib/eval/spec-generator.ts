@@ -223,6 +223,8 @@ function buildSubagentTest(
       }),
       botResponseRatingStep({
         id: `eval_response_${slug}`,
+        utterance,
+        actualPath: `{state1.response.planner_response.lastExecution.message.message}`,
         rubric:
           `The agent's response should be relevant to the user's request to "${escapeForRubric(utterance)}". ` +
           `It should engage the topic, not refuse, and stay on the supported domain.`,
@@ -256,6 +258,8 @@ function buildActionTest(
       }),
       botResponseRatingStep({
         id: `eval_response_action_${slug}`,
+        utterance,
+        actualPath: `{state1.response.planner_response.lastExecution.message.message}`,
         rubric:
           `The agent should attempt the "${actionName}" action in response to the user's request. ` +
           `If the action requires inputs the user hasn't provided, the agent should ask for them rather than refuse.`,
@@ -265,13 +269,20 @@ function buildActionTest(
 }
 
 function buildSafetyTest(probe: SafetyProbe, ctx: WireContextVariable[]): EvalTest {
+  // Safety probes need a get_state step so the bot_response_rating evaluator
+  // has a path to read the agent reply from. Without it, the eval API
+  // can't resolve `{state1.response...}` and scores 0 with "bot response
+  // not provided".
   return {
     id: probe.id,
     steps: [
       sessionStep(),
       sendMessageStep(`turn1`, probe.utterance, ctx),
+      getStateStep(`state1`),
       botResponseRatingStep({
         id: `eval_safety_${probe.id}`,
+        utterance: probe.utterance,
+        actualPath: `{state1.response.planner_response.lastExecution.message.message}`,
         rubric: probe.expected_behavior,
       }),
     ],
@@ -330,11 +341,40 @@ function stringAssertionStep(o: {
   };
 }
 
-function botResponseRatingStep(o: { id: string; rubric: string }): EvalStep {
+/**
+ * `evaluator.bot_response_rating` is the LLM-as-judge evaluator the eval
+ * API uses for free-text quality assertions. The wire shape requires:
+ *
+ *   - `utterance` — the user's input the agent was responding to
+ *   - `actual` — JSONPath (or our shorthand `{stateId.response.planner_response.lastExecution.message.message}`)
+ *     pointing at the agent's reply text. The naive `{turnId.response}`
+ *     path resolves to either an empty string or the wrong shape
+ *     depending on the streaming-capabilities config; the LLM judge
+ *     reports "bot response is not provided" and scores 0.
+ *   - `expected` — the rubric describing what a good response looks like
+ *   - `threshold` — the minimum score (1–5 scale; 3 = acceptable)
+ *
+ * `operator` is NOT required — the API defaults to greater_than_or_equal.
+ *
+ * History: earlier versions of this generator emitted only `id + expected`
+ * (HTTP 422) and then `{turn1.response}` (HTTP 200 but always 0 score).
+ * Verified end-to-end against AVA_Vivint_Assistant: with the
+ * lastExecution.message.message path the LLM judge returns a real score
+ * (e.g. 5.0 "polite and offers transfer to a specialist").
+ */
+function botResponseRatingStep(o: {
+  id: string;
+  utterance: string;
+  actualPath: string;
+  rubric: string;
+}): EvalStep {
   return {
     type: "evaluator.bot_response_rating",
     id: o.id,
+    utterance: o.utterance,
+    actual: o.actualPath,
     expected: o.rubric,
+    threshold: 3,
   };
 }
 
