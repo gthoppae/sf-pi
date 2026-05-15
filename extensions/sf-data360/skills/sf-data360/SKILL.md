@@ -67,6 +67,24 @@ hardcode a path like `/services/data/v60.0/...`.
 - Confirm destructive operations even in sandboxes unless the user
   explicitly asked for them.
 
+## Agentforce session tracing (STDM)
+
+When a question is about Agentforce session traces — "why did agent X
+behave wrong yesterday?", "top intent in production?", "which subagent
+has the most action errors?" — use **STDM** (Session Trace Data Model)
+DMOs in Data Cloud, not the local trace files (those are dev-only).
+
+For `.agent` source / preview / eval / publish, defer to the
+**sf-agentscript** skill. STDM is for what production users actually did.
+
+The pre-flight (probe + data-space + agent-name resolution), DMO field
+reference, query patterns (find sessions, get conversation timeline,
+aggregate metrics, RAG quality), and quirks (NOT_SET sentinel,
+TRUST_GUARDRAILS_STEP `error: "None"`, LLM_STEP-not-JSON, 15/18-char
+ID inconsistency, propagation lag) live in
+`references/agentforce-stdm.md`. Read that before writing any
+`/ssot/query-sql` against the `ssot__AiAgent*__dlm` family.
+
 ## References
 
 Read these only when needed:
@@ -82,6 +100,9 @@ Read these only when needed:
 - `references/safety.md` — mutating-operation safety policy.
 - `references/readiness.md` — how to interpret `d360_probe` output.
 - `references/troubleshooting.md` — symptom → cause → fix index.
+- `references/agentforce-stdm.md` — Agentforce session tracing DMO
+  schema, query patterns, and quirks. Pair with the **sf-agentscript**
+  skill for the dev-loop side.
 
 When local references are not enough, inspect the public upstream repo
 before broad web search:

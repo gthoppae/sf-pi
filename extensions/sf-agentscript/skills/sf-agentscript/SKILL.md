@@ -386,6 +386,114 @@ produces a small, reviewable diff. Multi-turn scenarios are deliberately
 not generated — grow those by hand from the failure records of the first
 few runs.
 
+## Pre-flight checklist (before `agentscript_compile`)
+
+A fast mental pass that catches the most common Agent Script mistakes
+before the SDK compile. Skim before mutating; skim again before publishing.
+Grouped by where the error usually lands.
+
+### Block ordering & top-level shape
+
+1. Block order is `system:` → `config:` → `variables:` → `connection:`
+   → `knowledge:` → `language:` → `start_agent agent_router:` → `subagent:`
+   blocks. Out-of-order blocks parse but emit warnings or silently lose
+   features.
+2. `config:` has `developer_name`. Service agents also need
+   `default_agent_user`. Employee agents must NOT have `default_agent_user`,
+   `connection messaging:`, or MessagingSession-linked variables.
+3. `system:` has `messages.welcome`, `messages.error`, AND `instructions`.
+   Missing any of the three is a publish-time failure.
+4. `start_agent` has a `description` and at least one transition action.
+   Without a transition, it's a dead hub anti-pattern.
+5. Each `subagent` has a `description` AND a `reasoning:` block. Without
+   reasoning, the planner can route to it but never invoke any action.
+
+### Variables & action I/O
+
+6. Every `mutable` variable needs a `default:`. The compiler refuses
+   without one.
+7. Every `linked` variable needs a `source:` AND no `default:`. Linked +
+   default is a contradiction the compiler catches.
+8. Numeric action I/O: bare `number` works for variables but **fails at
+   publish** in action `inputs:`/`outputs:`. Use `object` +
+   `complex_data_type_name: "GenAiNumberType"` (or the matching custom
+   Lightning type) for action params.
+9. `@inputs` and `@outputs` are ephemeral. `@inputs` only inside `with`;
+   `@outputs` only inside the `set`/`if` immediately following the
+   action. `@inputs` referenced inside `set` is a **silent failure** at
+   runtime — your variable just never updates.
+
+### Syntax that's easy to get wrong
+
+10. **Indent with 4 spaces, not tabs.** Mixed indentation breaks the
+    parser with errors that point to the wrong line.
+11. **Booleans are `True` / `False`, capitalized.** Lowercase silently
+    parses as a string in some places and as a literal elsewhere.
+12. **Strings always double-quoted.** Single quotes are not Agent Script.
+13. **No `else if`.** Use `if x and y:` or sequential flat `if` blocks.
+14. **Two transition syntaxes for two contexts.** Inside `reasoning:
+actions:` use `@utils.transition to @subagent.X`. Inside
+    `before_reasoning:`/`after_reasoning:` directive blocks use bare
+    `transition to @subagent.X`. Mix them up and the planner ignores the
+    transition silently.
+
+### Common WRONG/RIGHT pairs
+
+```yaml
+# WRONG — bare transition inside a reasoning action
+go_billing: transition to @subagent.billing
+# RIGHT
+go_billing: @utils.transition to @subagent.billing
+```
+
+```yaml
+# WRONG — mutable without default
+variables:
+    customer_name:
+        type: string
+        mutable: True
+# RIGHT
+variables:
+    customer_name:
+        type: string
+        mutable: True
+        default: ""
+```
+
+```yaml
+# WRONG — numeric action input as bare number; fails at publish
+inputs:
+    case_count: { type: number }
+# RIGHT
+inputs:
+    case_count:
+        type: object
+        complex_data_type_name: "GenAiNumberType"
+```
+
+```yaml
+# WRONG — @inputs referenced after the action runs (silent failure)
+set:
+    customer_name: @inputs.full_name
+# RIGHT — echo the input through @outputs, or capture before the call
+set:
+    customer_name: @outputs.echoed_full_name
+```
+
+### When the LLM should escalate to `agentscript_compile`
+
+Run the compile when the answer to any of the above is unclear, when
+`agentscript_inspect` reports `has_parse_errors: true`, or whenever
+you're about to publish. The compiler is ~10ms; it's cheaper than
+guessing.
+
+For the architecture-level review (FSM shape, instruction resolution,
+safety) the upstream `developing-agentforce` skill carries a 100-pt
+rubric across seven categories: Structure & Syntax, Safety &
+Responsible AI, Deterministic Logic, Instruction Resolution, FSM
+Architecture, Action Configuration, Deployment Readiness. Treat it as
+a review checklist to run before activate.
+
 ## Compile-on-save
 
 Runs after every successful `write` / `edit` on a `.agent` file. Same
@@ -397,6 +505,28 @@ filter as `agentscript_compile`:
   `unknown-dialect`, `invalid-modifier`, `unknown-type`.
 - Severity 3+ (Info/Hint) — always dropped.
 - First feedback per file per session includes a one-line dialect banner.
+
+## Coordination with sf-data360 (production observability)
+
+When the user asks "why did agent X behave wrong in production?" —
+that's a question for the live STDM (Session Trace Data Model) data
+in Data Cloud, not for the local trace files. Defer to the **sf-data360**
+skill for those queries; it carries the DMO schema, query patterns, and
+the quirks (NOT_SET sentinel, TRUST_GUARDRAILS_STEP `error: "None"`,
+LLM_STEP not-JSON output, 15/18-char ID inconsistency).
+
+The end-to-end loop is **observe → reproduce → improve**:
+
+1. `sf-data360` queries STDM → finds problem sessions, classifies issues
+2. `agentscript_preview action='start' agent_file=…` → reproduce the
+   issue with deterministic `context_variables`
+3. `agentscript_mutate` → fix the `.agent` file
+4. `agentscript_eval action='run'` → verify the fix doesn't regress
+   adjacent flows
+5. `agentscript_lifecycle action='publish'` → ship
+
+See `references/agentforce-stdm.md` in the `sf-data360` skill for the
+DMO field reference and copy-paste SQL.
 
 ## Coordination with sf-lsp
 
