@@ -216,11 +216,15 @@ export interface PlaceholderUsage {
 
 export function detectPlaceholderUsage(spec: unknown): PlaceholderUsage {
   const s = JSON.stringify(spec);
+  // Note: `$active_bot_id` is deliberately NOT a trigger for the active
+  // resolver. It's a BotDefinition lookup — same id for every version —
+  // so it can be filled in by either resolver (substitutePlaceholders
+  // falls back from active.bot_id to latest.bot_id). Triggering active
+  // resolution from $active_bot_id alone would silently misreport
+  // metadata.bot_version_id when the spec uses $active_bot_id +
+  // $latest_bot_version_id together (the ship→eval→activate flow).
   return {
-    active:
-      s.includes("$active_bot_id") ||
-      s.includes("$active_bot_version_id") ||
-      s.includes("$active_planner_id"),
+    active: s.includes("$active_bot_version_id") || s.includes("$active_planner_id"),
     latest: s.includes("$latest_bot_version_id") || s.includes("$latest_planner_id"),
   };
 }

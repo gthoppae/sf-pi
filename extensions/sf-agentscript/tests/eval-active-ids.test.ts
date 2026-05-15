@@ -47,10 +47,34 @@ describe("detectPlaceholderUsage", () => {
       active: false,
       latest: true,
     });
-    expect(detectPlaceholderUsage({ a: "$active_bot_id", b: "$latest_bot_version_id" })).toEqual({
+    expect(
+      detectPlaceholderUsage({
+        a: "$active_bot_version_id",
+        b: "$latest_planner_id",
+      }),
+    ).toEqual({
       active: true,
       latest: true,
     });
+  });
+
+  test("$active_bot_id alone does NOT trigger the active resolver (BotDefinition is per-agent, not per-version)", () => {
+    // Critical correctness invariant: when a spec uses `$active_bot_id` +
+    // `$latest_*`, only the latest resolver should run. Otherwise the run
+    // metadata's `bot_version_id` ends up pointing at the Active version
+    // (resolvedIds wins over latestIds in the metadata builder), even
+    // though the eval API actually ran against the latest version.
+    expect(detectPlaceholderUsage({ x: "$active_bot_id" })).toEqual({
+      active: false,
+      latest: false,
+    });
+    expect(
+      detectPlaceholderUsage({
+        botId: "$active_bot_id",
+        botVersionId: "$latest_bot_version_id",
+        plannerId: "$latest_planner_id",
+      }),
+    ).toEqual({ active: false, latest: true });
   });
 
   test("no placeholders → both false (skip both resolvers)", () => {
