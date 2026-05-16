@@ -137,6 +137,8 @@ the previous sf-skills-hud implementation.
 ```
 extensions/sf-skills/
   lib/
+    table-overlay/
+      viewport.ts           ← implementation module
     classify.ts             ← implementation module
     defaults.ts             ← implementation module
     hud-component.ts        ← implementation module
@@ -157,6 +159,7 @@ extensions/sf-skills/
     source-labels.test.ts   ← unit / smoke test
     table-data.test.ts      ← unit / smoke test
     usage-store.test.ts     ← unit / smoke test
+    viewport.test.ts        ← unit / smoke test
   CREDITS.md                ← extension attribution
   index.ts                  ← Pi extension entry point
   manifest.json             ← source-of-truth extension metadata
