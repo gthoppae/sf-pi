@@ -6,7 +6,14 @@
   "maturity": "stable",
   "defaultEnabled": true,
   "commands": ["/sf-skills"],
-  "events": ["session_start", "message_end", "session_tree", "session_compact", "session_shutdown"],
+  "events": [
+    "session_start",
+    "message_end",
+    "session_tree",
+    "session_compact",
+    "before_agent_start",
+    "session_shutdown"
+  ],
   "docs": {
     "summary": "Non-capturing top-right HUD overlay that distinguishes Live skills (still in context) from Earlier skills (used on this branch but compacted out). Re-scans on message_end / session_tree / session_compact.",
     "primaryFiles": ["index.ts", "lib/hud-component.ts", "lib/skill-state.ts"]

@@ -28,6 +28,7 @@
  */
 import {
   buildSessionContext,
+  parseSkillBlock,
   type ExtensionAPI,
   type ExtensionCommandContext,
   type ExtensionContext,
@@ -56,6 +57,7 @@ import { withSafeCommandHandler } from "../../lib/common/safe-command-handler.ts
 import { handleDefaults, parseDefaultsArgs } from "./lib/skills-command.ts";
 import { updateSkillSources } from "../../lib/common/skill-sources/skill-sources.ts";
 import { buildActiveRows, buildDiscoverRows } from "./lib/table-data.ts";
+import { loadUsageMap, recordSkillInvocation } from "./lib/usage-store.ts";
 import { SkillsTableOverlayComponent, type TableResult } from "./lib/table-overlay.ts";
 
 // -------------------------------------------------------------------------------------------------
@@ -72,7 +74,7 @@ const EMPTY_STATE: SkillsHudState = {
   usedCount: 0,
 };
 
-type SkillsAction = "summary" | "table" | "help" | "close" | LifecycleActionId;
+type SkillsAction = "summary" | "table" | "metrics" | "help" | "close" | LifecycleActionId;
 
 const SKILLS_ACTIONS: CommandPanelAction<SkillsAction>[] = [
   {
@@ -86,6 +88,12 @@ const SKILLS_ACTIONS: CommandPanelAction<SkillsAction>[] = [
     label: "Open skills table",
     description:
       "Tabbed datatable: Active, Discover, Stats. Toggle global / project wiring per row.",
+    group: "Status",
+  },
+  {
+    value: "metrics",
+    label: "Show usage metrics",
+    description: "Top-N skill invocations split by global / project counters.",
     group: "Status",
   },
   {
@@ -107,6 +115,34 @@ const SKILLS_ACTIONS: CommandPanelAction<SkillsAction>[] = [
 function buildSkillsActions(cwd: string): CommandPanelAction<SkillsAction>[] {
   const toggle = buildToggleExtensionAction({ extensionId: "sf-skills", cwd });
   return toggle ? [...SKILLS_ACTIONS, toggle] : SKILLS_ACTIONS;
+}
+
+function renderMetrics(cwd: string): string {
+  const global = loadUsageMap("global", cwd);
+  const project = loadUsageMap("project", cwd);
+  if (global.size === 0 && project.size === 0) {
+    return [
+      "No skill invocations recorded yet.",
+      "",
+      "Counters bump when you type /skill:<name> at the prompt. The HUD",
+      "shows in-session usage; this view persists across sessions.",
+    ].join("\n");
+  }
+  const top = (m: Map<string, { count: number; lastUsedAt: string }>): string[] => {
+    const sorted = [...m.entries()].sort((a, b) => b[1].count - a[1].count).slice(0, 10);
+    if (sorted.length === 0) return ["  (no entries)"];
+    return sorted.map(
+      ([name, rec], i) =>
+        `  ${String(i + 1).padStart(2)}. ${name.padEnd(28)} ${String(rec.count).padStart(4)}  last ${rec.lastUsedAt}`,
+    );
+  };
+  return [
+    "Top skill usage (global, all projects):",
+    ...top(global),
+    "",
+    "Top skill usage (this project):",
+    ...top(project),
+  ].join("\n");
 }
 
 function renderSkillsHelp(): string {
@@ -233,6 +269,21 @@ export default function sfSkills(pi: ExtensionAPI) {
     rebuildAndRender(ctx);
   });
 
+  pi.on("before_agent_start", async (event, ctx) => {
+    // Bump persistent counters on explicit /skill:<name> invocations.
+    // We mirror sf-skills-hud's signal model (explicit only) so the
+    // counter never drifts ahead of what the HUD calls "used".
+    const text = typeof event.prompt === "string" ? event.prompt : "";
+    if (!text) return;
+    const block = parseSkillBlock(text);
+    if (!block?.name) return;
+    try {
+      recordSkillInvocation(block.name, ctx.cwd);
+    } catch {
+      // Counters are best-effort — never break a turn.
+    }
+  });
+
   pi.on("session_shutdown", async (event) => {
     dismissOverlay();
     // Preserve in-memory state on reload — session_start will rebuild it anyway.
@@ -336,6 +387,17 @@ export default function sfSkills(pi: ExtensionAPI) {
       return;
     }
 
+    if (subcommand === "metrics") {
+      await emitSkillsOutput(
+        ctx,
+        "SF Skills usage metrics",
+        renderMetrics(ctx.cwd),
+        "info",
+        fromPanel,
+      );
+      return;
+    }
+
     await emitSkillsOutput(
       ctx,
       "Unknown command",
@@ -368,8 +430,9 @@ export default function sfSkills(pi: ExtensionAPI) {
       return;
     }
     const commands = pi.getCommands();
-    const active = buildActiveRows({ commands, cwd: ctx.cwd });
-    const discover = buildDiscoverRows({ commands, cwd: ctx.cwd });
+    const usage = loadUsageMap("all", ctx.cwd);
+    const active = buildActiveRows({ commands, cwd: ctx.cwd, usage });
+    const discover = buildDiscoverRows({ commands, cwd: ctx.cwd, usage });
 
     ctx.ui.setWorkingVisible(false);
     let result: TableResult | undefined;

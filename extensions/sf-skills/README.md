@@ -99,11 +99,13 @@ extensions/sf-skills/
     skills-command.ts       ← implementation module
     table-data.ts           ← implementation module
     table-overlay.ts        ← implementation module
+    usage-store.ts          ← implementation module
   tests/
     defaults.test.ts        ← unit / smoke test
     skill-state.test.ts     ← unit / smoke test
     smoke.test.ts           ← unit / smoke test
     table-data.test.ts      ← unit / smoke test
+    usage-store.test.ts     ← unit / smoke test
   CREDITS.md                ← extension attribution
   index.ts                  ← Pi extension entry point
   manifest.json             ← source-of-truth extension metadata

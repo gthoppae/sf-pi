@@ -147,7 +147,7 @@ export const SF_PI_REGISTRY: readonly SfPiExtension[] = [
     maturity: "stable",
     defaultEnabled: true,
     commands: ["/sf-skills"],
-    events: ["session_start","message_end","session_tree","session_compact","session_shutdown"],
+    events: ["session_start","message_end","session_tree","session_compact","before_agent_start","session_shutdown"],
   },
   {
     id: "sf-slack",
