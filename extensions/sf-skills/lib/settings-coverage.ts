@@ -123,34 +123,62 @@ export function planDisable(input: PlanInput): DisablePlan {
 /**
  * Compute what to add to enable `skillPath` in the given scope.
  *
- * If the file is already covered by a parent entry, return a plan that
- * does nothing — `add` is empty — so the caller can short-circuit and
- * tell the user "already loaded via parent root."
+ * Pi loads skills additively from BOTH global and project settings. So
+ * "already covered" must mean "covered in any scope" — not just the
+ * target scope. If we only check the target scope, toggling p on a row
+ * that's already wired globally appends the file path to project
+ * settings, pi loads the same skill twice (parent dir from global +
+ * file path from project), and the name-collision warning fires.
  *
- * Otherwise return a plan that adds the SKILL.md path verbatim.
+ * The returned `coveredInScope` lets the caller surface a clear
+ * message: "already loaded via global; toggle that scope first".
  */
 export function planEnable(input: PlanInput): {
   alreadyCovered: boolean;
+  coveredInScope?: SkillSourceScope;
   settingsPath: string;
   add: string[];
 } {
   const home = input.home ?? os.homedir();
-  const settingsPath =
+  const targetSettingsPath =
     input.scope === "project" ? projectSettingsPath(input.cwd) : globalSettingsPath();
   const skillAbs = path.normalize(input.skillPath);
 
-  for (const entry of readSkills(settingsPath)) {
-    const entryAbs = path.normalize(expandSettingsValue(entry, settingsPath, home, input.cwd));
-    if (!entryAbs) continue;
-    if (entryAbs === skillAbs) {
-      return { alreadyCovered: true, settingsPath, add: [] };
-    }
-    if (skillAbs.startsWith(`${entryAbs}${path.sep}`) && isDirectory(entryAbs)) {
-      return { alreadyCovered: true, settingsPath, add: [] };
+  // Walk both scopes — target scope first so an exact-match in the
+  // target wins for the `coveredInScope` reporting.
+  const scopes: Array<{ scope: SkillSourceScope; settingsPath: string }> = [
+    { scope: input.scope, settingsPath: targetSettingsPath },
+    {
+      scope: input.scope === "project" ? "global" : "project",
+      settingsPath:
+        input.scope === "project" ? globalSettingsPath() : projectSettingsPath(input.cwd),
+    },
+  ];
+
+  for (const { scope, settingsPath } of scopes) {
+    for (const entry of readSkills(settingsPath)) {
+      const entryAbs = path.normalize(expandSettingsValue(entry, settingsPath, home, input.cwd));
+      if (!entryAbs) continue;
+      if (entryAbs === skillAbs) {
+        return {
+          alreadyCovered: true,
+          coveredInScope: scope,
+          settingsPath: targetSettingsPath,
+          add: [],
+        };
+      }
+      if (skillAbs.startsWith(`${entryAbs}${path.sep}`) && isDirectory(entryAbs)) {
+        return {
+          alreadyCovered: true,
+          coveredInScope: scope,
+          settingsPath: targetSettingsPath,
+          add: [],
+        };
+      }
     }
   }
 
-  return { alreadyCovered: false, settingsPath, add: [input.skillPath] };
+  return { alreadyCovered: false, settingsPath: targetSettingsPath, add: [input.skillPath] };
 }
 
 // -------------------------------------------------------------------------------------------------

@@ -506,7 +506,15 @@ export default function sfSkills(pi: ExtensionAPI) {
         // produced a duplicate-load warning before this fix).
         const plan = planEnable({ skillPath: t.skillPath, scope: t.scope, cwd: ctx.cwd });
         if (plan.alreadyCovered) {
-          skipped.push(`${t.name} → ${t.scope}: already loaded via parent root`);
+          // Cross-scope: pi loads from global+project additively, so a skill
+          // already covered in EITHER scope is loaded for this session.
+          // Adding it again would only produce a name-collision warning.
+          const where = plan.coveredInScope ?? t.scope;
+          skipped.push(
+            where === t.scope
+              ? `${t.name} → ${t.scope}: already wired in this scope`
+              : `${t.name} → ${t.scope}: already loaded via ${where} settings (would duplicate)`,
+          );
           continue;
         }
         for (const value of plan.add) bucket.add.push(value);

@@ -129,6 +129,7 @@ describe("planEnable", () => {
 
     const plan = planEnable({ skillPath: skill, scope: "global", cwd: makeCwd() });
     expect(plan.alreadyCovered).toBe(true);
+    expect(plan.coveredInScope).toBe("global");
     expect(plan.add).toEqual([]);
   });
 
@@ -143,6 +144,7 @@ describe("planEnable", () => {
 
     const plan = planEnable({ skillPath: skill, scope: "global", cwd: makeCwd() });
     expect(plan.alreadyCovered).toBe(true);
+    expect(plan.coveredInScope).toBe("global");
     expect(plan.add).toEqual([]);
   });
 
@@ -156,6 +158,43 @@ describe("planEnable", () => {
 
     const plan = planEnable({ skillPath: skill, scope: "global", cwd: makeCwd() });
     expect(plan.alreadyCovered).toBe(false);
+    expect(plan.coveredInScope).toBeUndefined();
     expect(plan.add).toEqual([skill]);
+  });
+
+  // Regression: enabling at scope B while scope A already covers the
+  // skill used to silently append the file path, producing pi's
+  // name-collision warning on reload. Now we detect cross-scope cover.
+  it("detects cross-scope coverage (global wired, project toggle)", () => {
+    const home = makeHome();
+    process.env.HOME = home;
+    const cwd = makeCwd();
+    const root = path.join(home, ".claude", "skills");
+    const skill = makeSkill(root, "demo");
+    writeSettings(path.join(home, ".pi", "agent", "settings.json"), {
+      skills: ["~/.claude/skills"],
+    });
+    writeSettings(path.join(cwd, ".pi", "settings.json"), { skills: [] });
+
+    const plan = planEnable({ skillPath: skill, scope: "project", cwd });
+    expect(plan.alreadyCovered).toBe(true);
+    expect(plan.coveredInScope).toBe("global");
+    expect(plan.add).toEqual([]);
+  });
+
+  it("detects cross-scope coverage the other direction (project wired, global toggle)", () => {
+    const home = makeHome();
+    process.env.HOME = home;
+    const cwd = makeCwd();
+    const root = path.join(cwd, ".claude", "skills");
+    const skill = makeSkill(root, "demo");
+    writeSettings(path.join(cwd, ".pi", "settings.json"), {
+      skills: ["./.claude/skills"],
+    });
+
+    const plan = planEnable({ skillPath: skill, scope: "global", cwd });
+    expect(plan.alreadyCovered).toBe(true);
+    expect(plan.coveredInScope).toBe("project");
+    expect(plan.add).toEqual([]);
   });
 });
