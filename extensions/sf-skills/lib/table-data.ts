@@ -33,6 +33,7 @@ import {
   sourceCategory,
   type SourceCategory,
 } from "./classify.ts";
+import { friendlySourceLabel, friendlyWiredLabel } from "./source-labels.ts";
 
 // -------------------------------------------------------------------------------------------------
 // Types
@@ -50,10 +51,12 @@ export interface ActiveRow {
   klass: SkillClass;
   /** Where the file came from. */
   source: SourceCategory;
-  /** Display label for the source (e.g. "afv-library", "ext: sf-data360"). */
+  /** Display label for the source (e.g. "afv-library", "Claude Code"). */
   sourceLabel: string;
   /** Wiring status. "none" means auto-discovered or bundled. */
   wired: WiredScope;
+  /** User-friendly wiring label for the table column. */
+  wiredLabel: string;
   /** True when the skill cannot be toggled via settings (auto/bundled). */
   readOnly: boolean;
   /** Optional usage info for the Stats tab + sort. Filled in by callers
@@ -116,7 +119,7 @@ export function buildActiveRows(input: TableInput): ActiveRow[] {
       cwd: input.cwd,
       wiredAbsolutePaths: wiredAbs,
     });
-    const sourceLabel = formatSourceLabel(source, skillPath, homeDir, input.cwd);
+    const sourceLabel = friendlySourceLabel({ skillPath, cwd: input.cwd, homeDir });
     const wired = scopeForPath(skillPath, globalWired, projectWired);
     const readOnly = source === "auto" || source === "bundled";
     const usage = input.usage?.get(name);
@@ -127,6 +130,7 @@ export function buildActiveRows(input: TableInput): ActiveRow[] {
       source,
       sourceLabel,
       wired,
+      wiredLabel: friendlyWiredLabel(wired),
       readOnly,
       usageCount: usage?.count ?? 0,
       lastUsedAt: usage?.lastUsedAt ?? null,
@@ -221,32 +225,4 @@ function isUnderAny(normalized: string, paths: Set<string>): boolean {
   return false;
 }
 
-function formatSourceLabel(
-  source: SourceCategory,
-  skillPath: string,
-  homeDir: string,
-  cwd: string,
-): string {
-  if (source === "afv-library") return "afv-library";
-  if (source === "bundled") {
-    const match = /[\\/]extensions[\\/](sf-[^\\/]+)[\\/]skills[\\/]/.exec(skillPath);
-    return match ? `ext: ${match[1]}` : "ext: sf-pi";
-  }
-  if (source === "wired") {
-    if (skillPath.startsWith(homeDir)) {
-      return `~/${path.relative(homeDir, path.dirname(skillPath))}`;
-    }
-    if (skillPath.startsWith(cwd)) {
-      return `./${path.relative(cwd, path.dirname(skillPath))}`;
-    }
-    return path.dirname(skillPath);
-  }
-  // auto-discovered
-  if (skillPath.startsWith(homeDir)) {
-    return `~/${path.relative(homeDir, path.dirname(skillPath))}`;
-  }
-  if (skillPath.startsWith(cwd)) {
-    return `./${path.relative(cwd, path.dirname(skillPath))}`;
-  }
-  return path.dirname(skillPath);
-}
+// formatSourceLabel was replaced by friendlySourceLabel in lib/source-labels.ts.
