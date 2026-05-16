@@ -1,7 +1,7 @@
 {
   "id": "sf-skills",
   "name": "SF Skills",
-  "description": "Pinned top-right overlay that shows which skills are live in context versus earlier in the session",
+  "description": "Manage skills end-to-end: pinned HUD, tabbed datatable (Active/Discover/Stats), Claude/Codex/Cursor source detection, forcedotcom/afv-library install + auto-update, per-skill usage counters, and prune.",
   "category": "ui",
   "maturity": "stable",
   "defaultEnabled": true,
@@ -15,7 +15,18 @@
     "session_shutdown"
   ],
   "docs": {
-    "summary": "Non-capturing top-right HUD overlay that distinguishes Live skills (still in context) from Earlier skills (used on this branch but compacted out). Re-scans on message_end / session_tree / session_compact.",
-    "primaryFiles": ["index.ts", "lib/hud-component.ts", "lib/skill-state.ts"]
+    "summary": "Skills manager + passive top-right HUD overlay. Three datatable tabs (Active / Discover / Stats), source detection for global and project Claude/Codex/Cursor roots, an installer for forcedotcom/afv-library that wires the curated SF skills into settings.skills[], persistent per-skill usage counters split by global vs project, and a prune action for stale settings entries + orphan managed clones. Every enable/disable is a native pi settings.skills[] add/remove — no SKILL.md files are ever modified.",
+    "primaryFiles": [
+      "index.ts",
+      "lib/hud-component.ts",
+      "lib/skill-state.ts",
+      "lib/table-data.ts",
+      "lib/table-overlay.ts",
+      "lib/classify.ts",
+      "lib/defaults.ts",
+      "lib/skills-command.ts",
+      "lib/usage-store.ts",
+      "lib/prune.ts"
+    ]
   }
 }

@@ -108,7 +108,7 @@ _Salesforce-themed rainbow spinner during LLM thinking_
 
 ### [SF Skills](../extensions/sf-skills/)
 
-_Pinned top-right overlay that shows which skills are live in context versus earlier in the session_
+_Manage skills end-to-end: pinned HUD, tabbed datatable (Active/Discover/Stats), Claude/Codex/Cursor source detection, forcedotcom/afv-library install + auto-update, per-skill usage counters, and prune._
 
 - Default: **on**
 - Commands: `/sf-skills`

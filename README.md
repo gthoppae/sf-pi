@@ -373,7 +373,7 @@ For the canonical machine-readable bundle list, see [`catalog/index.json`](./cat
 | [SF LSP](./extensions/sf-lsp/)                                   | assistive  | on        | Real-time Salesforce LSP diagnostics on write/edit with a working-indicator spinner, transcript rows, and a permanent top-bar health segment in sf-devbar                                                                                      |
 | [SF DevBar](./extensions/sf-devbar/)                             | ui         | on        | Bespoke Salesforce developer status bar with org context, model info, git, and context window progress                                                                                                                                         |
 | [SF Ohana Spinner](./extensions/sf-ohana-spinner/)               | ui         | on        | Salesforce-themed rainbow spinner during LLM thinking                                                                                                                                                                                          |
-| [SF Skills](./extensions/sf-skills/)                             | ui         | on        | Pinned top-right overlay that shows which skills are live in context versus earlier in the session                                                                                                                                             |
+| [SF Skills](./extensions/sf-skills/)                             | ui         | on        | Manage skills end-to-end: pinned HUD, tabbed datatable (Active/Discover/Stats), Claude/Codex/Cursor source detection, forcedotcom/afv-library install + auto-update, per-skill usage counters, and prune.                                      |
 | [SF Welcome](./extensions/sf-welcome/)                           | ui         | on        | Salesforce-branded splash screen with environment status, extension health, and community info                                                                                                                                                 |
 
 <!-- GENERATED:bundled-extensions:end -->
@@ -642,8 +642,9 @@ Jump to an extension's Troubleshooting section to see the full fix. This index i
 
 - HUD never appears even though I know a skill was used
 - A skill moved from Live to Earlier mid-session
-- HUD doesn't update after switching branches with `/tree`
-- I want the HUD off or more controls
+- Can I disable a globally-installed skill for one project only
+- `/sf-skills defaults update` refuses to run
+- Prune wants to delete a clone I edited
 
 **[SF Welcome](./extensions/sf-welcome/#troubleshooting)**
 
