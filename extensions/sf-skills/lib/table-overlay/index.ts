@@ -44,17 +44,48 @@ const TABS: Array<{ id: TabId; label: string }> = [
   { id: "stats", label: "Stats" },
 ];
 
-// Column widths used in the Active tab. Sum + 4 separators = 86 chars,
-// matches our 90% width target on most terminals.
-const ACTIVE_COLS = {
+// Fixed column widths for the Active tab. The 'source' column is
+// flexible and absorbs whatever inner-width is left over so the table
+// fills the box (no dead space between the data and the scroll gutter).
+const ACTIVE_COL_WIDTHS = {
   cursor: 2,
   glyph: 2,
   name: 32,
   klass: 5,
-  source: 30,
   wired: 9,
   used: 6,
 } as const;
+const ACTIVE_FIXED_TOTAL =
+  ACTIVE_COL_WIDTHS.cursor +
+  ACTIVE_COL_WIDTHS.glyph +
+  ACTIVE_COL_WIDTHS.name +
+  ACTIVE_COL_WIDTHS.klass +
+  ACTIVE_COL_WIDTHS.wired +
+  ACTIVE_COL_WIDTHS.used;
+// 6 separator spaces between 7 cells + 1 leading + 2 trailing for scroll gutter.
+const ACTIVE_NON_DATA_PAD = 6 + 1 + 2;
+
+// Discover columns. 'origin' is the flex column.
+const DISCOVER_COL_WIDTHS = {
+  cursor: 2,
+  glyph: 2,
+  name: 30,
+  status: 18,
+} as const;
+const DISCOVER_FIXED_TOTAL =
+  DISCOVER_COL_WIDTHS.cursor +
+  DISCOVER_COL_WIDTHS.glyph +
+  DISCOVER_COL_WIDTHS.name +
+  DISCOVER_COL_WIDTHS.status;
+const DISCOVER_NON_DATA_PAD = 5 + 1 + 2;
+
+function activeSourceWidth(innerWidth: number): number {
+  return Math.max(18, innerWidth - ACTIVE_FIXED_TOTAL - ACTIVE_NON_DATA_PAD);
+}
+
+function discoverOriginWidth(innerWidth: number): number {
+  return Math.max(18, innerWidth - DISCOVER_FIXED_TOTAL - DISCOVER_NON_DATA_PAD);
+}
 
 // -------------------------------------------------------------------------------------------------
 // Component
@@ -351,13 +382,13 @@ export class SkillsTableOverlayComponent implements Focusable {
   ): string[] {
     const out: string[] = [];
     if (this.tab === "active") {
-      out.push(row(this.renderActiveHeader(theme)));
+      out.push(row(this.renderActiveHeader(theme, innerWidth)));
       out.push(row(theme.fg("border", `  ${"─".repeat(innerWidth - 4)}`)));
-      out.push(...this.renderActiveBody(theme, view, row));
+      out.push(...this.renderActiveBody(theme, innerWidth, view, row));
     } else if (this.tab === "discover") {
-      out.push(row(this.renderDiscoverHeader(theme)));
+      out.push(row(this.renderDiscoverHeader(theme, innerWidth)));
       out.push(row(theme.fg("border", `  ${"─".repeat(innerWidth - 4)}`)));
-      out.push(...this.renderDiscoverBody(theme, view, row));
+      out.push(...this.renderDiscoverBody(theme, innerWidth, view, row));
     } else {
       out.push(...this.renderStatsBody(theme, view, row));
     }
@@ -372,21 +403,23 @@ export class SkillsTableOverlayComponent implements Focusable {
   // Active tab
   // -----------------------------------------------------------------------------------------------
 
-  private renderActiveHeader(theme: Theme): string {
+  private renderActiveHeader(theme: Theme, innerWidth: number): string {
+    const sourceWidth = activeSourceWidth(innerWidth);
     const cells = [
-      pad("", ACTIVE_COLS.cursor),
-      pad("", ACTIVE_COLS.glyph),
-      pad("Skill", ACTIVE_COLS.name),
-      pad("Class", ACTIVE_COLS.klass),
-      pad("Where it's loaded", ACTIVE_COLS.source),
-      pad("Wired", ACTIVE_COLS.wired),
-      padRight("Used", ACTIVE_COLS.used),
+      pad("", ACTIVE_COL_WIDTHS.cursor),
+      pad("", ACTIVE_COL_WIDTHS.glyph),
+      pad("Skill", ACTIVE_COL_WIDTHS.name),
+      pad("Class", ACTIVE_COL_WIDTHS.klass),
+      pad("Where it's loaded", sourceWidth),
+      pad("Wired", ACTIVE_COL_WIDTHS.wired),
+      padRight("Used", ACTIVE_COL_WIDTHS.used),
     ];
-    return ` ${theme.fg("muted", cells.join(" "))}`;
+    return rightAnchor(innerWidth, ` ${theme.fg("muted", cells.join(" "))}`, " ");
   }
 
   private renderActiveBody(
     theme: Theme,
+    innerWidth: number,
     view: ViewportInfo,
     row: (content?: string) => string,
   ): string[] {
@@ -398,18 +431,20 @@ export class SkillsTableOverlayComponent implements Focusable {
     for (let i = view.offset; i < view.end; i++) {
       const r = rows[i]!;
       const isCursor = i === view.cursor;
-      out.push(row(this.renderActiveRow(theme, r, isCursor, view, i)));
+      out.push(row(this.renderActiveRow(theme, innerWidth, r, isCursor, view, i)));
     }
     return out;
   }
 
   private renderActiveRow(
     theme: Theme,
+    innerWidth: number,
     r: ActiveRow,
     isCursor: boolean,
     view: ViewportInfo,
     index: number,
   ): string {
+    const sourceWidth = activeSourceWidth(innerWidth);
     const cursorGlyph = isCursor ? theme.fg("accent", "▸") : " ";
     const onGlyph = this.activeOnGlyph(theme, r);
     const klassColor = r.klass === "salesforce" ? "success" : "muted";
@@ -417,16 +452,17 @@ export class SkillsTableOverlayComponent implements Focusable {
     const wiredText = r.wiredLabel ?? friendlyWiredLabel(r.wired);
     const wiredColor = r.wired === "none" ? "muted" : "success";
     const cells = [
-      pad(cursorGlyph, ACTIVE_COLS.cursor),
-      pad(onGlyph, ACTIVE_COLS.glyph),
-      pad(truncateToWidth(r.name, ACTIVE_COLS.name, "…"), ACTIVE_COLS.name),
-      pad(klass, ACTIVE_COLS.klass),
-      pad(truncateToWidth(r.sourceLabel, ACTIVE_COLS.source, "…"), ACTIVE_COLS.source),
-      pad(theme.fg(wiredColor, wiredText), ACTIVE_COLS.wired),
-      padRight(String(r.usageCount), ACTIVE_COLS.used),
+      pad(cursorGlyph, ACTIVE_COL_WIDTHS.cursor),
+      pad(onGlyph, ACTIVE_COL_WIDTHS.glyph),
+      pad(truncateToWidth(r.name, ACTIVE_COL_WIDTHS.name, "…"), ACTIVE_COL_WIDTHS.name),
+      pad(klass, ACTIVE_COL_WIDTHS.klass),
+      pad(truncateToWidth(r.sourceLabel, sourceWidth, "…"), sourceWidth),
+      pad(theme.fg(wiredColor, wiredText), ACTIVE_COL_WIDTHS.wired),
+      padRight(String(r.usageCount), ACTIVE_COL_WIDTHS.used),
     ];
+    const data = ` ${cells.join(" ")}`;
     const scrollGlyph = this.scrollGlyph(theme, view, index);
-    const line = ` ${cells.join(" ")} ${scrollGlyph}`;
+    const line = rightAnchor(innerWidth, data, scrollGlyph);
     if (isCursor) return theme.fg("accent", line);
     return line;
   }
@@ -443,19 +479,21 @@ export class SkillsTableOverlayComponent implements Focusable {
   // Discover tab
   // -----------------------------------------------------------------------------------------------
 
-  private renderDiscoverHeader(theme: Theme): string {
+  private renderDiscoverHeader(theme: Theme, innerWidth: number): string {
+    const originWidth = discoverOriginWidth(innerWidth);
     const cells = [
-      pad("", 2),
-      pad("", 2),
-      pad("Skill / Source", 30),
-      pad("Origin", 26),
-      pad("Status", 18),
+      pad("", DISCOVER_COL_WIDTHS.cursor),
+      pad("", DISCOVER_COL_WIDTHS.glyph),
+      pad("Skill / Source", DISCOVER_COL_WIDTHS.name),
+      pad("Origin", originWidth),
+      pad("Status", DISCOVER_COL_WIDTHS.status),
     ];
-    return ` ${theme.fg("muted", cells.join(" "))}`;
+    return rightAnchor(innerWidth, ` ${theme.fg("muted", cells.join(" "))}`, " ");
   }
 
   private renderDiscoverBody(
     theme: Theme,
+    innerWidth: number,
     view: ViewportInfo,
     row: (content?: string) => string,
   ): string[] {
@@ -467,29 +505,35 @@ export class SkillsTableOverlayComponent implements Focusable {
     for (let i = view.offset; i < view.end; i++) {
       const r = rows[i]!;
       const isCursor = i === view.cursor;
-      out.push(row(this.renderDiscoverRow(theme, r, isCursor, view, i)));
+      out.push(row(this.renderDiscoverRow(theme, innerWidth, r, isCursor, view, i)));
     }
     return out;
   }
 
   private renderDiscoverRow(
     theme: Theme,
+    innerWidth: number,
     r: DiscoverRow,
     isCursor: boolean,
     view: ViewportInfo,
     index: number,
   ): string {
+    const originWidth = discoverOriginWidth(innerWidth);
     const cursorGlyph = isCursor ? theme.fg("accent", "▸") : " ";
     if (r.discover === "active") {
       const on = this.activeOnGlyph(theme, r);
       const cells = [
-        pad(cursorGlyph, 2),
-        pad(on, 2),
-        pad(truncateToWidth(r.name, 30, "…"), 30),
-        pad(truncateToWidth(r.sourceLabel, 26, "…"), 26),
-        pad(theme.fg("success", `Active (${friendlyWiredLabel(r.wired)})`), 18),
+        pad(cursorGlyph, DISCOVER_COL_WIDTHS.cursor),
+        pad(on, DISCOVER_COL_WIDTHS.glyph),
+        pad(truncateToWidth(r.name, DISCOVER_COL_WIDTHS.name, "…"), DISCOVER_COL_WIDTHS.name),
+        pad(truncateToWidth(r.sourceLabel, originWidth, "…"), originWidth),
+        pad(
+          theme.fg("success", `Active (${friendlyWiredLabel(r.wired)})`),
+          DISCOVER_COL_WIDTHS.status,
+        ),
       ];
-      const line = ` ${cells.join(" ")} ${this.scrollGlyph(theme, view, index)}`;
+      const data = ` ${cells.join(" ")}`;
+      const line = rightAnchor(innerWidth, data, this.scrollGlyph(theme, view, index));
       return isCursor ? theme.fg("accent", line) : line;
     }
     const key = `${r.absolutePath}|${r.scope}`;
@@ -499,13 +543,14 @@ export class SkillsTableOverlayComponent implements Focusable {
       ? theme.fg("accent", "wire pending")
       : theme.fg("muted", `${r.skillCount} skill${r.skillCount === 1 ? "" : "s"}, off`);
     const cells = [
-      pad(cursorGlyph, 2),
-      pad(on, 2),
-      pad(truncateToWidth(r.label, 30, "…"), 30),
-      pad(truncateToWidth(r.absolutePath, 26, "…"), 26),
-      pad(status, 18),
+      pad(cursorGlyph, DISCOVER_COL_WIDTHS.cursor),
+      pad(on, DISCOVER_COL_WIDTHS.glyph),
+      pad(truncateToWidth(r.label, DISCOVER_COL_WIDTHS.name, "…"), DISCOVER_COL_WIDTHS.name),
+      pad(truncateToWidth(r.absolutePath, originWidth, "…"), originWidth),
+      pad(status, DISCOVER_COL_WIDTHS.status),
     ];
-    const line = ` ${cells.join(" ")} ${this.scrollGlyph(theme, view, index)}`;
+    const data = ` ${cells.join(" ")}`;
+    const line = rightAnchor(innerWidth, data, this.scrollGlyph(theme, view, index));
     return isCursor ? theme.fg("accent", line) : line;
   }
 
@@ -740,6 +785,24 @@ function padRight(text: string, width: number): string {
 function boxRow(theme: Theme, innerWidth: number, content: string): string {
   const padded = pad(truncateToWidth(content, innerWidth, ""), innerWidth);
   return `${theme.fg("border", "│")}${padded}${theme.fg("border", "│")}`;
+}
+
+/**
+ * Anchor a single character (the scroll glyph or a placeholder space) to
+ * the right edge of the row. Reserves 2 columns at the right (" " + glyph)
+ * and pads the data area with spaces so the glyph always lands at
+ * `innerWidth - 1`. Without this, boxRow's trailing-space padding pushes
+ * the glyph into the middle of the row, leaving an obvious dead-space
+ * gap between the data and the scroll indicator.
+ */
+function rightAnchor(innerWidth: number, data: string, rightChar: string): string {
+  const reserve = 2; // " " + 1-char glyph
+  const dataWidth = visibleWidth(data);
+  const target = Math.max(0, innerWidth - reserve);
+  if (dataWidth >= target) {
+    return `${truncateToWidth(data, target, "…")} ${rightChar}`;
+  }
+  return `${data}${" ".repeat(target - dataWidth)} ${rightChar}`;
 }
 
 function matchesFilter(a: string, b: string, query: string): boolean {
