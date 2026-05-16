@@ -92,9 +92,12 @@ its usage is still present in the active context. Older skill usage moves to the
 ```
 extensions/sf-skills/
   lib/
+    defaults.ts             ← implementation module
     hud-component.ts        ← implementation module
     skill-state.ts          ← implementation module
+    skills-command.ts       ← implementation module
   tests/
+    defaults.test.ts        ← unit / smoke test
     skill-state.test.ts     ← unit / smoke test
     smoke.test.ts           ← unit / smoke test
   CREDITS.md                ← extension attribution

@@ -53,6 +53,7 @@ import {
 } from "../../lib/common/command-panel.ts";
 import { openInfoPanel } from "../../lib/common/info-panel.ts";
 import { withSafeCommandHandler } from "../../lib/common/safe-command-handler.ts";
+import { handleDefaults, parseDefaultsArgs } from "./lib/skills-command.ts";
 
 // -------------------------------------------------------------------------------------------------
 // Constants
@@ -234,12 +235,26 @@ export default function sfSkills(pi: ExtensionAPI) {
     },
     handler: async (args, ctx) => {
       await withSafeCommandHandler(ctx, COMMAND_NAME, async () => {
-        const subcommand = args.trim().toLowerCase();
-        if (subcommand === "" && ctx.hasUI) {
+        const trimmed = args.trim();
+        if (trimmed === "" && ctx.hasUI) {
           await handleSkillsPanel(ctx);
           return;
         }
-        await handleSkillsCommand(ctx, subcommand === "" ? "summary" : subcommand);
+        // Top-level subcommand: route `defaults ...` into the management
+        // dispatcher; everything else stays in the HUD-flavored handler.
+        const head = trimmed.split(/\s+/, 1)[0]?.toLowerCase() ?? "summary";
+        if (head === "defaults") {
+          const tail = trimmed.slice("defaults".length);
+          const parsed = parseDefaultsArgs(tail);
+          await handleDefaults(ctx, parsed, async (title, body, level) => {
+            ctx.ui.notify(
+              body ? `${title}\n\n${body}` : title,
+              level === "success" ? "info" : level,
+            );
+          });
+          return;
+        }
+        await handleSkillsCommand(ctx, head);
       });
     },
   });
