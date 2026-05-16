@@ -470,6 +470,7 @@
         "lib/classify.ts",
         "lib/defaults.ts",
         "lib/skills-command.ts",
+        "lib/settings-coverage.ts",
         "lib/usage-store.ts",
         "lib/prune.ts"
       ]
@@ -477,7 +478,7 @@
     "entry": "extensions/sf-skills/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 2393
+    "srcLoc": 2661
   },
   {
     "id": "sf-slack",

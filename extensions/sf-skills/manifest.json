@@ -25,6 +25,7 @@
       "lib/classify.ts",
       "lib/defaults.ts",
       "lib/skills-command.ts",
+      "lib/settings-coverage.ts",
       "lib/usage-store.ts",
       "lib/prune.ts"
     ]

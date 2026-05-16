@@ -59,6 +59,7 @@ import { updateSkillSources } from "../../lib/common/skill-sources/skill-sources
 import { buildActiveRows, buildDiscoverRows } from "./lib/table-data.ts";
 import { loadUsageMap, recordSkillInvocation } from "./lib/usage-store.ts";
 import { applyPrunePlan, buildPrunePlan } from "./lib/prune.ts";
+import { planDisable, planEnable } from "./lib/settings-coverage.ts";
 import { SkillsTableOverlayComponent, type TableResult } from "./lib/table-overlay.ts";
 
 // -------------------------------------------------------------------------------------------------
@@ -494,11 +495,44 @@ export default function sfSkills(pi: ExtensionAPI) {
       global: { add: [], remove: [] },
       project: { add: [], remove: [] },
     };
+    const skipped: string[] = [];
+    const expansions: string[] = [];
+
     for (const t of result.toggles) {
       const bucket = buckets[t.scope];
-      if (t.enable) bucket.add.push(t.skillPath);
-      else bucket.remove.push(t.skillPath);
+      if (t.enable) {
+        // Native pi-aware enable: if the file is already covered by a
+        // wider settings entry, the toggle is a no-op (and would have
+        // produced a duplicate-load warning before this fix).
+        const plan = planEnable({ skillPath: t.skillPath, scope: t.scope, cwd: ctx.cwd });
+        if (plan.alreadyCovered) {
+          skipped.push(`${t.name} → ${t.scope}: already loaded via parent root`);
+          continue;
+        }
+        for (const value of plan.add) bucket.add.push(value);
+      } else {
+        // Native pi-aware disable: if a parent dir covers the file, expand
+        // it into per-file entries minus the disabled one. If neither the
+        // file nor a parent is wired (auto-discovered or bundled), refuse.
+        const plan = planDisable({ skillPath: t.skillPath, scope: t.scope, cwd: ctx.cwd });
+        if (plan.coverage === "none") {
+          skipped.push(
+            `${t.name} → ${t.scope}: not wired in this scope (auto-discovered or bundled)`,
+          );
+          continue;
+        }
+        for (const value of plan.remove) bucket.remove.push(value);
+        for (const value of plan.add) bucket.add.push(value);
+        if (plan.coverage === "parent" && plan.expandedFrom) {
+          expansions.push(
+            `${plan.expandedFrom} → ${plan.expandedSiblingCount ?? 0} per-file entr${
+              plan.expandedSiblingCount === 1 ? "y" : "ies"
+            } (so ${t.name} can be excluded)`,
+          );
+        }
+      }
     }
+
     for (const c of result.addCandidates) {
       buckets[c.scope].add.push(c.settingsValue);
     }
@@ -524,11 +558,19 @@ export default function sfSkills(pi: ExtensionAPI) {
       return;
     }
 
+    const lines: string[] = [];
+    if (summary.length > 0) lines.push(`Applied: ${summary.join(", ")}`);
+    for (const e of expansions) lines.push(`Expanded ${e}`);
+    for (const s of skipped) lines.push(`Skipped ${s}`);
+
     if (summary.length === 0) {
-      ctx.ui.notify("No changes — nothing to apply.", "info");
+      ctx.ui.notify(
+        lines.length > 0 ? lines.join("\n") : "No changes — nothing to apply.",
+        skipped.length > 0 ? "warning" : "info",
+      );
       return;
     }
-    ctx.ui.notify(`Applied: ${summary.join(", ")}. Reloading…`, "info");
+    ctx.ui.notify(`${lines.join("\n")}\nReloading…`, "info");
     await ctx.reload();
   }
 

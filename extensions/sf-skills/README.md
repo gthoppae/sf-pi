@@ -141,6 +141,7 @@ extensions/sf-skills/
     defaults.ts             ← implementation module
     hud-component.ts        ← implementation module
     prune.ts                ← implementation module
+    settings-coverage.ts    ← implementation module
     skill-state.ts          ← implementation module
     skills-command.ts       ← implementation module
     table-data.ts           ← implementation module
@@ -149,6 +150,7 @@ extensions/sf-skills/
   tests/
     defaults.test.ts        ← unit / smoke test
     prune.test.ts           ← unit / smoke test
+    settings-coverage.test.ts← unit / smoke test
     skill-state.test.ts     ← unit / smoke test
     smoke.test.ts           ← unit / smoke test
     table-data.test.ts      ← unit / smoke test

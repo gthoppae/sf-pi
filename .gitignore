@@ -22,6 +22,10 @@ dist/
 # Local SF gateway credentials
 .pi/sf-llm-gateway-internal.json
 
+# Local pi project settings (user-owned skills[] wiring, sf-pi flags)
+.pi/settings.json
+.pi/sf-skills-usage.json
+
 # Local Salesforce CLI generated state
 .sfdx/
 
