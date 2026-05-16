@@ -58,6 +58,7 @@ import { handleDefaults, parseDefaultsArgs } from "./lib/skills-command.ts";
 import { updateSkillSources } from "../../lib/common/skill-sources/skill-sources.ts";
 import { buildActiveRows, buildDiscoverRows } from "./lib/table-data.ts";
 import { loadUsageMap, recordSkillInvocation } from "./lib/usage-store.ts";
+import { applyPrunePlan, buildPrunePlan } from "./lib/prune.ts";
 import { SkillsTableOverlayComponent, type TableResult } from "./lib/table-overlay.ts";
 
 // -------------------------------------------------------------------------------------------------
@@ -74,7 +75,14 @@ const EMPTY_STATE: SkillsHudState = {
   usedCount: 0,
 };
 
-type SkillsAction = "summary" | "table" | "metrics" | "help" | "close" | LifecycleActionId;
+type SkillsAction =
+  | "summary"
+  | "table"
+  | "metrics"
+  | "prune"
+  | "help"
+  | "close"
+  | LifecycleActionId;
 
 const SKILLS_ACTIONS: CommandPanelAction<SkillsAction>[] = [
   {
@@ -95,6 +103,13 @@ const SKILLS_ACTIONS: CommandPanelAction<SkillsAction>[] = [
     label: "Show usage metrics",
     description: "Top-N skill invocations split by global / project counters.",
     group: "Status",
+  },
+  {
+    value: "prune",
+    label: "Prune stale & orphan (dry-run)",
+    description:
+      "Report stale settings entries and orphan managed clones. Run /sf-skills prune --apply to delete.",
+    group: "Maintenance",
   },
   {
     value: "help",
@@ -327,7 +342,11 @@ export default function sfSkills(pi: ExtensionAPI) {
           });
           return;
         }
-        await handleSkillsCommand(ctx, head);
+        // Forward the apply flag for prune so '/sf-skills prune --apply' works.
+        const tail = trimmed.slice(head.length).trim();
+        const subcommand =
+          head === "prune" && /(^|\s)--apply(\s|$)/.test(tail) ? "prune --apply" : head;
+        await handleSkillsCommand(ctx, subcommand);
       });
     },
   });
@@ -395,6 +414,16 @@ export default function sfSkills(pi: ExtensionAPI) {
         "info",
         fromPanel,
       );
+      return;
+    }
+
+    if (subcommand === "prune") {
+      await runPrune(ctx, false, fromPanel);
+      return;
+    }
+
+    if (subcommand === "prune --apply" || subcommand === "prune-apply") {
+      await runPrune(ctx, true, fromPanel);
       return;
     }
 
@@ -501,5 +530,57 @@ export default function sfSkills(pi: ExtensionAPI) {
     }
     ctx.ui.notify(`Applied: ${summary.join(", ")}. Reloading…`, "info");
     await ctx.reload();
+  }
+
+  async function runPrune(
+    ctx: ExtensionCommandContext,
+    apply: boolean,
+    fromPanel: boolean,
+  ): Promise<void> {
+    const plan = buildPrunePlan(ctx.cwd);
+    const lines: string[] = [];
+    lines.push(`Stale settings entries: ${plan.staleWired.length}`);
+    for (const raw of plan.staleWired) lines.push(`  ○ ${raw}`);
+    lines.push("");
+    lines.push(`Orphan managed clones: ${plan.orphanManagedDirs.length}`);
+    for (const orphan of plan.orphanManagedDirs) {
+      lines.push(`  ○ [${orphan.scope}] ${orphan.absolutePath}`);
+    }
+
+    if (!apply) {
+      lines.push("");
+      lines.push(
+        plan.staleWired.length === 0 && plan.orphanManagedDirs.length === 0
+          ? "Nothing to prune. ✨"
+          : "Run '/sf-skills prune --apply' to remove the entries above.",
+      );
+      await emitSkillsOutput(ctx, "SF Skills prune (dry-run)", lines.join("\n"), "info", fromPanel);
+      return;
+    }
+
+    const outcome = applyPrunePlan(plan, ctx.cwd, {
+      removeStale: true,
+      deleteOrphans: true,
+    });
+    lines.push("");
+    lines.push(
+      `Removed ${outcome.staleRemoved} stale entr${outcome.staleRemoved === 1 ? "y" : "ies"}, ` +
+        `deleted ${outcome.dirsDeleted} orphan dir${outcome.dirsDeleted === 1 ? "" : "s"}.`,
+    );
+    if (outcome.errors.length > 0) {
+      lines.push("");
+      lines.push("Errors:");
+      for (const err of outcome.errors) lines.push(`  ⚠  ${err}`);
+    }
+    await emitSkillsOutput(
+      ctx,
+      "SF Skills prune",
+      lines.join("\n"),
+      outcome.errors.length > 0 ? "warning" : "info",
+      fromPanel,
+    );
+    if (outcome.staleRemoved > 0 || outcome.dirsDeleted > 0) {
+      await ctx.reload();
+    }
   }
 }
