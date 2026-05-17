@@ -83,7 +83,11 @@ export default function sfData360(pi: ExtensionAPI) {
     toolsRegistered = true;
   }
 
-  pi.on("session_start", (_event, ctx) => {
+  pi.on("session_start", (event, ctx) => {
+    // /reload can reuse the same extension closure. Re-register on reload so
+    // tool schemas, renderers, and registry-backed closures pick up code/data
+    // changes without requiring a full pi restart.
+    if (event.reason === "reload") toolsRegistered = false;
     if (isSfPiExtensionEnabled(ctx.cwd, "sf-data360")) ensureToolsRegistered();
     // Drop the cached @salesforce/core Org so resumed sessions re-auth and
     // pick up any token refresh that happened outside this process. Cache
@@ -92,6 +96,7 @@ export default function sfData360(pi: ExtensionAPI) {
     clearConnectionCache();
   });
   pi.on("session_shutdown", () => {
+    toolsRegistered = false;
     clearConnectionCache();
   });
 
@@ -102,6 +107,10 @@ export default function sfData360(pi: ExtensionAPI) {
 
   pi.on("resources_discover", (event) => {
     if (!isSfPiExtensionEnabled(event.cwd, "sf-data360")) return;
+    if (event.reason === "reload") {
+      toolsRegistered = false;
+      ensureToolsRegistered();
+    }
     return { skillPaths: [path.join(__dirname, "skills")] };
   });
 
