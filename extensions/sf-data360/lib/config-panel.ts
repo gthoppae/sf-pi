@@ -12,6 +12,7 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { ConfigPanelFactory, ConfigPanelResult } from "../../../catalog/registry.ts";
 import { isSfPiExtensionEnabled } from "../../../lib/common/sf-pi-extension-state.ts";
 import { D360_TOOL_NAME, HEADLESS_WRITE_ENV } from "./api-tool.ts";
+import { D360_FACADE_TOOL_NAME } from "./facade-tool.ts";
 import { D360_METADATA_TOOL_NAME } from "./metadata-tool.ts";
 import { D360_PROBE_TOOL_NAME } from "./probe-tool.ts";
 
@@ -66,6 +67,11 @@ class SfData360ConfigPanel implements Focusable {
     lines.push(pad(""));
 
     lines.push(pad(` ${t.fg("muted", "When enabled:")}`));
+    lines.push(
+      pad(
+        `   ${toolDot(t, enabled)} ${D360_FACADE_TOOL_NAME}        ${t.fg("dim", "search/examples/execute/runbook facade")}`,
+      ),
+    );
     lines.push(
       pad(
         `   ${toolDot(t, enabled)} ${D360_TOOL_NAME}    ${t.fg("dim", "direct Data 360 REST calls")}`,

@@ -6,8 +6,11 @@
 Data Cloud / Data 360 REST APIs without adding MCP support and without exposing
 hundreds of endpoint-specific tools.
 
-It registers three native tools:
+It registers four native tools:
 
+- `d360` — a facade for deterministic Data 360 workflows: search registry
+  entries, fetch examples, execute known operations, and run Agentforce
+  observability runbooks.
 - `d360_api` — calls Data 360 REST endpoints directly via `@salesforce/core`
   Connection (no subprocess), reusing the active Salesforce CLI auth context.
 - `d360_metadata` — compact list/describe helpers for common DMO and DLO
@@ -21,7 +24,7 @@ It is enabled by default and contributes an extension-owned `sf-data360` skill. 
 
 The intended balance is:
 
-- **Context-efficient:** three small tools plus a small skill description.
+- **Context-efficient:** four small tools plus a small skill description.
 - **Composable:** the agent can still script REST workflows, pagination, and
   JSON transforms on the fly.
 - **Deterministic:** the tool pins the API version, resolves the target org,
@@ -34,7 +37,7 @@ The intended balance is:
 
 ```
 Extension loads
-  ├─ register d360_api, d360_metadata, and d360_probe
+  ├─ register d360, d360_api, d360_metadata, and d360_probe
   ├─ register /sf-data360
   └─ resources_discover
        └─ contribute ./skills so /skill:sf-data360 exists only while enabled
@@ -83,18 +86,19 @@ version.
 
 ## Behavior Matrix
 
-| Event / trigger                                          | Condition                                 | Result                                                                     |
-| -------------------------------------------------------- | ----------------------------------------- | -------------------------------------------------------------------------- |
-| Extension load                                           | Extension enabled                         | Register `d360_api`, `d360_metadata`, `d360_probe`, and `/sf-data360`.     |
-| `resources_discover`                                     | Extension enabled                         | Contribute `./skills` so `/skill:sf-data360` is visible.                   |
-| Extension explicitly disabled + `/reload` or new session | —                                         | No `d360_api`, no `d360_metadata`, no `d360_probe`, no `sf-data360` skill. |
-| `d360_probe`                                             | Org readiness is uncertain                | Run read-only surface probes and classify readiness.                       |
-| `d360_metadata`                                          | list/describe DMO/DLO request             | Return compact metadata and save raw JSON to a temp file.                  |
-| `d360_api`                                               | `dry_run: true`                           | Return resolved request and safety decision without calling Salesforce.    |
-| `d360_api`                                               | Read/query/validate/test request          | Execute via `@salesforce/core` Connection (`conn.request`).                |
-| `d360_api`                                               | `output_mode: "summary"` or `"file_only"` | Save full output to a temp file and avoid large inline payloads.           |
-| `d360_api`                                               | Confirmation required and UI is available | Prompt the user to allow once or block.                                    |
-| `d360_api`                                               | Confirmation required and headless        | Fail closed unless `SF_D360_ALLOW_HEADLESS_WRITE=1`.                       |
+| Event / trigger                                          | Condition                                 | Result                                                                         |
+| -------------------------------------------------------- | ----------------------------------------- | ------------------------------------------------------------------------------ |
+| Extension load                                           | Extension enabled                         | Register `d360`, `d360_api`, `d360_metadata`, `d360_probe`, and `/sf-data360`. |
+| `resources_discover`                                     | Extension enabled                         | Contribute `./skills` so `/skill:sf-data360` is visible.                       |
+| Extension explicitly disabled + `/reload` or new session | —                                         | No `d360_api`, no `d360_metadata`, no `d360_probe`, no `sf-data360` skill.     |
+| `d360`                                                   | search/examples/execute/runbook request   | Use registry-backed deterministic workflows or known operation execution.      |
+| `d360_probe`                                             | Org readiness is uncertain                | Run read-only surface probes and classify readiness.                           |
+| `d360_metadata`                                          | list/describe DMO/DLO request             | Return compact metadata and save raw JSON to a temp file.                      |
+| `d360_api`                                               | `dry_run: true`                           | Return resolved request and safety decision without calling Salesforce.        |
+| `d360_api`                                               | Read/query/validate/test request          | Execute via `@salesforce/core` Connection (`conn.request`).                    |
+| `d360_api`                                               | `output_mode: "summary"` or `"file_only"` | Save full output to a temp file and avoid large inline payloads.               |
+| `d360_api`                                               | Confirmation required and UI is available | Prompt the user to allow once or block.                                        |
+| `d360_api`                                               | Confirmation required and headless        | Fail closed unless `SF_D360_ALLOW_HEADLESS_WRITE=1`.                           |
 
 ## DMO/DLO Discovery Defaults
 
@@ -158,9 +162,14 @@ extensions/sf-data360/
   lib/
     agent-observability/
       platform-tracing.ts   ← implementation module
+    facade/
+      agent-observability.ts← implementation module
+      registry.ts           ← implementation module
+      sql.ts                ← implementation module
     api-tool.ts             ← implementation module
     config-panel.ts         ← implementation module
     extension-doctor.ts     ← implementation module
+    facade-tool.ts          ← implementation module
     metadata-tool.ts        ← implementation module
     path.ts                 ← implementation module
     probe-tool.ts           ← implementation module
@@ -168,7 +177,9 @@ extensions/sf-data360/
     target-org.ts           ← implementation module
     truncation.ts           ← implementation module
   tests/
+    agent-observability-runbooks.test.ts← unit / smoke test
     api-tool.test.ts        ← unit / smoke test
+    facade-registry.test.ts ← unit / smoke test
     metadata-tool.test.ts   ← unit / smoke test
     path.test.ts            ← unit / smoke test
     platform-tracing.test.ts← unit / smoke test

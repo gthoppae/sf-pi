@@ -105,7 +105,7 @@
   {
     "id": "sf-data360",
     "name": "SF Data 360",
-    "description": "Data Cloud/Data 360 direct REST helper — d360_api, compact d360_metadata discovery, d360_probe, and extension-owned progressive-disclosure skill references",
+    "description": "Data Cloud/Data 360 facade and direct REST helper — d360 search/examples/execute/runbook, d360_api, compact metadata discovery, readiness probe, and progressive-disclosure references",
     "category": "agent-tool",
     "maturity": "stable",
     "defaultEnabled": true,
@@ -116,6 +116,7 @@
     ],
     "providers": [],
     "tools": [
+      "d360",
       "d360_api",
       "d360_metadata",
       "d360_probe"
@@ -126,9 +127,10 @@
       "resources_discover"
     ],
     "docs": {
-      "summary": "Direct Data 360 REST access through @salesforce/core Connection with API-version pinning, target-org resolution, dry-run, safety confirmation, compact metadata helpers, and progressive skill references.",
+      "summary": "Data 360 facade plus direct REST access through @salesforce/core Connection with API-version pinning, target-org resolution, dry-run, safety confirmation, compact metadata helpers, deterministic observability runbooks, and progressive skill references.",
       "primaryFiles": [
         "index.ts",
+        "lib/facade-tool.ts",
         "lib/api-tool.ts",
         "lib/path.ts",
         "lib/safety.ts",
@@ -146,7 +148,7 @@
     "entry": "extensions/sf-data360/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 2218
+    "srcLoc": 3100
   },
   {
     "id": "sf-devbar",

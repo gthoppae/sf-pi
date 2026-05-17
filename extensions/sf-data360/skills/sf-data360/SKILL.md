@@ -1,6 +1,6 @@
 ---
 name: sf-data360
-description: Data Cloud/Data 360 REST API workflows using d360_api or sf api request rest. Use for Data 360 metadata discovery, SQL queries, DMO/DLO schemas, mappings, data streams, calculated insights, segments, activations, semantic data models, search indexes, retrievers, and DataKit operations.
+description: Data Cloud/Data 360 workflows using d360 facade runbooks, d360_api, d360_metadata, or d360_probe. Use for Data 360 metadata discovery, SQL queries, DMO/DLO schemas, Agentforce observability, mappings, data streams, calculated insights, segments, activations, semantic data models, search indexes, retrievers, and DataKit operations.
 ---
 
 # SF Data 360
@@ -10,8 +10,10 @@ Use this skill for Salesforce Data Cloud / Data 360 REST work.
 ## Tool order
 
 1. `d360_probe` first when readiness is uncertain.
-2. `d360_metadata` for compact DMO/DLO list and describe.
-3. `d360_api` for everything else; `sf api request rest` only as a fallback.
+2. `d360` action=`search` / `examples` for deterministic operation discovery.
+3. `d360` action=`runbook` for Agentforce observability workflows (STDM + Agent Platform Tracing).
+4. `d360_metadata` for compact DMO/DLO list and describe.
+5. `d360_api` for raw REST escape hatches; `sf api request rest` only as a fallback.
 
 Always pass `target_org` explicitly when the intended Data 360 org is not
 the active sf-pi default. Always use the active org API version — do not
@@ -19,11 +21,11 @@ hardcode a path like `/services/data/v60.0/...`.
 
 ## Default workflow
 
-1. Probe → metadata-discover → read examples → dry-run mutating calls.
+1. Probe → `d360 search` → `d360 examples` → `d360 runbook`/`execute` or raw `d360_api`.
 2. Keep result sets small (`limit`, `rowLimit`, `output_mode: "summary"|"file_only"`).
 3. Prefer validation/preview/test endpoints before saving configuration.
-4. For a non-default explicit `target_org`, `d360_api` will resolve that
-   org via `sf org display` and use its API version and org type.
+4. For a non-default explicit `target_org`, d360 tools resolve that org
+   through `@salesforce/core` and use its API version and org type.
 
 ## DMO/DLO discovery discipline
 
@@ -51,6 +53,8 @@ hardcode a path like `/services/data/v60.0/...`.
 
 ## Rules of thumb
 
+- Use `d360` action=`runbook` for repeated STDM / Agent Platform Tracing
+  workflows before hand-writing SQL.
 - Prefer `/ssot/query-sql` for new query work; `/ssot/query` and
   `/ssot/queryv2` are legacy. All three accept `{ "sql": "..." }` —
   there is no `query` field.
