@@ -1,0 +1,70 @@
+{
+  "d360_query_sql": {
+    "safety": "safe_post",
+    "requiredParams": ["sql"],
+    "optionalParams": ["dataspaceName"],
+    "tips": "Always bound broad queries with LIMIT or a trace/session/id predicate."
+  },
+  "d360_data_spaces_list": {
+    "safety": "read"
+  },
+  "d360_dmo_describe": {
+    "safety": "read",
+    "requiredParams": ["dmoName"]
+  },
+  "d360_dlo_describe": {
+    "safety": "read",
+    "requiredParams": ["dloName"]
+  },
+  "d360_segments_list": {
+    "safety": "read",
+    "optionalParams": ["limit", "offset"]
+  },
+  "d360_activations_list": {
+    "safety": "read",
+    "optionalParams": ["limit", "offset"]
+  },
+  "d360_calculated_insights_list": {
+    "safety": "read",
+    "optionalParams": ["limit", "offset"]
+  },
+  "d360_connectors_list": {
+    "safety": "read"
+  },
+  "d360_connections_sfdc_list": {
+    "safety": "read"
+  },
+  "d360_data_streams_list": {
+    "safety": "read",
+    "optionalParams": ["limit", "offset"]
+  },
+  "d360_data_transforms_list": {
+    "safety": "read",
+    "optionalParams": ["limit", "offset"]
+  },
+  "d360_data_actions_list": {
+    "safety": "read",
+    "optionalParams": ["limit", "offset"]
+  },
+  "d360_identity_resolutions_list": {
+    "safety": "read",
+    "optionalParams": ["limit", "offset"]
+  },
+  "d360_semantic_models_list": {
+    "safety": "read",
+    "optionalParams": ["limit", "offset"]
+  },
+  "d360_search_indexes_list": {
+    "safety": "read",
+    "optionalParams": ["limit", "offset"],
+    "tips": "Some orgs expose this surface only after search indexes are provisioned."
+  },
+  "d360_retrievers_list": {
+    "safety": "read",
+    "tips": "Can return not-found when retriever APIs are not provisioned; do not use as a core readiness gate."
+  },
+  "d360_datakits_list": {
+    "safety": "read",
+    "optionalParams": ["limit", "offset"]
+  }
+}

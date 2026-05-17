@@ -94,6 +94,7 @@ extensions/sf-brain/
   tests/
     injection.test.ts       ← unit / smoke test
     kernel.test.ts          ← unit / smoke test
+    should-inject-kernel.test.ts← unit / smoke test
     smoke.test.ts           ← unit / smoke test
   index.ts                  ← Pi extension entry point
   manifest.json             ← source-of-truth extension metadata

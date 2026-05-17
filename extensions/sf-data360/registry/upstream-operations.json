@@ -1,0 +1,121 @@
+[
+  {
+    "name": "d360_query_sql",
+    "family": "Query",
+    "description": "Execute a Data 360 SQL query through /ssot/query-sql.",
+    "method": "POST",
+    "path": "/ssot/query-sql"
+  },
+  {
+    "name": "d360_data_spaces_list",
+    "family": "Metadata",
+    "description": "List Data 360 data spaces.",
+    "method": "GET",
+    "path": "/ssot/data-spaces"
+  },
+  {
+    "name": "d360_dmo_describe",
+    "family": "Metadata",
+    "description": "Describe one Data Model Object by API name.",
+    "method": "GET",
+    "path": "/ssot/data-model-objects/{dmoName}"
+  },
+  {
+    "name": "d360_dlo_describe",
+    "family": "Metadata",
+    "description": "Describe one Data Lake Object by API name.",
+    "method": "GET",
+    "path": "/ssot/data-lake-objects/{dloName}"
+  },
+  {
+    "name": "d360_segments_list",
+    "family": "Segment",
+    "description": "List segments with optional pagination.",
+    "method": "GET",
+    "path": "/ssot/segments"
+  },
+  {
+    "name": "d360_activations_list",
+    "family": "Activation",
+    "description": "List activations with optional pagination.",
+    "method": "GET",
+    "path": "/ssot/activations"
+  },
+  {
+    "name": "d360_calculated_insights_list",
+    "family": "Calculated Insights",
+    "description": "List calculated insights.",
+    "method": "GET",
+    "path": "/ssot/calculated-insights"
+  },
+  {
+    "name": "d360_connectors_list",
+    "family": "Ingestion",
+    "description": "List connector catalog entries supported by the org.",
+    "method": "GET",
+    "path": "/ssot/connectors"
+  },
+  {
+    "name": "d360_connections_sfdc_list",
+    "family": "Ingestion",
+    "description": "List Salesforce CRM connections.",
+    "method": "GET",
+    "path": "/ssot/connections?connectorType=SalesforceDotCom"
+  },
+  {
+    "name": "d360_data_streams_list",
+    "family": "Ingestion",
+    "description": "List data streams with optional pagination.",
+    "method": "GET",
+    "path": "/ssot/data-streams"
+  },
+  {
+    "name": "d360_data_transforms_list",
+    "family": "Transforms and Actions",
+    "description": "List Data 360 SQL/data transforms.",
+    "method": "GET",
+    "path": "/ssot/data-transforms"
+  },
+  {
+    "name": "d360_data_actions_list",
+    "family": "Transforms and Actions",
+    "description": "List Data 360 data actions.",
+    "method": "GET",
+    "path": "/ssot/data-actions"
+  },
+  {
+    "name": "d360_identity_resolutions_list",
+    "family": "Identity Resolution",
+    "description": "List identity resolution rulesets.",
+    "method": "GET",
+    "path": "/ssot/identity-resolutions"
+  },
+  {
+    "name": "d360_semantic_models_list",
+    "family": "Semantic Retrieval",
+    "description": "List semantic data models.",
+    "method": "GET",
+    "path": "/ssot/semantic/models"
+  },
+  {
+    "name": "d360_search_indexes_list",
+    "family": "Semantic Retrieval",
+    "description": "List search indexes when the org exposes the search-index surface.",
+    "method": "GET",
+    "path": "/ssot/search-index"
+  },
+  {
+    "name": "d360_retrievers_list",
+    "family": "Semantic Retrieval",
+    "description": "List machine-learning retrievers when retriever APIs are provisioned.",
+    "method": "GET",
+    "path": "/machine-learning/retrievers"
+  },
+  {
+    "name": "d360_datakits_list",
+    "family": "DataKit",
+    "description": "List available DataKits.",
+    "method": "GET",
+    "path": "/ssot/data-kits"
+  }
+]
