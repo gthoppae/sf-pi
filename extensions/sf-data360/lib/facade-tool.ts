@@ -22,7 +22,13 @@ import { connRequest } from "../../../lib/common/sf-conn/request.ts";
 import { buildApiPath, type QueryParams } from "./path.ts";
 import { responseLooksLikeError } from "./api-tool.ts";
 import { resolveTargetOrgContext } from "./target-org.ts";
-import { buildD360Envelope, formatD360Output, type D360OutputMode } from "./truncation.ts";
+import { facadeResultToLlmText } from "./display/facade-card.ts";
+import {
+  buildD360Envelope,
+  formatD360Output,
+  type D360OutputMode,
+  writeFullD360Output,
+} from "./truncation.ts";
 import {
   D360_EXAMPLES,
   D360_OPERATIONS,
@@ -100,8 +106,7 @@ export function registerD360FacadeTool(pi: ExtensionAPI): void {
       const input = params as D360FacadeInput;
       const env = await resolveEnvironment(exec, ctx);
       const result = await runFacade(input, env, ctx, signal);
-      const text = JSON.stringify(result, null, 2);
-      return buildFacadeResult(text, input.output_mode ?? "inline", {
+      return buildFacadeResult(result, input.output_mode ?? "summary", {
         ok: result.ok !== false,
         action: input.action,
         targetOrg: result.targetOrg,
@@ -343,20 +348,42 @@ async function resolveEnvironment(
 }
 
 async function buildFacadeResult(
-  text: string,
+  result: Record<string, unknown>,
   outputMode: D360OutputMode,
   details: Record<string, unknown>,
 ) {
-  const formatted = await formatD360Output(text, outputMode);
+  const text = JSON.stringify(result, null, 2);
   const ok = details.ok !== false;
+
+  if (outputMode === "inline" || outputMode === "file_only") {
+    const formatted = await formatD360Output(text, outputMode);
+    return {
+      content: [{ type: "text" as const, text: formatted.text }],
+      details: {
+        ...details,
+        outputMode: formatted.outputMode ?? outputMode,
+        ...(formatted.truncation ? { truncation: formatted.truncation } : {}),
+        ...(formatted.fullOutputPath ? { fullOutputPath: formatted.fullOutputPath } : {}),
+        sfPi: buildD360Envelope(D360_FACADE_TOOL_NAME, ok, text, details, formatted),
+      },
+    };
+  }
+
+  const fullOutputPath = await writeFullD360Output(text);
+  const { card, text: compactText } = facadeResultToLlmText(result, { fullOutputPath });
+  const formatted = { text: compactText, fullOutputPath, outputMode };
+  const sfPi = buildD360Envelope(D360_FACADE_TOOL_NAME, ok, compactText, details, formatted);
+  sfPi.data = { card };
+  sfPi.renderHints = { profile: "balanced", collapsedLines: 8, expandedMaxLines: 40 };
+
   return {
-    content: [{ type: "text" as const, text: formatted.text }],
+    content: [{ type: "text" as const, text: compactText }],
     details: {
       ...details,
-      outputMode: formatted.outputMode ?? outputMode,
-      ...(formatted.truncation ? { truncation: formatted.truncation } : {}),
-      ...(formatted.fullOutputPath ? { fullOutputPath: formatted.fullOutputPath } : {}),
-      sfPi: buildD360Envelope(D360_FACADE_TOOL_NAME, ok, text, details, formatted),
+      outputMode,
+      fullOutputPath,
+      card,
+      sfPi,
     },
   };
 }
