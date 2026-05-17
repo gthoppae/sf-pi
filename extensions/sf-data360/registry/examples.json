@@ -62,5 +62,24 @@
         }
       }
     }
+  },
+  "d360_ci_create": {
+    "operation": "d360_ci_create",
+    "params": {
+      "body": {
+        "apiName": "Example_Score__cio",
+        "displayName": "Example Score",
+        "definitionType": "CALCULATED_METRIC",
+        "dataSpaceName": "default",
+        "publishScheduleInterval": "SYSTEM_MANAGED",
+        "expression": "SELECT SomeDmo__dlm.Id__c AS id__c, COUNT(*) AS count__c FROM SomeDmo__dlm GROUP BY SomeDmo__dlm.Id__c"
+      }
+    }
+  },
+  "d360_ci_run": {
+    "operation": "d360_ci_run",
+    "params": {
+      "ciName": "Example_Score__cio"
+    }
   }
 }

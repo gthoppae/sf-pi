@@ -502,5 +502,40 @@
     "description": "Execute a semantic data model query.",
     "method": "POST",
     "path": "/semantic-engine/gateway"
+  },
+  {
+    "name": "d360_ci_create",
+    "family": "Calculated Insights",
+    "description": "Create a calculated insight. Validate the payload before create.",
+    "method": "POST",
+    "path": "/ssot/calculated-insights"
+  },
+  {
+    "name": "d360_ci_update",
+    "family": "Calculated Insights",
+    "description": "Update a calculated insight by API name.",
+    "method": "PATCH",
+    "path": "/ssot/calculated-insights/{ciName}"
+  },
+  {
+    "name": "d360_ci_run",
+    "family": "Calculated Insights",
+    "description": "Run a calculated insight calculation.",
+    "method": "POST",
+    "path": "/ssot/calculated-insights/{ciName}/actions/run"
+  },
+  {
+    "name": "d360_ci_enable",
+    "family": "Calculated Insights",
+    "description": "Enable a calculated insight.",
+    "method": "POST",
+    "path": "/ssot/calculated-insights/{ciName}/actions/enable"
+  },
+  {
+    "name": "d360_ci_disable",
+    "family": "Calculated Insights",
+    "description": "Disable a calculated insight.",
+    "method": "POST",
+    "path": "/ssot/calculated-insights/{ciName}/actions/disable"
   }
 ]

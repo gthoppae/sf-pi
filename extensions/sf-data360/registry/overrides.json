@@ -289,5 +289,27 @@
     "requiredParams": ["body"],
     "safety": "safe_post",
     "tips": "Semantic queries use /semantic-engine/gateway, not /ssot/query-sql."
+  },
+  "d360_ci_create": {
+    "requiredParams": ["body"],
+    "safety": "confirmed",
+    "tips": "Run d360_ci_validate first. apiName must end with __cio."
+  },
+  "d360_ci_update": {
+    "requiredParams": ["ciName", "body"],
+    "safety": "confirmed",
+    "tips": "Validate changes before update; updates can trigger recompilation."
+  },
+  "d360_ci_run": {
+    "requiredParams": ["ciName"],
+    "safety": "confirmed"
+  },
+  "d360_ci_enable": {
+    "requiredParams": ["ciName"],
+    "safety": "confirmed"
+  },
+  "d360_ci_disable": {
+    "requiredParams": ["ciName"],
+    "safety": "confirmed"
   }
 }

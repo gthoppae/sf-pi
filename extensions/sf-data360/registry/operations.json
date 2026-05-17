@@ -653,5 +653,52 @@
     "requiredParams": ["body"],
     "safety": "safe_post",
     "tips": "Semantic queries use /semantic-engine/gateway, not /ssot/query-sql."
+  },
+  {
+    "name": "d360_ci_create",
+    "family": "Calculated Insights",
+    "description": "Create a calculated insight. Validate the payload before create.",
+    "method": "POST",
+    "path": "/ssot/calculated-insights",
+    "requiredParams": ["body"],
+    "safety": "confirmed",
+    "tips": "Run d360_ci_validate first. apiName must end with __cio."
+  },
+  {
+    "name": "d360_ci_update",
+    "family": "Calculated Insights",
+    "description": "Update a calculated insight by API name.",
+    "method": "PATCH",
+    "path": "/ssot/calculated-insights/{ciName}",
+    "requiredParams": ["ciName", "body"],
+    "safety": "confirmed",
+    "tips": "Validate changes before update; updates can trigger recompilation."
+  },
+  {
+    "name": "d360_ci_run",
+    "family": "Calculated Insights",
+    "description": "Run a calculated insight calculation.",
+    "method": "POST",
+    "path": "/ssot/calculated-insights/{ciName}/actions/run",
+    "requiredParams": ["ciName"],
+    "safety": "confirmed"
+  },
+  {
+    "name": "d360_ci_enable",
+    "family": "Calculated Insights",
+    "description": "Enable a calculated insight.",
+    "method": "POST",
+    "path": "/ssot/calculated-insights/{ciName}/actions/enable",
+    "requiredParams": ["ciName"],
+    "safety": "confirmed"
+  },
+  {
+    "name": "d360_ci_disable",
+    "family": "Calculated Insights",
+    "description": "Disable a calculated insight.",
+    "method": "POST",
+    "path": "/ssot/calculated-insights/{ciName}/actions/disable",
+    "requiredParams": ["ciName"],
+    "safety": "confirmed"
   }
 ]

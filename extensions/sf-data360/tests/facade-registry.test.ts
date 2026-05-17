@@ -59,6 +59,10 @@ describe("d360 facade registry", () => {
       family: "Semantic Retrieval",
       operations: expect.arrayContaining(["d360_semantic_query"]),
     });
+    expect(searchRegistry("create run enable calculated insight")[0]).toMatchObject({
+      family: "Calculated Insights",
+      operations: expect.arrayContaining(["d360_ci_create", "d360_ci_run", "d360_ci_enable"]),
+    });
     expect(searchRegistry("connection test connector")[0]).toMatchObject({
       family: "Connection",
       operations: expect.arrayContaining(["d360_connection_test"]),
