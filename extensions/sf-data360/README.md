@@ -163,6 +163,7 @@ extensions/sf-data360/
     agent-observability/
       platform-tracing.ts   ← implementation module
     display/
+      api-card.ts           ← implementation module
       card.ts               ← implementation module
       facade-card.ts        ← implementation module
       metadata-card.ts      ← implementation module
@@ -184,6 +185,7 @@ extensions/sf-data360/
     truncation.ts           ← implementation module
   tests/
     agent-observability-runbooks.test.ts← unit / smoke test
+    api-card.test.ts        ← unit / smoke test
     api-tool.test.ts        ← unit / smoke test
     display-card.test.ts    ← unit / smoke test
     facade-card.test.ts     ← unit / smoke test

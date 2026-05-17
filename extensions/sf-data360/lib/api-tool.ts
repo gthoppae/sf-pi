@@ -12,6 +12,8 @@ import type { OrgInfo, OrgType, SfEnvironment } from "../../../lib/common/sf-env
 import { connFromAlias } from "../../../lib/common/sf-conn/connection.ts";
 import { connRequest } from "../../../lib/common/sf-conn/request.ts";
 import { buildApiPath, type QueryParams } from "./path.ts";
+import { apiResultToCard } from "./display/api-card.ts";
+import { renderD360ApiCall, renderD360ApiResult } from "./display/render.ts";
 import {
   normalizeTargetOrg,
   resolveApiVersion,
@@ -117,6 +119,8 @@ export function registerD360ApiTool(pi: ExtensionAPI): void {
       "Before complex Data 360 create/update calls, read the sf-data360 skill references for payload examples.",
     ],
     parameters: D360ApiParams,
+    renderCall: renderD360ApiCall,
+    renderResult: renderD360ApiResult,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       const input = params as D360ApiInput;
       const env = await resolveEnvironment(exec, ctx);
@@ -299,16 +303,30 @@ async function buildResult(
 ) {
   const formatted = await formatD360Output(text, outputMode ?? "inline");
   const ok = details.ok !== false;
+  const resolved = details.resolved as ResolvedRequest | undefined;
+  const card = apiResultToCard(text, {
+    method: resolved?.method,
+    path: resolved?.apiPath,
+    targetOrg: resolved?.targetOrg,
+    status: typeof details.status === "number" ? details.status : undefined,
+    ok,
+    action: typeof details.action === "string" ? details.action : undefined,
+    fullOutputPath: formatted.fullOutputPath,
+  });
+  const sfPi = buildD360Envelope(D360_TOOL_NAME, ok, text, details, formatted);
+  sfPi.data = { card };
+  sfPi.renderHints = { profile: "balanced", collapsedLines: 8, expandedMaxLines: 40 };
   return {
     content: [{ type: "text" as const, text: formatted.text }],
     details: {
       ...details,
+      card,
       outputMode: formatted.outputMode ?? outputMode ?? "inline",
       ...(formatted.truncation ? { truncation: formatted.truncation } : {}),
       ...(formatted.fullOutputPath ? { fullOutputPath: formatted.fullOutputPath } : {}),
       // Standard SF Pi tool-result envelope for renderers + downstream tooling.
       // See `lib/common/display/types.ts` and `lib/common/display/diagnostics.ts`.
-      sfPi: buildD360Envelope(D360_TOOL_NAME, ok, text, details, formatted),
+      sfPi,
     },
   };
 }

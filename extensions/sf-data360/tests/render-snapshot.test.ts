@@ -4,6 +4,8 @@ import type { Text } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
 
 import {
+  renderD360ApiCall,
+  renderD360ApiResult,
   renderD360Call,
   renderD360MetadataCall,
   renderD360MetadataResult,
@@ -25,7 +27,31 @@ function renderToString(text: Text, width = 120): string {
     .join("\n");
 }
 
-describe("d360 facade renderers", () => {
+describe("d360 renderers", () => {
+  it("renderApiCall summarizes method and path", () => {
+    const rendered = renderToString(
+      renderD360ApiCall(
+        { method: "POST", path: "/ssot/query-sql", target_org: "ExampleOrg" },
+        passthroughTheme,
+      ),
+    );
+
+    expect(rendered).toBe("☁️ d360_api POST · /ssot/query-sql · ExampleOrg");
+  });
+
+  it("renderApiResult uses cards", () => {
+    const rendered = renderToString(
+      renderD360ApiResult(
+        { details: { ok: true, card: { ...stdmCard(), icon: "☁️", title: "Data 360 API" } } },
+        {},
+        passthroughTheme,
+      ),
+    );
+
+    expect(rendered).toContain("☁️ Data 360 API ✅");
+    expect(rendered).toContain("📄 Full JSON: /tmp/pi-d360/output.json");
+  });
+
   it("renderCall summarizes action and subject", () => {
     const rendered = renderToString(
       renderD360Call(

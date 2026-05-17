@@ -13,6 +13,13 @@ interface D360RenderArgs {
   dry_run?: boolean;
 }
 
+interface D360ApiRenderArgs {
+  method?: string;
+  path?: string;
+  target_org?: string;
+  dry_run?: boolean;
+}
+
 interface D360ProbeRenderArgs {
   target_org?: string;
 }
@@ -37,6 +44,28 @@ interface D360RenderResult {
       };
     };
   };
+}
+
+export function renderD360ApiCall(args: D360ApiRenderArgs, theme: Theme): Text {
+  const bits = [
+    args.method,
+    args.path,
+    args.target_org,
+    args.dry_run ? "dry-run" : undefined,
+  ].filter((bit): bit is string => typeof bit === "string" && bit.length > 0);
+  return new Text(
+    theme.fg("toolTitle", theme.bold("☁️ d360_api ")) + theme.fg("muted", bits.join(" · ")),
+    0,
+    0,
+  );
+}
+
+export function renderD360ApiResult(
+  result: D360RenderResult,
+  opts: { isPartial?: boolean; expanded?: boolean },
+  theme: Theme,
+): Text {
+  return renderD360CardResult(result, opts, theme, "☁️ d360_api · running…");
 }
 
 export function renderD360Call(args: D360RenderArgs, theme: Theme): Text {
