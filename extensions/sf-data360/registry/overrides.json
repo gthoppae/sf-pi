@@ -271,7 +271,7 @@
   },
   "d360_metadata_search": {
     "requiredParams": ["body"],
-    "tips": "Use for discovery when compact catalogs are not enough. Search-plane indexes can be unavailable even when DMO/DLO catalogs work."
+    "tips": "Use for discovery when compact catalogs are not enough. Include a metadataType filter when possible. If the response is PRISM_RUNTIME_ERROR and mentions msr_metadata_index__dlm, the org search plane is unindexed; fall back to d360_metadata_entities or d360_metadata list/describe."
   },
   "d360_ci_validate": {
     "requiredParams": ["body"],

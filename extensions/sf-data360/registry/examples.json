@@ -43,7 +43,13 @@
         "query": "AI Agent Interaction",
         "pagination": {
           "limit": 5
-        }
+        },
+        "filters": [
+          {
+            "field": "metadataType",
+            "values": ["DataModelObject"]
+          }
+        ]
       }
     }
   },

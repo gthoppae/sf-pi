@@ -71,6 +71,30 @@ describe("d360 facade result cards", () => {
     expect(text).toContain('table "ssot__TelemetryTraceSpan__dlm" does not exist');
   });
 
+  it("extracts nested application errors from HTTP 200 responses", () => {
+    const { card, text } = facadeResultToLlmText({
+      ok: false,
+      action: "execute",
+      targetOrg: "AgentforceSTDM",
+      operation: "d360_metadata_search",
+      status: 200,
+      response: {
+        content: [],
+        error: {
+          type: "PRISM_RUNTIME_ERROR",
+          message:
+            'Failed to execute hybrid search. Error: INVALID_ARGUMENT: table "msr_metadata_index__dlm" does not exist',
+        },
+        size: 0,
+      },
+    });
+
+    expect(card.status).toBe("error");
+    expect(text).toContain("PRISM_RUNTIME_ERROR");
+    expect(text).toContain('table "msr_metadata_index__dlm" does not exist');
+    expect(text).not.toContain("Keys: content, error, size");
+  });
+
   it("summarizes STDM timeline runbooks", () => {
     const { text } = facadeResultToLlmText(
       {

@@ -196,10 +196,14 @@ function withArtifacts(card: D360ResultCard, opts: FacadeCardBuildOptions): D360
 }
 
 function summarizeResponse(response: Record<string, unknown>): string[] {
-  if (response.errorCode || response.message || response.name) {
+  const nestedError = objectValue(response.error);
+  if (response.errorCode || response.message || response.name || Object.keys(nestedError).length) {
     return [
-      stringValue(response.errorCode) ?? stringValue(response.name) ?? "Error",
-      cleanErrorMessage(stringValue(response.message)),
+      stringValue(response.errorCode) ??
+        stringValue(response.name) ??
+        stringValue(nestedError.type) ??
+        "Error",
+      cleanErrorMessage(stringValue(response.message) ?? stringValue(nestedError.message)),
     ].filter(Boolean) as string[];
   }
   const rows = arrayValue(response.data);
