@@ -1,0 +1,75 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/** Lightweight TUI renderers for the d360 facade tool. */
+import type { Theme } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
+import { renderCardCollapsed, renderCardExpanded, type D360ResultCard } from "./card.ts";
+
+interface D360RenderArgs {
+  action?: string;
+  query?: string;
+  operation?: string;
+  runbook?: string;
+  target_org?: string;
+  dry_run?: boolean;
+}
+
+interface D360RenderResult {
+  content?: unknown[];
+  details?: {
+    ok?: boolean;
+    summary?: string;
+    card?: D360ResultCard;
+    sfPi?: {
+      summary?: string;
+      data?: {
+        card?: D360ResultCard;
+      };
+    };
+  };
+}
+
+export function renderD360Call(args: D360RenderArgs, theme: Theme): Text {
+  const action = args.action ?? "?";
+  const subject = args.runbook ?? args.operation ?? args.query;
+  const bits = [action, subject, args.target_org, args.dry_run ? "dry-run" : undefined].filter(
+    (bit): bit is string => typeof bit === "string" && bit.length > 0,
+  );
+  return new Text(
+    theme.fg("toolTitle", theme.bold("☁️ d360 ")) + theme.fg("muted", bits.join(" · ")),
+    0,
+    0,
+  );
+}
+
+export function renderD360Result(
+  result: D360RenderResult,
+  opts: { isPartial?: boolean; expanded?: boolean },
+  theme: Theme,
+): Text {
+  if (opts.isPartial) return new Text(theme.fg("warning", "☁️ d360 · running…"), 0, 0);
+
+  const card = result.details?.card ?? result.details?.sfPi?.data?.card;
+  if (card) {
+    const rendered = opts.expanded
+      ? renderCardExpanded(card, { expandedMaxLines: 40 })
+      : renderCardCollapsed(card, { collapsedMaxLines: 8 });
+    return new Text(colorizeStatus(rendered, card.status, theme), 0, 0);
+  }
+
+  const ok = result.details?.ok !== false;
+  const summary = result.details?.summary ?? result.details?.sfPi?.summary ?? firstText(result);
+  return new Text(theme.fg(ok ? "success" : "error", `${ok ? "✓" : "✗"} ${summary}`), 0, 0);
+}
+
+function colorizeStatus(text: string, status: D360ResultCard["status"], theme: Theme): string {
+  if (status === "error") return theme.fg("error", text);
+  if (status === "warning") return theme.fg("warning", text);
+  return theme.fg("success", text);
+}
+
+function firstText(result: D360RenderResult): string {
+  const first = result.content?.find((item): item is { type?: string; text?: string } =>
+    Boolean(item && typeof item === "object" && "text" in item),
+  );
+  return first?.text ?? "d360 completed";
+}

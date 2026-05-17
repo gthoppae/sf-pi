@@ -165,6 +165,7 @@ extensions/sf-data360/
     display/
       card.ts               ← implementation module
       facade-card.ts        ← implementation module
+      render.ts             ← implementation module
     facade/
       agent-observability.ts← implementation module
       registry.ts           ← implementation module
@@ -189,6 +190,7 @@ extensions/sf-data360/
     path.test.ts            ← unit / smoke test
     platform-tracing.test.ts← unit / smoke test
     probe-tool.test.ts      ← unit / smoke test
+    render-snapshot.test.ts ← unit / smoke test
     safety.test.ts          ← unit / smoke test
     smoke.test.ts           ← unit / smoke test
     target-org.test.ts      ← unit / smoke test

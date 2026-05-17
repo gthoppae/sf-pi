@@ -23,6 +23,7 @@ import { buildApiPath, type QueryParams } from "./path.ts";
 import { responseLooksLikeError } from "./api-tool.ts";
 import { resolveTargetOrgContext } from "./target-org.ts";
 import { facadeResultToLlmText } from "./display/facade-card.ts";
+import { renderD360Call, renderD360Result } from "./display/render.ts";
 import {
   buildD360Envelope,
   formatD360Output,
@@ -102,6 +103,8 @@ export function registerD360FacadeTool(pi: ExtensionAPI): void {
       "Use d360_api as the raw REST escape hatch when an operation is not in the facade registry.",
     ],
     parameters: D360FacadeParams,
+    renderCall: renderD360Call,
+    renderResult: renderD360Result,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       const input = params as D360FacadeInput;
       const env = await resolveEnvironment(exec, ctx);
