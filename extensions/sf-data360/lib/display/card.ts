@@ -148,7 +148,7 @@ function clampLines(lines: string[], maxLines: number, opts: D360CardRenderOptio
   if (maxLines <= 0 || lines.length <= maxLines) return lines;
   const maxChars = opts.lineMaxChars ?? 160;
   const artifactLines = lines.filter(
-    (line) => line === "Artifacts" || /^\s*[📄🧾📝📊]/u.test(line),
+    (line, index) => index > 0 && (line === "Artifacts" || /^\s*[📄🧾📝📊]/u.test(line)),
   );
   const artifactSet = new Set(artifactLines);
   const bodyBudget = Math.max(1, maxLines - artifactLines.length - 1);
