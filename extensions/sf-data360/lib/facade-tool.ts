@@ -102,7 +102,7 @@ export function registerD360FacadeTool(pi: ExtensionAPI): void {
       const result = await runFacade(input, env, ctx, signal);
       const text = JSON.stringify(result, null, 2);
       return buildFacadeResult(text, input.output_mode ?? "inline", {
-        ok: true,
+        ok: result.ok !== false,
         action: input.action,
         targetOrg: result.targetOrg,
         summary: result.summary,
@@ -237,30 +237,43 @@ async function runRunbook(
   const params = input.params ?? {};
   const dataspaceName = typeof params.dataspaceName === "string" ? params.dataspaceName : "default";
 
-  const result = await runAgentObservabilityRunbook(runbookName, params, async (sql) => {
-    if (signal?.aborted) throw new Error("d360 runbook cancelled before query.");
-    const resp = await connRequest<unknown>(conn, {
-      method: "POST",
-      url: buildApiPath("/ssot/query-sql", apiVersion, { dataspaceName }),
-      body: { sql },
-      timeoutMs: input.timeout_ms ?? 120_000,
+  try {
+    const result = await runAgentObservabilityRunbook(runbookName, params, async (sql) => {
+      if (signal?.aborted) throw new Error("d360 runbook cancelled before query.");
+      const resp = await connRequest<unknown>(conn, {
+        method: "POST",
+        url: buildApiPath("/ssot/query-sql", apiVersion, { dataspaceName }),
+        body: { sql },
+        timeoutMs: input.timeout_ms ?? 120_000,
+      });
+      if (resp.status < 200 || resp.status >= 300 || responseLooksLikeError(stringify(resp.body))) {
+        throw new Error(`Query failed (${resp.status}): ${stringify(resp.body).slice(0, 1000)}`);
+      }
+      return resp.body as never;
     });
-    if (resp.status < 200 || resp.status >= 300 || responseLooksLikeError(stringify(resp.body))) {
-      throw new Error(`Query failed (${resp.status}): ${stringify(resp.body).slice(0, 1000)}`);
-    }
-    return resp.body as never;
-  });
 
-  return {
-    ok: true,
-    action: "runbook",
-    targetOrg,
-    apiVersion,
-    dataspaceName,
-    runbook: runbookName,
-    result,
-    summary: result.markdown.split("\n")[0],
-  };
+    return {
+      ok: true,
+      action: "runbook",
+      targetOrg,
+      apiVersion,
+      dataspaceName,
+      runbook: runbookName,
+      result,
+      summary: result.markdown.split("\n")[0],
+    };
+  } catch (err) {
+    return {
+      ok: false,
+      action: "runbook",
+      targetOrg,
+      apiVersion,
+      dataspaceName,
+      runbook: runbookName,
+      error: err instanceof Error ? err.message : String(err),
+      summary: `${runbookName} failed`,
+    };
+  }
 }
 
 function resolveOperationRequest(

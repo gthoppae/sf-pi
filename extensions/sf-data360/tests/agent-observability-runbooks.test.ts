@@ -56,6 +56,23 @@ describe("Agent observability runbooks", () => {
     expect(result.markdown).toContain("👤 yes");
     expect(result.markdown).toContain("run.retriever.Knowledge");
   });
+
+  it("returns STDM context with a warning when Platform Tracing is unavailable", async () => {
+    const result = await runAgentObservabilityRunbook(
+      "agent_observability.join_interaction_trace",
+      { interaction_id: "interaction-1" },
+      async (sql) => {
+        if (sql.includes('FROM "ssot__AiAgentInteraction__dlm"')) return interactionRows();
+        if (sql.includes("AiAgentInteractionMessage")) return messageRows();
+        if (sql.includes("AiAgentInteractionStep")) return stepRows();
+        throw new Error('table "ssot__TelemetryTraceSpan__dlm" does not exist');
+      },
+    );
+
+    expect(result.markdown).toContain("⚠️ Platform trace unavailable");
+    expect(result.markdown).toContain('table "ssot__TelemetryTraceSpan__dlm" does not exist');
+    expect(result.data).toMatchObject({ traceAvailable: false });
+  });
 });
 
 function spanRows(): QuerySqlResponse {

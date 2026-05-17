@@ -175,21 +175,40 @@ async function runJoinInteractionTrace(
 
   const traceId = requiredString(context.trace_id, "interaction trace_id");
   const traceSql = buildTraceTreeSql(traceId);
-  const [messages, steps, traceResponse] = await Promise.all([
+  const [messages, steps] = await Promise.all([
     query(messagesSql).then(rowsFromQuery),
     query(stepsSql).then(rowsFromQuery),
-    query(traceSql),
   ]);
-  const spans = rowsFromQuery(traceResponse).map(normalizePlatformSpanRow);
-  const tree = buildSpanTree(spans);
-  const summary = summarizeSpanTree(tree);
 
-  return {
-    name: "agent_observability.join_interaction_trace",
-    sql: { context: contextSql, messages: messagesSql, steps: stepsSql, trace: traceSql },
-    data: { interaction: context, messages, steps, tree, summary },
-    markdown: renderJoinedInteraction(context, messages, steps, traceId, tree, summary),
-  };
+  try {
+    const traceResponse = await query(traceSql);
+    const spans = rowsFromQuery(traceResponse).map(normalizePlatformSpanRow);
+    const tree = buildSpanTree(spans);
+    const summary = summarizeSpanTree(tree);
+
+    return {
+      name: "agent_observability.join_interaction_trace",
+      sql: { context: contextSql, messages: messagesSql, steps: stepsSql, trace: traceSql },
+      data: { interaction: context, messages, steps, tree, summary, traceAvailable: true },
+      markdown: renderJoinedInteraction(context, messages, steps, traceId, tree, summary),
+    };
+  } catch (err) {
+    const traceError = err instanceof Error ? err.message : String(err);
+    return {
+      name: "agent_observability.join_interaction_trace",
+      sql: { context: contextSql, messages: messagesSql, steps: stepsSql, trace: traceSql },
+      data: { interaction: context, messages, steps, traceAvailable: false, traceError },
+      markdown: renderJoinedInteraction(
+        context,
+        messages,
+        steps,
+        traceId,
+        undefined,
+        undefined,
+        traceError,
+      ),
+    };
+  }
 }
 
 async function runStdmSessionTimeline(
@@ -254,9 +273,15 @@ function renderJoinedInteraction(
   messages: Record<string, unknown>[],
   steps: Record<string, unknown>[],
   traceId: string,
-  tree: SpanTree,
-  summary: SpanTreeSummary,
+  tree?: SpanTree,
+  summary?: SpanTreeSummary,
+  traceError?: string,
 ): string {
+  const traceBlock =
+    tree && summary
+      ? renderTraceTree(traceId, tree, summary)
+      : `⚠️ Platform trace unavailable for ${traceId}\n   ${clip(traceError ?? "No Platform Tracing spans returned.", 220)}`;
+
   return [
     `🔗 STDM ↔ Platform Trace`,
     `   session=${String(interaction.session_id ?? "?")}`,
@@ -265,7 +290,7 @@ function renderJoinedInteraction(
     `   trace=${traceId}`,
     `💬 messages=${messages.length}  🪜 steps=${steps.length}`,
     ...messages.map(renderMessageRow),
-    renderTraceTree(traceId, tree, summary),
+    traceBlock,
   ].join("\n");
 }
 
