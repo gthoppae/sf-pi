@@ -100,7 +100,7 @@
     "entry": "extensions/sf-brain/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 143
+    "srcLoc": 182
   },
   {
     "id": "sf-data360",

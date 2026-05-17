@@ -22,11 +22,16 @@ describe("sf-brain before_agent_start handler", () => {
     expect(brainSource).toMatch(/pi\.on\("before_agent_start",\s*async\s*\(/);
   });
 
-  it("skips injection if a kernel entry is already in the session", () => {
-    expect(brainSource).toContain("alreadyInjected");
+  it("delegates the inject/skip decision to the shouldInjectKernel predicate", () => {
+    // The handler hands the live entry list to a pure predicate so the
+    // post-compaction logic stays unit-testable. Asserting the wiring keeps
+    // the dedup contract from silently regressing back to the broken
+    // `entries.some(type === "custom")` check that re-injected the kernel
+    // on every turn.
+    expect(brainSource).toContain("shouldInjectKernel");
     expect(brainSource).toContain("ctx.sessionManager");
     expect(brainSource).toContain(".getEntries()");
-    expect(brainSource).toMatch(/if \(alreadyInjected\) return;/);
+    expect(brainSource).toMatch(/if \(!shouldInjectKernel\([\s\S]*?\)\) return;/);
   });
 
   it("returns a persistent hidden custom message on first injection", () => {

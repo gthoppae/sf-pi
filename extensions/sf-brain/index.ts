@@ -22,31 +22,28 @@
  *
  * Behavior matrix:
  *
- *   Event               | Condition                             | Result
- *   --------------------|---------------------------------------|------------------------------------------
- *   before_agent_start  | kernel already in session entries     | Skip injection
- *   before_agent_start  | CLI installed, no kernel entry yet    | Inject full kernel as hidden message
- *   before_agent_start  | CLI not installed, no kernel entry    | Inject install stub as hidden message
+ *   Event               | Condition                                       | Result
+ *   --------------------|-------------------------------------------------|------------------------------------------
+ *   before_agent_start  | live kernel custom_message entry exists         | Skip injection
+ *   before_agent_start  | last kernel was folded into compaction summary  | Re-inject so model sees rules verbatim
+ *   before_agent_start  | CLI installed, no live kernel entry             | Inject full kernel as hidden message
+ *   before_agent_start  | CLI not installed, no live kernel entry         | Inject install stub as hidden message
+ *
+ * The dedup predicate (`shouldInjectKernel` in lib/kernel.ts) handles two
+ * subtleties: pi stores the kernel as `type: "custom_message"` (LLM-visible,
+ * created via `appendCustomMessageEntry`), not `type: "custom"` (state-only
+ * marker created via `pi.appendEntry()`); and post-compaction, only entries
+ * from `firstKeptEntryId` onward count as "live."
  */
-import type { CustomEntry, ExtensionAPI } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 
 import { buildExecFn } from "../../lib/common/exec-adapter.ts";
 import {
   getCachedSfEnvironment,
   getSharedSfEnvironment,
 } from "../../lib/common/sf-environment/shared-runtime.ts";
-import { KERNEL_ENTRY_TYPE, loadKernel } from "./lib/kernel.ts";
+import { KERNEL_ENTRY_TYPE, loadKernel, shouldInjectKernel } from "./lib/kernel.ts";
 import { requirePiVersion } from "../../lib/common/pi-compat.ts";
-
-/**
- * Type guard for our own persisted kernel entries. Prevents false matches
- * against other extensions' custom entries in the session log.
- */
-function isKernelEntry(entry: unknown): entry is CustomEntry<unknown> {
-  if (!entry || typeof entry !== "object") return false;
-  const candidate = entry as { type?: string; customType?: string };
-  return candidate.type === "custom" && candidate.customType === KERNEL_ENTRY_TYPE;
-}
 
 export default function (pi: ExtensionAPI) {
   if (!requirePiVersion(pi, "sf-brain")) return;
@@ -54,8 +51,7 @@ export default function (pi: ExtensionAPI) {
   const exec = buildExecFn(pi);
 
   pi.on("before_agent_start", async (_event, ctx) => {
-    const alreadyInjected = ctx.sessionManager.getEntries().some((entry) => isKernelEntry(entry));
-    if (alreadyInjected) return;
+    if (!shouldInjectKernel(ctx.sessionManager.getEntries())) return;
 
     // Prefer the already-populated shared cache. If nothing has run detection
     // yet in this process, fall through to a live detection. Either way the

@@ -18,6 +18,8 @@ import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
+import { getLatestCompactionEntry, type SessionEntry } from "@earendil-works/pi-coding-agent";
+
 import { globalAgentPath } from "../../../lib/common/pi-paths.ts";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -81,4 +83,47 @@ export function loadKernel(options: { cliInstalled: boolean }): string {
   }
 
   return readBundledKernel();
+}
+
+/**
+ * Type guard for our own persisted kernel entries. Matches the entry shape
+ * pi creates when an extension returns `BeforeAgentStartEventResult.message`
+ * (`type: "custom_message"`), not the unrelated `pi.appendEntry()` state
+ * marker shape (`type: "custom"`). The mismatch is the bug we're fixing:
+ * the previous predicate matched on `type === "custom"` and never matched
+ * a real kernel entry, so the kernel was re-injected on every turn.
+ */
+export function isLiveKernelEntry(entry: unknown): boolean {
+  if (!entry || typeof entry !== "object") return false;
+  const candidate = entry as { type?: string; customType?: string };
+  return candidate.type === "custom_message" && candidate.customType === KERNEL_ENTRY_TYPE;
+}
+
+/**
+ * Decide whether the kernel should be injected on this `before_agent_start`.
+ *
+ * Pure predicate so it can be unit-tested without a pi runtime. Two contracts:
+ *
+ * 1. Inject exactly once per *live* session. The kernel is stored as a
+ *    `custom_message` entry (LLM-visible) — see `isLiveKernelEntry`.
+ *
+ * 2. Re-inject after compaction. Pi's `buildSessionContext` only emits entries
+ *    from `firstKeptEntryId` onward post-compaction; entries before that are
+ *    folded into the compaction summary. The historical kernel custom_message
+ *    is still visible to `getEntries()` for replay/debug, but the model no
+ *    longer sees it verbatim — only as part of a summary. Treat the kernel as
+ *    "live" only if a custom_message kernel entry exists at or after the
+ *    *latest* compaction's `firstKeptEntryId`.
+ */
+export function shouldInjectKernel(entries: readonly SessionEntry[]): boolean {
+  const latestCompaction = getLatestCompactionEntry(entries as SessionEntry[]);
+  let liveStart = 0;
+  if (latestCompaction) {
+    const firstKeptIdx = entries.findIndex((e) => e.id === latestCompaction.firstKeptEntryId);
+    liveStart = firstKeptIdx >= 0 ? firstKeptIdx : 0;
+  }
+  for (let i = liveStart; i < entries.length; i++) {
+    if (isLiveKernelEntry(entries[i])) return false;
+  }
+  return true;
 }
