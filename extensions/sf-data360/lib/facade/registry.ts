@@ -68,6 +68,31 @@ export const D360_FAMILIES: D360Family[] = [
     summary: "Validate, run, and inspect calculated metrics and insights.",
     keywords: ["calculated insight", "ci", "metric", "score", "aggregate"],
   },
+  {
+    name: "Ingestion",
+    summary: "Discover connectors, connections, data streams, and ingestion health surfaces.",
+    keywords: ["ingestion", "connector", "connection", "data stream", "stream", "source"],
+  },
+  {
+    name: "Transforms and Actions",
+    summary: "Inspect SQL transforms and real-time data actions.",
+    keywords: ["transform", "data transform", "data action", "action", "event", "trigger"],
+  },
+  {
+    name: "Identity Resolution",
+    summary: "Inspect identity resolution rulesets and profile unification setup.",
+    keywords: ["identity", "identity resolution", "ruleset", "unified", "match", "reconcile"],
+  },
+  {
+    name: "Semantic Retrieval",
+    summary: "Inspect retrievers, search indexes, and semantic data models for RAG and BI.",
+    keywords: ["retriever", "search index", "semantic", "sdm", "rag", "vector", "hybrid"],
+  },
+  {
+    name: "DataKit",
+    summary: "Inspect packaged Data 360 data kits and deployment bundles.",
+    keywords: ["datakit", "data kit", "package", "bundle", "deploy"],
+  },
 ];
 
 export const D360_OPERATIONS: D360Operation[] = [
@@ -135,6 +160,95 @@ export const D360_OPERATIONS: D360Operation[] = [
     safety: "read",
     optionalParams: ["limit", "offset"],
   },
+  {
+    name: "d360_connectors_list",
+    family: "Ingestion",
+    description: "List connector catalog entries supported by the org.",
+    method: "GET",
+    path: "/ssot/connectors",
+    safety: "read",
+  },
+  {
+    name: "d360_connections_sfdc_list",
+    family: "Ingestion",
+    description: "List Salesforce CRM connections.",
+    method: "GET",
+    path: "/ssot/connections?connectorType=SalesforceDotCom",
+    safety: "read",
+  },
+  {
+    name: "d360_data_streams_list",
+    family: "Ingestion",
+    description: "List data streams with optional pagination.",
+    method: "GET",
+    path: "/ssot/data-streams",
+    safety: "read",
+    optionalParams: ["limit", "offset"],
+  },
+  {
+    name: "d360_data_transforms_list",
+    family: "Transforms and Actions",
+    description: "List Data 360 SQL/data transforms.",
+    method: "GET",
+    path: "/ssot/data-transforms",
+    safety: "read",
+    optionalParams: ["limit", "offset"],
+  },
+  {
+    name: "d360_data_actions_list",
+    family: "Transforms and Actions",
+    description: "List Data 360 data actions.",
+    method: "GET",
+    path: "/ssot/data-actions",
+    safety: "read",
+    optionalParams: ["limit", "offset"],
+  },
+  {
+    name: "d360_identity_resolutions_list",
+    family: "Identity Resolution",
+    description: "List identity resolution rulesets.",
+    method: "GET",
+    path: "/ssot/identity-resolutions",
+    safety: "read",
+    optionalParams: ["limit", "offset"],
+  },
+  {
+    name: "d360_semantic_models_list",
+    family: "Semantic Retrieval",
+    description: "List semantic data models.",
+    method: "GET",
+    path: "/ssot/semantic/models",
+    safety: "read",
+    optionalParams: ["limit", "offset"],
+  },
+  {
+    name: "d360_search_indexes_list",
+    family: "Semantic Retrieval",
+    description: "List search indexes when the org exposes the search-index surface.",
+    method: "GET",
+    path: "/ssot/search-index",
+    safety: "read",
+    optionalParams: ["limit", "offset"],
+    tips: "Some orgs expose this surface only after search indexes are provisioned.",
+  },
+  {
+    name: "d360_retrievers_list",
+    family: "Semantic Retrieval",
+    description: "List machine-learning retrievers when retriever APIs are provisioned.",
+    method: "GET",
+    path: "/machine-learning/retrievers",
+    safety: "read",
+    tips: "Can return not-found when retriever APIs are not provisioned; do not use as a core readiness gate.",
+  },
+  {
+    name: "d360_datakits_list",
+    family: "DataKit",
+    description: "List available DataKits.",
+    method: "GET",
+    path: "/ssot/data-kits",
+    safety: "read",
+    optionalParams: ["limit", "offset"],
+  },
 ];
 
 export const D360_RUNBOOKS: D360RunbookInfo[] = [
@@ -181,6 +295,14 @@ export const D360_EXAMPLES: Record<string, unknown> = {
   d360_dlo_describe: {
     operation: "d360_dlo_describe",
     params: { dloName: "ObservabilitySpans__dll" },
+  },
+  d360_data_streams_list: {
+    operation: "d360_data_streams_list",
+    params: { limit: 10 },
+  },
+  d360_semantic_models_list: {
+    operation: "d360_semantic_models_list",
+    params: { limit: 10 },
   },
   "agent_observability.platform_trace_tree": {
     runbook: "agent_observability.platform_trace_tree",

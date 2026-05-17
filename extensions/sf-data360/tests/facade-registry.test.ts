@@ -19,11 +19,30 @@ describe("d360 facade registry", () => {
     expect(new Set(runbookNames).size).toBe(runbookNames.length);
   });
 
-  it("finds Data 360 families by intent", () => {
+  it("finds Agentforce observability by intent", () => {
     const results = searchRegistry("agent trace errors");
 
     expect(results[0]?.family).toBe("Agent Observability");
     expect(results[0]?.runbooks).toContain("agent_observability.platform_error_traces");
+  });
+
+  it("finds expanded read-only domain families by intent", () => {
+    expect(searchRegistry("data stream connector ingestion")[0]).toMatchObject({
+      family: "Ingestion",
+      operations: expect.arrayContaining(["d360_data_streams_list", "d360_connectors_list"]),
+    });
+    expect(searchRegistry("identity resolution rulesets")[0]).toMatchObject({
+      family: "Identity Resolution",
+      operations: expect.arrayContaining(["d360_identity_resolutions_list"]),
+    });
+    expect(searchRegistry("semantic retriever search index")[0]).toMatchObject({
+      family: "Semantic Retrieval",
+      operations: expect.arrayContaining(["d360_semantic_models_list", "d360_retrievers_list"]),
+    });
+    expect(searchRegistry("datakit bundle deploy")[0]).toMatchObject({
+      family: "DataKit",
+      operations: expect.arrayContaining(["d360_datakits_list"]),
+    });
   });
 
   it("returns operation and runbook examples that point at registered names", () => {
