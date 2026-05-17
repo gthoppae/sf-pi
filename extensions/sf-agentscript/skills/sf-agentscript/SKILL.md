@@ -613,15 +613,26 @@ filter as `agentscript_compile`:
 ## Coordination with sf-data360 (production observability)
 
 When the user asks "why did agent X behave wrong in production?" —
-that's a question for the live STDM (Session Trace Data Model) data
-in Data Cloud, not for the local trace files. Defer to the **sf-data360**
-skill for those queries; it carries the DMO schema, query patterns, and
-the quirks (NOT_SET sentinel, TRUST_GUARDRAILS_STEP `error: "None"`,
-LLM_STEP not-JSON output, 15/18-char ID inconsistency).
+start with the live Data Cloud observability data, not the local trace
+files. Defer to the **sf-data360** skill for those queries.
+
+Use **STDM** (Session Trace Data Model) when the question is about the
+conversation: session, interaction, user message, topic, agent response,
+planner step I/O, and STDM quirks (NOT_SET sentinel,
+TRUST_GUARDRAILS_STEP `error: "None"`, LLM_STEP not-JSON output,
+15/18-char ID inconsistency).
+
+Use **Agent Platform Tracing** when the question is about backend
+execution: LLM span timing, action execution, Flow/Apex spans,
+retriever/search spans, `OK`/`ERROR` status, operation latency, or a full
+OpenTelemetry-style trace tree. When both surfaces are available, join
+`ssot__AiAgentInteraction__dlm.ssot__TelemetryTraceId__c` to
+`ssot__TelemetryTraceSpan__dlm.ssot__TelemetryTrace__c`.
 
 The end-to-end loop is **observe → reproduce → improve**:
 
-1. `sf-data360` queries STDM → finds problem sessions, classifies issues
+1. `sf-data360` queries STDM and/or Agent Platform Tracing → finds
+   problem sessions, interactions, spans, and root-cause signals
 2. `agentscript_preview action='start' agent_file=…` → reproduce the
    issue with deterministic `context_variables`
 3. `agentscript_mutate` → fix the `.agent` file
@@ -629,8 +640,9 @@ The end-to-end loop is **observe → reproduce → improve**:
    adjacent flows
 5. `agentscript_lifecycle action='publish'` → ship
 
-See `references/agentforce-stdm.md` in the `sf-data360` skill for the
-DMO field reference and copy-paste SQL.
+See `references/agentforce-stdm.md` and
+`references/agent-platform-tracing.md` in the `sf-data360` skill for the
+DMO field references and copy-paste SQL.
 
 ## Coordination with sf-lsp
 

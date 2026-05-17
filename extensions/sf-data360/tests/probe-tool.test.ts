@@ -31,10 +31,49 @@ describe("sf-data360 readiness probe", () => {
     ).toMatchObject({ state: "feature_gated", featureCode: "CdpDataStreams" });
 
     expect(
+      classifyConnectionProbeResult(
+        "agent_platform_tracing_dmo",
+        "/ssot/data-model-objects/ssot__TelemetryTraceSpan__dlm",
+        403,
+        [
+          {
+            message:
+              "This feature is not currently enabled for this user type or org: [AgentPlatformTracing]",
+            errorCode: "FUNCTIONALITY_NOT_ENABLED",
+          },
+        ],
+      ),
+    ).toMatchObject({ state: "feature_gated", featureCode: "AgentPlatformTracing" });
+
+    expect(
       classifyConnectionProbeResult("search_indexes", "/ssot/search-indexes?limit=1", 404, [
         { errorCode: "NOT_FOUND", message: "The requested resource does not exist" },
       ]),
     ).toMatchObject({ state: "not_found" });
+
+    expect(
+      classifyConnectionProbeResult(
+        "agent_platform_tracing_dmo",
+        "/ssot/data-model-objects/ssot__TelemetryTraceSpan__dlm",
+        404,
+        [{ errorCode: "NOT_FOUND", message: "The requested resource does not exist" }],
+      ),
+    ).toMatchObject({ state: "not_found" });
+  });
+
+  it("classifies the Agent Platform Tracing DMO as populated when metadata is visible", () => {
+    expect(
+      classifyConnectionProbeResult(
+        "agent_platform_tracing_dmo",
+        "/ssot/data-model-objects/ssot__TelemetryTraceSpan__dlm",
+        200,
+        {
+          name: "ssot__TelemetryTraceSpan__dlm",
+          label: "Telemetry Trace Span",
+          fields: [{ name: "ssot__Id__c" }],
+        },
+      ),
+    ).toMatchObject({ state: "enabled_populated", count: 1, countKind: "returned_rows" });
   });
 
   it("summarizes ready, partial, and blocked orgs", () => {

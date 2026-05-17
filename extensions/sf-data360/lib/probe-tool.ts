@@ -81,6 +81,10 @@ const PROBES: Array<{ name: string; path: string; requiredForReady?: boolean }> 
   { name: "semantic_models", path: "/ssot/semantic/models?limit=1" },
   { name: "profile_metadata", path: "/ssot/profile/metadata" },
   { name: "metadata_entities_dmo", path: "/ssot/metadata-entities?entityType=DataModelObject" },
+  {
+    name: "agent_platform_tracing_dmo",
+    path: "/ssot/data-model-objects/ssot__TelemetryTraceSpan__dlm",
+  },
 ];
 
 export function registerD360ProbeTool(pi: ExtensionAPI): void {

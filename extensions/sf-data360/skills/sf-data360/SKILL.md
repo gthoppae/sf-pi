@@ -85,6 +85,23 @@ ID inconsistency, propagation lag) live in
 `references/agentforce-stdm.md`. Read that before writing any
 `/ssot/query-sql` against the `ssot__AiAgent*__dlm` family.
 
+## Agent Platform Tracing
+
+When a question is about Agentforce backend execution — slow LLM spans,
+Flow/Apex action failures, retriever/search spans, or reconstructing an
+OpenTelemetry-style trace tree — use **Agent Platform Tracing** data in
+Data Cloud. Query `ssot__TelemetryTraceSpan__dlm` with `d360_api`, then
+reconstruct the tree client-side from span id and parent span id.
+
+Use STDM when you need the conversation; use Agent Platform Tracing when
+you need the backend execution chain. When both are available, join
+`ssot__AiAgentInteraction__dlm.ssot__TelemetryTraceId__c` to
+`ssot__TelemetryTraceSpan__dlm.ssot__TelemetryTrace__c`.
+
+The pre-flight, field reference, copy-paste SQL, tree reconstruction
+rules, and quirks live in `references/agent-platform-tracing.md`. Read
+that before querying `ssot__TelemetryTraceSpan__dlm`.
+
 ## References
 
 Read these only when needed:
@@ -103,6 +120,9 @@ Read these only when needed:
 - `references/agentforce-stdm.md` — Agentforce session tracing DMO
   schema, query patterns, and quirks. Pair with the **sf-agentscript**
   skill for the dev-loop side.
+- `references/agent-platform-tracing.md` — Agent Platform Tracing span
+  DMO/DLO schema, trace-tree reconstruction, STDM join pattern, and
+  backend execution diagnostics.
 
 When local references are not enough, inspect the public upstream repo
 before broad web search:

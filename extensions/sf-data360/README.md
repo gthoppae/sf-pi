@@ -128,7 +128,7 @@ target org, org type, and safety decision.
 The bundled `sf-data360` skill is intentionally short. It points agents to
 reference files under `skills/sf-data360/references/` for endpoint families,
 workflow recipes, action coverage, request-body shapes, query patterns, examples,
-and safety rules.
+safety rules, Agentforce Session Tracing (STDM), and Agent Platform Tracing.
 
 When local references are not enough, use the public upstream Data 360 MCP server
 repo before broad web search: <https://github.com/forcedotcom/d360-mcp-server>.
@@ -156,6 +156,8 @@ behind file references so the agent loads it only when needed.
 ```
 extensions/sf-data360/
   lib/
+    agent-observability/
+      platform-tracing.ts   ← implementation module
     api-tool.ts             ← implementation module
     config-panel.ts         ← implementation module
     extension-doctor.ts     ← implementation module
@@ -169,6 +171,7 @@ extensions/sf-data360/
     api-tool.test.ts        ← unit / smoke test
     metadata-tool.test.ts   ← unit / smoke test
     path.test.ts            ← unit / smoke test
+    platform-tracing.test.ts← unit / smoke test
     probe-tool.test.ts      ← unit / smoke test
     safety.test.ts          ← unit / smoke test
     smoke.test.ts           ← unit / smoke test

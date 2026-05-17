@@ -134,7 +134,7 @@ async function main() {
   const conn = await connFromAlias(ALIAS);
   console.log(`\n  jsforce conn apiVersion = ${conn.getApiVersion()}`);
 
-  section("6. Probe — full d360_probe surface (15 paths)");
+  section("6. Probe — full d360_probe surface (16 paths)");
   const PROBES = [
     { name: "data_spaces", path: "/ssot/data-spaces", required: true },
     { name: "dmo_catalog", path: "/ssot/data-model-objects?limit=1", required: true },
@@ -151,6 +151,10 @@ async function main() {
     { name: "semantic_models", path: "/ssot/semantic/models?limit=1" },
     { name: "profile_metadata", path: "/ssot/profile/metadata" },
     { name: "metadata_entities_dmo", path: "/ssot/metadata-entities?entityType=DataModelObject" },
+    {
+      name: "agent_platform_tracing_dmo",
+      path: "/ssot/data-model-objects/ssot__TelemetryTraceSpan__dlm",
+    },
   ];
   const probeResults = await Promise.all(
     PROBES.map(async (p) => {
