@@ -45,6 +45,34 @@ and this project adheres to [Semantic Versioning 2.0.0](https://semver.org/spec/
   pi keeps starting instead of crashing with `schema validation failed` or
   `ctx.ui.<method> is not a function`.
 
+### Changed
+
+- **Raised pi-coding-agent peerDependency floor to `>=0.74.1`.** Pi 0.74.1
+  (2026-05-16) ships three fixes that affect sf-pi extensions directly:
+  Node 26 OpenAI-compatible streams no longer time out after five idle
+  minutes (pi-mono #4519), `--resume` no longer OOMs on large session
+  histories (#4583), and the skill-name-vs-parent-directory diagnostic
+  warning is gone (#4534). Improved markdown list / checkbox / inline-image
+  rendering also flows through to the sf-welcome splash, sf-skills HUD, and
+  sf-devbar via pi-tui. The `requirePiVersion()` gate in
+  `lib/common/pi-compat.ts` continues to log a single actionable warning per
+  extension when a user runs against an older pi.
+- **Simplified `peerDependencies` to a single entry.** `@earendil-works/pi-ai`
+  and `@earendil-works/pi-tui` are transitive of `pi-coding-agent` and ship
+  in lockstep — pinning them as separate peers added two ways for an install
+  to be half-satisfied without any real correctness benefit. The runtime
+  `requirePiVersion()` check enforces the version floor end-to-end, so
+  `peerDependencies` now lists only `@earendil-works/pi-coding-agent` and
+  `typebox`. Verified that `parseChangelog` in
+  `lib/common/catalog-state/whats-new.ts` already handles pi 0.74.1's
+  changelog layout (`### New Features` / `### Added` / `### Fixed`) — the
+  existing fixture in `extensions/sf-welcome/tests/whats-new.test.ts` covers
+  the same shape, so no test churn was needed.
+- Updated the `### Supported platforms` README paragraph to reflect that
+  pi 0.74.1 ships standalone Windows ARM64 binaries; the `sf` CLI is now the
+  only Windows prerequisite. WSL is still recommended for shell parity with
+  Linux/macOS, but native Windows is no longer flagged as best-effort.
+
 ### Features
 
 - **Adopt pi 0.72 model-level `thinkingLevelMap` in
