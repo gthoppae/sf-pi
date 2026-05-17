@@ -175,7 +175,7 @@ Four of seven live on **SFAP** and need the host fallback walk
 | 6   | `https://<instanceUrl>/services/oauth2/userinfo`                                       | GET    | `org_id` + `user_id` for SFAP headers                                   | `connection.resolveOrgIdentity` (via `conn.identity()`)                   | no — instance URL |
 | 7   | `/services/data/vXX.X/query` (SOQL via jsforce)                                        | GET    | `BotDefinition`, `BotVersion`, `GenAiPlannerDefinition`, `User` lookups | `eval action=resolve_active`, `preview action=start` (bypassUser check)   | no — instance URL |
 
-API version `vXX.X` for endpoint 7 reads from `[Salesforce Environment]` at
+API version `vXX.X` for endpoint 7 reads from `<sf_environment>` at
 run time — never hardcoded. We do **not** add new endpoints in this rewrite.
 
 ## Eval API — we reuse our existing TypeScript implementation

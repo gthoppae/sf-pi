@@ -52,7 +52,7 @@ code lives in `extensions/<id>/lib/`.
 | `sf-environment/detect.ts`                    | shared runtime                                                              | Pure detection logic — runs SF CLI, parses config, returns a snapshot              |
 | `sf-environment/shared-runtime.ts`            | `sf-welcome`, `sf-devbar`, others                                           | In-memory + persisted cache so startup runs SF CLI **once** per session            |
 | `sf-environment/persisted-cache.ts`           | shared runtime                                                              | Disk persistence for the last-known snapshot                                       |
-| `sf-environment/format-agent-context.ts`      | `sf-slack`, `sf-devbar`                                                     | Shared `[Salesforce Environment]` context-block formatter                          |
+| `sf-environment/format-agent-context.ts`      | `sf-slack`, `sf-devbar`                                                     | Shared `<sf_environment>` context-block formatter                                  |
 | `sf-environment/types.ts`                     | all SF-aware extensions                                                     | `SfEnvironment` snapshot shape                                                     |
 | `test-fixtures.ts`                            | tests across extensions                                                     | Shared factories for Pi context stubs + common fixtures                            |
 | `tests/`                                      | —                                                                           | Tests for the shared modules themselves                                            |

@@ -52,7 +52,7 @@ function kernelMessageEntry(parentId: string | null = null): CustomMessageEntry 
     timestamp: new Date().toISOString(),
     type: "custom_message",
     customType: KERNEL_ENTRY_TYPE,
-    content: "[Salesforce Operator Kernel]\n…body…\n",
+    content: "<sf_operator_kernel>\n…body…\n</sf_operator_kernel>\n",
     display: false,
   };
 }
@@ -117,7 +117,7 @@ describe("isLiveKernelEntry", () => {
       timestamp: new Date().toISOString(),
       type: "custom_message",
       customType: "sf-devbar-environment",
-      content: "[Salesforce Environment]\n…",
+      content: "<sf_environment>\n…\n</sf_environment>",
       display: false,
     };
     expect(isLiveKernelEntry(otherExtension)).toBe(false);
@@ -155,7 +155,7 @@ describe("shouldInjectKernel — no compaction", () => {
       timestamp: new Date().toISOString(),
       type: "custom_message",
       customType: "sf-slack-context",
-      content: "[Slack Workspace]\n…",
+      content: "<slack_workspace>\n…\n</slack_workspace>",
       display: false,
     };
     expect(shouldInjectKernel([k, sibling])).toBe(false);

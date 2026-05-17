@@ -100,7 +100,7 @@
     "entry": "extensions/sf-brain/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 182
+    "srcLoc": 193
   },
   {
     "id": "sf-data360",
@@ -551,7 +551,7 @@
     "entry": "extensions/sf-slack/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 11454
+    "srcLoc": 11457
   },
   {
     "id": "sf-welcome",

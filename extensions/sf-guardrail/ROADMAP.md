@@ -76,7 +76,7 @@ DELETE|PATCH|PUT` — production only.
       `deploy preview --json` before `deploy start` and surface a
       warning if > N components change. Does not block.
 - [ ] **API version drift warning** — cross-check the `--api-version`
-      flag (if any) against the `[Salesforce Environment]` cached
+      flag (if any) against the `<sf_environment>` cached
       version and notify when they disagree.
 
 ## Non-goals (permanent)

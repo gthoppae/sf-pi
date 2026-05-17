@@ -5,7 +5,7 @@
  * The contract is deliberately simple:
  *   1. If the command has `-o <alias>` or `--target-org <alias>`, that wins.
  *   2. Else, use the default-org alias from the sf-devbar shared cache.
- *   3. Org *type* comes from the same cached `[Salesforce Environment]`
+ *   3. Org *type* comes from the same cached `<sf_environment>`
  *      snapshot. If the alias isn't the default, we don't re-detect (we'd
  *      need an sf CLI call and we need this hook to stay hot); instead we
  *      consult `productionAliases` from config and otherwise fall back to

@@ -9,3 +9,5 @@ or accidentally contradicted in extension READMEs.
 - [0004: Guardrail Fails Closed](./0004-guardrail-fail-closed.md)
 - [0005: Standard Pi-Native Command Panels](./0005-standard-command-panels.md)
 - [0006: Extension Consistency Baseline](./0006-extension-consistency-baseline.md)
+- [0007: Single-Place Credential Entry per Integration](./0007-single-place-credentials.md)
+- [0008: Context-Injection Boundary Tags](./0008-context-injection-boundaries.md)

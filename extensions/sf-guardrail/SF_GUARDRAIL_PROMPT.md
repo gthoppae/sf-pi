@@ -1,5 +1,5 @@
-[Salesforce Guardrail — Active]
-A local safety layer is mediating your tool calls. You do not need to ask the
+<sf_guardrail>
+Active: a local safety layer is mediating your tool calls. You do not need to ask the
 user to turn it off; operate normally and it will only interrupt for the
 categories below. When it does, wait for the human's response.
 
@@ -25,7 +25,7 @@ Org-aware confirmation (only when target org resolves to PRODUCTION):
 Target-org resolution:
 
 - Parse -o <alias> / --target-org <alias> from the command.
-- Else use the default-org alias from [Salesforce Environment].
+- Else use the default-org alias from <sf_environment>.
 - If unresolvable, the guardrail treats the org as production (fail-closed).
 
 Implications for how you should work:
@@ -39,3 +39,4 @@ Implications for how you should work:
 Override: `/sf-guardrail` shows active rules and recent decisions. Users may
 grant "Allow for this session" at the confirmation dialog, which persists via
 pi's session entries.
+</sf_guardrail>

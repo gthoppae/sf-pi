@@ -44,7 +44,10 @@ export function formatAgentContext(
     return undefined;
   }
 
-  const lines: string[] = ["[Salesforce Environment]"];
+  // Boundary convention: lowercase snake_case XML tags, matching pi 0.75's
+  // own context boundaries (`<conversation>`, `<project_context>`,
+  // `<project_instructions>`). See ADR 0008 for the rationale.
+  const lines: string[] = ["<sf_environment>"];
 
   // CLI
   if (env.cli.version) {
@@ -116,6 +119,8 @@ export function formatAgentContext(
       lines.push(`Active SF skills: ${sfSkills.join(", ")}`);
     }
   }
+
+  lines.push("</sf_environment>");
 
   return lines.join("\n");
 }

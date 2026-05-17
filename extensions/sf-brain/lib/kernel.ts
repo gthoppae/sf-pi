@@ -25,22 +25,34 @@ import { globalAgentPath } from "../../../lib/common/pi-paths.ts";
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-/** Header used for both kernel variants so extensions / tests can match on it. */
-export const KERNEL_HEADER = "[Salesforce Operator Kernel]";
-export const KERNEL_MISSING_CLI_HEADER = "[Salesforce Operator Kernel — sf CLI not detected]";
+/**
+ * Opening tag of the kernel block. Used by both kernel variants and by
+ * tests as the canonical "this is a kernel" anchor.
+ *
+ * Boundary convention: lowercase snake_case XML tags, matching pi 0.75's
+ * own internal context boundaries (`<conversation>`, `<project_context>`,
+ * `<project_instructions>`). See ADR 0008 for the rationale.
+ */
+export const KERNEL_OPEN_TAG = "<sf_operator_kernel>";
+export const KERNEL_CLOSE_TAG = "</sf_operator_kernel>";
+/** Human label used inside the open tag for the CLI-missing variant. */
+export const KERNEL_MISSING_CLI_NOTE = "sf CLI not detected — install before any operator action";
 
 /** customType used when persisting the kernel into the session. */
 export const KERNEL_ENTRY_TYPE = "sf-brain-kernel";
 
 const BUNDLED_KERNEL_PATH = path.resolve(__dirname, "..", "SF_KERNEL.md");
 
-const INSTALL_STUB = `${KERNEL_MISSING_CLI_HEADER}
+const INSTALL_STUB = `${KERNEL_OPEN_TAG}
+${KERNEL_MISSING_CLI_NOTE}
+
 Do not fabricate sf command output. Install first:
   macOS:    brew install --cask salesforce-cli
   Linux:    npm install -g @salesforce/cli
   Windows:  https://developer.salesforce.com/tools/salesforcecli
 Verify:     sf --version
 Login:      sf org login web --set-default --alias MyOrg
+${KERNEL_CLOSE_TAG}
 `;
 
 /**

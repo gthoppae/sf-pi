@@ -14,8 +14,8 @@ import { tmpdir } from "node:os";
 import path from "node:path";
 
 import {
-  KERNEL_HEADER,
-  KERNEL_MISSING_CLI_HEADER,
+  KERNEL_OPEN_TAG,
+  KERNEL_MISSING_CLI_NOTE,
   loadKernel,
   readBundledKernel,
 } from "../lib/kernel.ts";
@@ -39,13 +39,17 @@ afterEach(() => {
 describe("loadKernel", () => {
   it("returns the bundled kernel when CLI is installed and no override exists", () => {
     const body = loadKernel({ cliInstalled: true });
-    expect(body.startsWith(KERNEL_HEADER)).toBe(true);
+    expect(body.startsWith(KERNEL_OPEN_TAG)).toBe(true);
     expect(body).toBe(readBundledKernel());
   });
 
   it("returns the install stub when CLI is missing", () => {
     const body = loadKernel({ cliInstalled: false });
-    expect(body.startsWith(KERNEL_MISSING_CLI_HEADER)).toBe(true);
+    // Stub still opens with <sf_operator_kernel> so the boundary tag is
+    // consistent across both kernel variants. The CLI-missing note appears
+    // on the next line.
+    expect(body.startsWith(KERNEL_OPEN_TAG)).toBe(true);
+    expect(body).toContain(KERNEL_MISSING_CLI_NOTE);
     expect(body).toContain("brew install --cask salesforce-cli");
     expect(body).toContain("npm install -g @salesforce/cli");
   });
@@ -53,11 +57,16 @@ describe("loadKernel", () => {
   it("returns the install stub even when an override file is present", () => {
     const overrideDir = path.join(tempAgentDir, "sf-brain");
     mkdirSync(overrideDir, { recursive: true });
-    writeFileSync(path.join(overrideDir, "SF_KERNEL.md"), "[Custom Kernel]\nrule 1.\n", "utf8");
+    writeFileSync(
+      path.join(overrideDir, "SF_KERNEL.md"),
+      "<custom_kernel>\nrule 1.\n</custom_kernel>\n",
+      "utf8",
+    );
 
     const body = loadKernel({ cliInstalled: false });
-    expect(body.startsWith(KERNEL_MISSING_CLI_HEADER)).toBe(true);
-    expect(body).not.toContain("[Custom Kernel]");
+    expect(body.startsWith(KERNEL_OPEN_TAG)).toBe(true);
+    expect(body).toContain(KERNEL_MISSING_CLI_NOTE);
+    expect(body).not.toContain("<custom_kernel>");
   });
 
   it("loads a user override when CLI is installed", () => {

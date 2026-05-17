@@ -60,7 +60,7 @@ Extension loads
        └─ Clear footer status
   on("before_agent_start")
        ├─ If no Slack tool is active in systemPromptOptions.selectedTools → skip
-       └─ Inject [Slack Workspace] identity anchors (User + Team) only
+       └─ Inject <slack_workspace> identity anchors (User + Team) only
             (cache sizes and gated counts are intentionally omitted — they drift
              turn-to-turn and would invalidate prompt cache)
   /sf-slack
@@ -414,9 +414,10 @@ extension injects the minimum Slack context the LLM needs to interpret
 `from:me` / `with:@user` references correctly:
 
 ```
-[Slack Workspace]
+<slack_workspace>
 User: @username (U01ABC123)
 Team: T01XYZ789
+</slack_workspace>
 ```
 
 Cache sizes and gated-tool counts are intentionally **not** included because

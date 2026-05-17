@@ -41,6 +41,7 @@ describe("sf-slack systemPromptOptions wiring", () => {
   it("still injects context when Slack tools are active", () => {
     // The injection path should still exist after the guard
     expect(slackSource).toContain("sf-slack-context");
-    expect(slackSource).toContain("[Slack Workspace]");
+    expect(slackSource).toContain("<slack_workspace>");
+    expect(slackSource).toContain("</slack_workspace>");
   });
 });

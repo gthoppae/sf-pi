@@ -84,7 +84,8 @@ describe("formatAgentContext", () => {
       sourceApiVersion: "66.0",
     });
     const ctx = formatAgentContext(env)!;
-    expect(ctx).toContain("[Salesforce Environment]");
+    expect(ctx).toContain("<sf_environment>");
+    expect(ctx).toContain("</sf_environment>");
     expect(ctx).toContain("Project: my-app (API 66.0)");
   });
 

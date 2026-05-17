@@ -142,7 +142,8 @@ describe("sf-slack workspace context injection (token-efficient shape)", () => {
     const inject = indexSource.match(/pi\.on\("before_agent_start"[\s\S]*?(?=pi\.registerCommand)/);
     expect(inject).not.toBeNull();
     const body = inject![0];
-    expect(body).toContain("[Slack Workspace]");
+    expect(body).toContain("<slack_workspace>");
+    expect(body).toContain("</slack_workspace>");
     expect(body).toContain("User: @${identity.userName}");
     expect(body).toContain("Team: ${identity.teamId}");
     // Cache and gated-tool lines must NOT appear in the injected payload

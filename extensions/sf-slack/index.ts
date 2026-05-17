@@ -679,10 +679,13 @@ export default function sfSlack(pi: ExtensionAPI) {
     const hasSlackTool = systemPromptOptions.selectedTools?.some((t) => t.startsWith("slack"));
     if (!hasSlackTool) return;
 
+    // Boundary convention: lowercase snake_case XML tags, matching pi 0.75's
+    // own context boundaries. See ADR 0008.
     const lines = [
-      "[Slack Workspace]",
+      "<slack_workspace>",
       `User: @${identity.userName} (${identity.userId})`,
       `Team: ${identity.teamId}`,
+      "</slack_workspace>",
     ];
 
     return {

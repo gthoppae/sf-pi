@@ -11,7 +11,7 @@ that teaches the agent:
 2. **A 5-question API picker** — Data vs Tooling vs Metadata vs Composite vs
    Anonymous Apex.
 3. **`sf org api` as the universal REST tool** — replaces hand-rolled curl.
-4. **API-version pinning** from the injected `[Salesforce Environment]` block.
+4. **API-version pinning** from the injected `<sf_environment>` block.
 5. **`--json` + `jq`** — CLI deprecation policy protects JSON output only.
 6. **Name the org explicitly on destructive calls** with `-o <alias>`.
 7. **Anonymous Apex as the primary verification tool** — a verification loop
@@ -57,7 +57,7 @@ Subsequent turns in the same session
   the same bytes turn after turn (big prompt-cache wins on Anthropic / OpenAI).
 - Session replays (`/resume`, `/fork`, `/reload`) inherit the entry from the
   session store — no re-detection, no drift.
-- It participates in the transcript alongside `[Salesforce Environment]` and
+- It participates in the transcript alongside `<sf_environment>` and
   Slack context, so `/tree` navigation doesn't strand it.
 
 ## Why Deferred Until `before_agent_start`, Not `session_start`
