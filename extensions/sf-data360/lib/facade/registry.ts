@@ -4,12 +4,17 @@
  *
  * The registry is data-driven so the facade can grow toward the upstream
  * Data 360 MCP server's ~190 operation surface without turning this TypeScript
- * module into a giant hand-maintained endpoint list.
+ * module into a giant hand-maintained endpoint list. The JSON files are read at
+ * call time (with a small mtime cache) so `/reload` can pick up registry-only
+ * edits without a full pi process restart.
  */
-import familiesJson from "../../registry/families.json" with { type: "json" };
-import operationsJson from "../../registry/operations.json" with { type: "json" };
-import runbooksJson from "../../registry/runbooks.json" with { type: "json" };
-import examplesJson from "../../registry/examples.json" with { type: "json" };
+import { readFileSync, statSync } from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const REGISTRY_DIR = path.resolve(__dirname, "..", "..", "registry");
 
 export type D360OperationSafety = "read" | "safe_post" | "confirmed" | "destructive";
 
@@ -40,17 +45,38 @@ export interface D360Family {
   keywords: string[];
 }
 
-export const D360_FAMILIES = familiesJson as D360Family[];
-export const D360_OPERATIONS = operationsJson as D360Operation[];
-export const D360_RUNBOOKS = runbooksJson as D360RunbookInfo[];
-export const D360_EXAMPLES = examplesJson as Record<string, unknown>;
+interface RegistrySnapshot {
+  families: D360Family[];
+  operations: D360Operation[];
+  runbooks: D360RunbookInfo[];
+  examples: Record<string, unknown>;
+  mtimeKey: string;
+}
+
+let registryCache: RegistrySnapshot | undefined;
+
+export function getD360Families(): D360Family[] {
+  return loadRegistry().families;
+}
+
+export function getD360Operations(): D360Operation[] {
+  return loadRegistry().operations;
+}
+
+export function getD360Runbooks(): D360RunbookInfo[] {
+  return loadRegistry().runbooks;
+}
+
+export function getD360Examples(): Record<string, unknown> {
+  return loadRegistry().examples;
+}
 
 export function findOperation(name: string): D360Operation | undefined {
-  return D360_OPERATIONS.find((op) => op.name === name);
+  return getD360Operations().find((op) => op.name === name);
 }
 
 export function findRunbook(name: string): D360RunbookInfo | undefined {
-  return D360_RUNBOOKS.find((runbook) => runbook.name === name);
+  return getD360Runbooks().find((runbook) => runbook.name === name);
 }
 
 export function searchRegistry(query: string): Array<{
@@ -60,25 +86,48 @@ export function searchRegistry(query: string): Array<{
   operations: string[];
   runbooks: string[];
 }> {
+  const registry = loadRegistry();
   const terms = query
     .toLowerCase()
     .split(/[^a-z0-9_]+/)
     .filter(Boolean);
-  const scored = D360_FAMILIES.map((family) => {
+  const scored = registry.families.map((family) => {
     const haystack = [family.name, family.summary, ...family.keywords].join(" ").toLowerCase();
     const score = terms.reduce((sum, term) => sum + (haystack.includes(term) ? 1 : 0), 0);
     return {
       family: family.name,
       score,
       summary: family.summary,
-      operations: D360_OPERATIONS.filter((op) => op.family === family.name).map((op) => op.name),
-      runbooks: D360_RUNBOOKS.filter((runbook) => runbook.family === family.name).map(
-        (runbook) => runbook.name,
-      ),
+      operations: registry.operations
+        .filter((op) => op.family === family.name)
+        .map((op) => op.name),
+      runbooks: registry.runbooks
+        .filter((runbook) => runbook.family === family.name)
+        .map((runbook) => runbook.name),
     };
   });
   return scored
     .filter((entry) => entry.score > 0 || terms.length === 0)
     .sort((a, b) => b.score - a.score || a.family.localeCompare(b.family))
     .slice(0, 6);
+}
+
+function loadRegistry(): RegistrySnapshot {
+  const mtimeKey = ["families.json", "operations.json", "runbooks.json", "examples.json"]
+    .map((fileName) => statSync(path.join(REGISTRY_DIR, fileName)).mtimeMs)
+    .join(":");
+  if (registryCache?.mtimeKey === mtimeKey) return registryCache;
+
+  registryCache = {
+    families: readJson<D360Family[]>("families.json"),
+    operations: readJson<D360Operation[]>("operations.json"),
+    runbooks: readJson<D360RunbookInfo[]>("runbooks.json"),
+    examples: readJson<Record<string, unknown>>("examples.json"),
+    mtimeKey,
+  };
+  return registryCache;
+}
+
+function readJson<T>(fileName: string): T {
+  return JSON.parse(readFileSync(path.join(REGISTRY_DIR, fileName), "utf8")) as T;
 }

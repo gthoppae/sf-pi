@@ -2,19 +2,19 @@
 import { describe, expect, it } from "vitest";
 
 import {
-  D360_EXAMPLES,
-  D360_FAMILIES,
-  D360_OPERATIONS,
-  D360_RUNBOOKS,
   findOperation,
   findRunbook,
+  getD360Examples,
+  getD360Families,
+  getD360Operations,
+  getD360Runbooks,
   searchRegistry,
 } from "../lib/facade/registry.ts";
 
 describe("d360 facade registry", () => {
   it("keeps operation and runbook names unique", () => {
-    const operationNames = D360_OPERATIONS.map((operation) => operation.name);
-    const runbookNames = D360_RUNBOOKS.map((runbook) => runbook.name);
+    const operationNames = getD360Operations().map((operation) => operation.name);
+    const runbookNames = getD360Runbooks().map((runbook) => runbook.name);
 
     expect(new Set(operationNames).size).toBe(operationNames.length);
     expect(new Set(runbookNames).size).toBe(runbookNames.length);
@@ -47,7 +47,7 @@ describe("d360 facade registry", () => {
   });
 
   it("returns operation and runbook examples that point at registered names", () => {
-    for (const example of Object.values(D360_EXAMPLES) as Array<Record<string, unknown>>) {
+    for (const example of Object.values(getD360Examples()) as Array<Record<string, unknown>>) {
       const operation = typeof example.operation === "string" ? example.operation : undefined;
       const runbook = typeof example.runbook === "string" ? example.runbook : undefined;
       if (operation) expect(findOperation(operation)).toBeTruthy();
@@ -57,9 +57,9 @@ describe("d360 facade registry", () => {
   });
 
   it("validates registry integrity", () => {
-    const families = new Set(D360_FAMILIES.map((family) => family.name));
+    const families = new Set(getD360Families().map((family) => family.name));
 
-    for (const operation of D360_OPERATIONS) {
+    for (const operation of getD360Operations()) {
       expect(families.has(operation.family), `${operation.name} has unknown family`).toBe(true);
       expect(["read", "safe_post", "confirmed", "destructive"]).toContain(operation.safety);
       expect(operation.path).toMatch(/^\//);
@@ -71,7 +71,7 @@ describe("d360 facade registry", () => {
       }
     }
 
-    for (const runbook of D360_RUNBOOKS) {
+    for (const runbook of getD360Runbooks()) {
       expect(families.has(runbook.family), `${runbook.name} has unknown family`).toBe(true);
     }
   });

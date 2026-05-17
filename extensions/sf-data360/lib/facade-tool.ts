@@ -31,11 +31,11 @@ import {
   writeFullD360Output,
 } from "./truncation.ts";
 import {
-  D360_EXAMPLES,
-  D360_OPERATIONS,
-  D360_RUNBOOKS,
   findOperation,
   findRunbook,
+  getD360Examples,
+  getD360Operations,
+  getD360Runbooks,
   searchRegistry,
   type D360Operation,
 } from "./facade/registry.ts";
@@ -159,9 +159,9 @@ function runExamples(input: D360FacadeInput): Record<string, unknown> {
       ok: true,
       action: "examples",
       summary: "Available facade examples",
-      operations: D360_OPERATIONS.map((op) => op.name),
-      runbooks: D360_RUNBOOKS.map((runbook) => runbook.name),
-      examples: Object.keys(D360_EXAMPLES),
+      operations: getD360Operations().map((op) => op.name),
+      runbooks: getD360Runbooks().map((runbook) => runbook.name),
+      examples: Object.keys(getD360Examples()),
     };
   }
 
@@ -173,7 +173,7 @@ function runExamples(input: D360FacadeInput): Record<string, unknown> {
     summary: operation || runbook ? `Example for ${name}` : `Unknown facade item ${name}`,
     operation,
     runbook,
-    example: D360_EXAMPLES[name] ?? null,
+    example: getD360Examples()[name] ?? null,
     hint: operation || runbook ? undefined : "Use d360 action='search' to discover names.",
   };
 }
