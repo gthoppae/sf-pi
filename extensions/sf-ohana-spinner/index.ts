@@ -2,18 +2,18 @@
 /**
  * sf-ohana-spinner behavior contract
  *
- * - Shows a random Salesforce ecosystem message with rainbow ANSI animation
- *   during LLM streaming via Pi's native setWorkingIndicator() API
- * - Rotates messages every 5 seconds by regenerating the frame set
+ * - Shows either Ohana mode (rainbow rotating messages) or Calm mode
+ *   (stable "Processing..." text) via Pi's native setWorkingIndicator() API
+ * - Rotates messages every 5 seconds only in Ohana mode
  * - Pi manages the animation lifecycle (auto-starts on streaming, auto-stops on idle)
- * - Zero config, zero state between sessions
+ * - One persisted mode preference; no runtime state between sessions
  *
  * Behavior matrix:
  *
  *   Event           | Result
  *   ----------------|------------------------------------------------------------
- *   session_start   | Install the rainbow working indicator
- *   5s interval     | Rotate to new random message, regenerate indicator frames
+ *   session_start   | Install the selected working indicator mode
+ *   5s interval     | In Ohana mode, rotate to a new random message
  *   session_shutdown| Clear rotation timer, restore default indicator
  *   No LLM activity | Silent — Pi only shows the indicator while streaming
  *
@@ -22,12 +22,15 @@
  *   session_start, session_shutdown — lifecycle management
  */
 import type { ExtensionAPI, ExtensionContext } from "@earendil-works/pi-coding-agent";
-import { messages } from "./lib/messages.ts";
-import { buildRainbowFrames } from "./lib/rainbow.ts";
+import { buildCalmFrames, buildRainbowFrames } from "./lib/rainbow.ts";
+import { readEffectiveOhanaSpinnerSettings } from "./lib/settings.ts";
 import { requirePiVersion } from "../../lib/common/pi-compat.ts";
 
-function pickRandom(): string {
-  return messages[Math.floor(Math.random() * messages.length)];
+let messageCatalog: readonly string[] | undefined;
+
+async function pickRandomMessage(): Promise<string> {
+  messageCatalog ??= (await import("./lib/messages.ts")).messages;
+  return messageCatalog[Math.floor(Math.random() * messageCatalog.length)];
 }
 
 // ---- Animation interval matches the original 150ms per color shift ----
@@ -51,17 +54,23 @@ export default function (pi: ExtensionAPI) {
     return generation === activeSessionGeneration && activeSessionKey === sessionKey(ctx);
   }
 
-  /** Install the indicator with frames for the current message.
+  /** Install the indicator with frames for the selected mode.
    *
    * Pi 0.70+ composes the working loader as `{indicator-frame} {workingMessage}`
-   * and defaults the message to "Working...". Our rainbow frames already
-   * carry the full Salesforce message text (plus a leading braille
-   * spinner glyph), so we blank Pi's default working message — otherwise
-   * "Working..." paints next to our animation and the rainbow effectively
-   * disappears behind the static label. */
-  function applyIndicator(ctx: ExtensionContext, generation: number) {
+   * and defaults the message to "Working...". Our frames already carry the
+   * full visible text (plus a leading braille spinner glyph), so we blank Pi's
+   * default working message — otherwise "Working..." paints next to the custom
+   * indicator. */
+  function applyCalmIndicator(ctx: ExtensionContext, generation: number) {
     if (!ctx.hasUI || !isActiveSession(ctx, generation)) return;
-    const frames = buildRainbowFrames(pickRandom());
+    ctx.ui.setWorkingIndicator({ frames: buildCalmFrames(), intervalMs: FRAME_INTERVAL_MS });
+    ctx.ui.setWorkingMessage("");
+  }
+
+  async function applyOhanaIndicator(ctx: ExtensionContext, generation: number) {
+    if (!ctx.hasUI || !isActiveSession(ctx, generation)) return;
+    const frames = buildRainbowFrames(await pickRandomMessage());
+    if (!ctx.hasUI || !isActiveSession(ctx, generation)) return;
     ctx.ui.setWorkingIndicator({ frames, intervalMs: FRAME_INTERVAL_MS });
     ctx.ui.setWorkingMessage("");
   }
@@ -71,13 +80,24 @@ export default function (pi: ExtensionAPI) {
     activeSessionKey = sessionKey(ctx);
     const generation = activeSessionGeneration;
 
+    clearInterval(rotationTimer);
+    rotationTimer = undefined;
+
+    const settings = readEffectiveOhanaSpinnerSettings(ctx.cwd);
+    if (settings.mode === "calm") {
+      applyCalmIndicator(ctx, generation);
+      return;
+    }
+
     // Set the initial rainbow indicator — Pi shows it only while streaming.
-    applyIndicator(ctx, generation);
+    await applyOhanaIndicator(ctx, generation);
 
     // Rotate to a new random message every 5s so the spinner stays fresh.
     // The indicator keeps animating the previous frames between rotations.
-    clearInterval(rotationTimer);
-    rotationTimer = setInterval(() => applyIndicator(ctx, generation), MESSAGE_ROTATION_MS);
+    rotationTimer = setInterval(
+      () => void applyOhanaIndicator(ctx, generation),
+      MESSAGE_ROTATION_MS,
+    );
   });
 
   pi.on("session_shutdown", async (_event, ctx) => {

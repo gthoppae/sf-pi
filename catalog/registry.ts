@@ -120,6 +120,11 @@ export const SF_PI_REGISTRY: readonly SfPiExtension[] = [
     maturity: "stable",
     defaultEnabled: true,
     events: ["session_start","session_shutdown"],
+    configurable: true,
+    getConfigPanel: async () => {
+      const mod = await import("../extensions/sf-ohana-spinner/lib/config-panel.ts");
+      return mod.createConfigPanel;
+    },
   },
   {
     id: "sf-pi-manager",

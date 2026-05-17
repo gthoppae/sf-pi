@@ -5,9 +5,17 @@
   "category": "ui",
   "maturity": "stable",
   "defaultEnabled": true,
+  "configurable": true,
   "events": ["session_start", "session_shutdown"],
   "docs": {
-    "summary": "Pi setWorkingIndicator-driven rainbow spinner with rotating Salesforce ecosystem messages. Pi manages start/stop based on streaming activity; this extension only owns frame generation.",
-    "primaryFiles": ["index.ts", "lib/messages.ts", "lib/rainbow.ts"]
+    "summary": "Pi setWorkingIndicator-driven spinner with Ohana and Calm modes. Pi manages start/stop based on streaming activity; this extension owns frame generation and a small mode preference.",
+    "primaryFiles": [
+      "index.ts",
+      "lib/config-panel.ts",
+      "lib/settings.ts",
+      "lib/messages.ts",
+      "lib/rainbow.ts"
+    ],
+    "stateFiles": ["settings.json → sfPi.ohanaSpinner.mode"]
   }
 }

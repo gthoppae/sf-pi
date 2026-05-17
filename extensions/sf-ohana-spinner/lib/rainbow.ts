@@ -45,6 +45,8 @@ export function rainbow(text: string, offset: number): string {
   return result;
 }
 
+export const CALM_WORKING_TEXT = "Processing...";
+
 /**
  * Pre-compute one animation cycle of frames for a given message. Each frame
  * is `<braille-spinner> <rainbow-text>`, both colored with the current
@@ -62,4 +64,9 @@ export function buildRainbowFrames(text: string): string[] {
     const spinner = `\x1b[38;2;${r};${g};${b}m${spinnerChar}\x1b[0m`;
     return `${spinner} ${rainbow(text, offset)}`;
   });
+}
+
+/** Build the calm mode frames: animated spinner glyph, stable text. */
+export function buildCalmFrames(text = CALM_WORKING_TEXT): string[] {
+  return SPINNER_FRAMES.map((spinnerChar) => `${spinnerChar} ${text}`);
 }

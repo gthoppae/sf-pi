@@ -4,15 +4,22 @@
  *
  * Covers:
  * - rainbow() produces valid 24-bit ANSI color sequences
- * - buildRainbowFrames() generates one frame per animation step (LCM of the
- *   braille-spinner and rainbow cycles) with a rotating spinner glyph
- *   prepended to the rainbow-colored message
+ * - buildRainbowFrames() generates one frame per animation step with a
+ *   rotating spinner glyph prepended to the rainbow-colored message
+ * - buildCalmFrames() keeps the text stable while only the spinner glyph changes
  * - Each frame is unique (animation shifts both spinner and colors)
  * - Spaces are preserved without color codes
  * - Module export still works after the migration
  */
 import { describe, it, expect } from "vitest";
-import { rainbow, buildRainbowFrames, RAINBOW_COLORS, SPINNER_FRAMES } from "../lib/rainbow.ts";
+import {
+  rainbow,
+  buildCalmFrames,
+  buildRainbowFrames,
+  CALM_WORKING_TEXT,
+  RAINBOW_COLORS,
+  SPINNER_FRAMES,
+} from "../lib/rainbow.ts";
 import { messages } from "../lib/messages.ts";
 
 // -------------------------------------------------------------------------------------------------
@@ -76,13 +83,40 @@ describe("rainbow", () => {
 });
 
 // -------------------------------------------------------------------------------------------------
-// buildRainbowFrames() — frame set generation for setWorkingIndicator
+// buildCalmFrames() — stable text frame generation for Calm mode
+// -------------------------------------------------------------------------------------------------
+
+describe("buildCalmFrames", () => {
+  it("generates one frame per spinner glyph", () => {
+    const frames = buildCalmFrames();
+    expect(frames).toHaveLength(SPINNER_FRAMES.length);
+  });
+
+  it("keeps the visible text stable while the spinner changes", () => {
+    const frames = buildCalmFrames();
+    const visibleTexts = frames.map((frame) => frame.slice(2));
+    expect(new Set(visibleTexts)).toEqual(new Set([CALM_WORKING_TEXT]));
+
+    const spinnerGlyphs = frames.map((frame) => [...frame][0]);
+    expect(spinnerGlyphs).toEqual([...SPINNER_FRAMES]);
+  });
+
+  it("does not add rainbow color escapes", () => {
+    const frames = buildCalmFrames();
+    for (const frame of frames) {
+      expect(frame).not.toMatch(/\x1b\[38;2;\d+;\d+;\d+m/);
+    }
+  });
+});
+
+// -------------------------------------------------------------------------------------------------
+// buildRainbowFrames() — frame set generation for Ohana mode
 // -------------------------------------------------------------------------------------------------
 
 describe("buildRainbowFrames", () => {
   const EXPECTED_FRAME_COUNT = Math.max(RAINBOW_COLORS.length, SPINNER_FRAMES.length);
 
-  it("generates one frame per animation step (LCM of spinner + rainbow cycles)", () => {
+  it("generates one frame per animation step", () => {
     const frames = buildRainbowFrames("Test message...");
     expect(frames).toHaveLength(EXPECTED_FRAME_COUNT);
   });
