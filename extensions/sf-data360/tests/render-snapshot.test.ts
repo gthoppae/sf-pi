@@ -3,7 +3,12 @@ import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { Text } from "@earendil-works/pi-tui";
 import { describe, expect, it } from "vitest";
 
-import { renderD360Call, renderD360Result } from "../lib/display/render.ts";
+import {
+  renderD360Call,
+  renderD360ProbeCall,
+  renderD360ProbeResult,
+  renderD360Result,
+} from "../lib/display/render.ts";
 import type { D360ResultCard } from "../lib/display/card.ts";
 
 const passthroughTheme = {
@@ -63,6 +68,27 @@ describe("d360 facade renderers", () => {
     expect(rendered).toContain("Facts");
     expect(rendered).toContain("Messages");
     expect(rendered).toContain("→ Run join_interaction_trace next");
+  });
+
+  it("renderProbeCall summarizes target org", () => {
+    const rendered = renderToString(
+      renderD360ProbeCall({ target_org: "AgentforceSTDM" }, passthroughTheme),
+    );
+
+    expect(rendered).toBe("🩺 d360 probe AgentforceSTDM");
+  });
+
+  it("renderProbeResult uses cards", () => {
+    const rendered = renderToString(
+      renderD360ProbeResult(
+        { details: { ok: true, card: { ...stdmCard(), icon: "🩺", title: "Data 360 readiness" } } },
+        {},
+        passthroughTheme,
+      ),
+    );
+
+    expect(rendered).toContain("🩺 Data 360 readiness ✅");
+    expect(rendered).toContain("📄 Full JSON: /tmp/pi-d360/output.json");
   });
 
   it("renderResult falls back to summary when no card is present", () => {

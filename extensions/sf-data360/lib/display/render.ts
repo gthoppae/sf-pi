@@ -13,6 +13,10 @@ interface D360RenderArgs {
   dry_run?: boolean;
 }
 
+interface D360ProbeRenderArgs {
+  target_org?: string;
+}
+
 interface D360RenderResult {
   content?: unknown[];
   details?: {
@@ -46,7 +50,35 @@ export function renderD360Result(
   opts: { isPartial?: boolean; expanded?: boolean },
   theme: Theme,
 ): Text {
-  if (opts.isPartial) return new Text(theme.fg("warning", "☁️ d360 · running…"), 0, 0);
+  return renderD360CardResult(result, opts, theme, "☁️ d360 · running…");
+}
+
+export function renderD360ProbeCall(args: D360ProbeRenderArgs, theme: Theme): Text {
+  const bits = [args.target_org].filter(
+    (bit): bit is string => typeof bit === "string" && bit.length > 0,
+  );
+  return new Text(
+    theme.fg("toolTitle", theme.bold("🩺 d360 probe ")) + theme.fg("muted", bits.join(" · ")),
+    0,
+    0,
+  );
+}
+
+export function renderD360ProbeResult(
+  result: D360RenderResult,
+  opts: { isPartial?: boolean; expanded?: boolean },
+  theme: Theme,
+): Text {
+  return renderD360CardResult(result, opts, theme, "🩺 d360_probe · running…");
+}
+
+export function renderD360CardResult(
+  result: D360RenderResult,
+  opts: { isPartial?: boolean; expanded?: boolean },
+  theme: Theme,
+  partialLabel: string,
+): Text {
+  if (opts.isPartial) return new Text(theme.fg("warning", partialLabel), 0, 0);
 
   const card = result.details?.card ?? result.details?.sfPi?.data?.card;
   if (card) {

@@ -19,8 +19,11 @@ import type { SfEnvironment } from "../../../lib/common/sf-environment/types.ts"
 import { connFromAlias } from "../../../lib/common/sf-conn/connection.ts";
 import { connRequest } from "../../../lib/common/sf-conn/request.ts";
 import { buildApiPath } from "./path.ts";
+import { renderCardForLlm } from "./display/card.ts";
+import { probeResultToCard } from "./display/probe-card.ts";
+import { renderD360ProbeCall, renderD360ProbeResult } from "./display/render.ts";
 import { resolveTargetOrgContext } from "./target-org.ts";
-import { buildD360Envelope } from "./truncation.ts";
+import { buildD360Envelope, writeFullD360Output } from "./truncation.ts";
 
 export const D360_PROBE_TOOL_NAME = "d360_probe";
 
@@ -102,6 +105,8 @@ export function registerD360ProbeTool(pi: ExtensionAPI): void {
       "Treat d360_probe counts as readiness/sample indicators unless countKind is total or nested_total.",
     ],
     parameters: D360ProbeParams,
+    renderCall: renderD360ProbeCall,
+    renderResult: renderD360ProbeResult,
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       const input = params as D360ProbeInput;
       const env = await resolveEnvironment(exec, ctx);
@@ -134,7 +139,11 @@ export function registerD360ProbeTool(pi: ExtensionAPI): void {
       );
 
       const summary = summarizeReadiness(probes);
-      const text = JSON.stringify({ targetOrg, apiVersion, ...summary, probes }, null, 2);
+      const raw = { targetOrg, apiVersion, ...summary, probes };
+      const text = JSON.stringify(raw, null, 2);
+      const fullOutputPath = await writeFullD360Output(text);
+      const card = probeResultToCard(raw, fullOutputPath);
+      const compactText = renderCardForLlm(card);
       const ok =
         summary.state === "ready" || summary.state === "ready_empty" || summary.state === "partial";
       const probeDetails: Record<string, unknown> = {
@@ -143,19 +152,25 @@ export function registerD360ProbeTool(pi: ExtensionAPI): void {
         apiVersion,
         ...summary,
         probes,
+        fullOutputPath,
+        card,
       };
+      const sfPi = buildD360Envelope(
+        D360_PROBE_TOOL_NAME,
+        ok,
+        compactText,
+        { ...probeDetails, summary: `state=${summary.state}` },
+        { text: compactText, fullOutputPath, outputMode: "summary" },
+      );
+      sfPi.data = { card };
+      sfPi.renderHints = { profile: "balanced", collapsedLines: 8, expandedMaxLines: 40 };
       return {
-        content: [{ type: "text", text }],
+        content: [{ type: "text", text: compactText }],
         details: {
           ...probeDetails,
           // Standard SF Pi tool-result envelope so renderers and downstream
           // tooling can read summary + state without per-tool branches.
-          sfPi: buildD360Envelope(
-            D360_PROBE_TOOL_NAME,
-            ok,
-            `Data 360 readiness: ${summary.state}`,
-            { ...probeDetails, summary: `state=${summary.state}` },
-          ),
+          sfPi,
         },
       };
     },
