@@ -53,8 +53,8 @@ describe("pi version floor", () => {
       peerDependencies?: Record<string, string>;
     };
 
-    expect(MIN_PI_VERSION).toBe("0.74.1");
-    expect(pkg.peerDependencies?.["@earendil-works/pi-coding-agent"]).toBe(">=0.74.1");
+    expect(MIN_PI_VERSION).toBe("0.75.0");
+    expect(pkg.peerDependencies?.["@earendil-works/pi-coding-agent"]).toBe(">=0.75.0");
     // pi-ai and pi-tui are transitive of pi-coding-agent and ship in lockstep,
     // so they are intentionally absent from peerDependencies (see commit
     // 4f1b753). Lock that state so they don't silently come back.
