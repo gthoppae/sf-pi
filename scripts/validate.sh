@@ -29,6 +29,9 @@ banner() {
 banner "Generate Data 360 registry"
 node scripts/generate-d360-registry.mjs --check
 
+banner "Generate Data 360 parity"
+node scripts/generate-d360-parity.mjs --check
+
 banner "Generate catalog"
 node scripts/generate-catalog.mjs
 
