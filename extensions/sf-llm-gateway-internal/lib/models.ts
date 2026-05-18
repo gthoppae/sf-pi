@@ -34,6 +34,7 @@ import {
   ANTHROPIC_FINE_GRAINED_TOOL_STREAMING_BETA,
   isGpt5FamilyResponsesModelId,
   isGpt55ModelId,
+  isOpus47ModelId,
 } from "./transport.ts";
 
 // -------------------------------------------------------------------------------------------------
@@ -354,27 +355,27 @@ export function toProviderModelConfig(
     // prompt caching, and multi-block streaming natively. We only attach
     // `anthropic-beta` when the model / runtime asks for it.
     //
-    // IMPORTANT — beta-merge shim:
-    //   pi-ai builds the Anthropic client with
-    //     defaultHeaders["anthropic-beta"] = "fine-grained-tool-streaming-2025-05-14"
-    //   and then merges model.headers on top with Object.assign. That replaces
-    //   the entire `anthropic-beta` value instead of comma-merging, so setting
-    //   any custom beta (e.g. context-1m-2025-08-07) here silently drops pi-ai's
-    //   default. fine-grained-tool-streaming is what makes tool argument
-    //   streaming robust on long generations — losing it correlates with the
-    //   late-stream `api_error: Internal server error` reports on Opus 4.7.
+    // Opus 4.7 is the first model where the gateway advertises 1M input and
+    // 128K output natively, and live probes confirm >200K-token requests work
+    // without `context-1m-2025-08-07`. Keep its default header set empty so
+    // the normal path uses no deprecated beta flags; runtime beta toggles can
+    // still add explicit headers when someone wants to probe a gateway change.
     //
-    //   Until pi-ai's mergeHeaders is fixed upstream to comma-merge this one
-    //   header, we always include fine-grained-tool-streaming in our beta list
-    //   so the final header carries both values.
+    // IMPORTANT — beta-merge shim for older Claude defaults:
+    //   pi-ai merges Anthropic headers with Object.assign. If this extension
+    //   sets any model-level `anthropic-beta`, that value replaces pi-ai's
+    //   default rather than comma-merging. For older models where we still
+    //   send default betas, include fine-grained-tool-streaming too so tool
+    //   argument streaming stays on the robust path. Do not add it to Opus
+    //   4.7's no-beta default.
     const effectiveBetas = resolveEffectiveBetas(
       def.betaHeaders ?? [],
       runtimeBetaOverrides,
       runtimeExtraBetas,
     );
-    const mergedBetas = [
-      ...new Set([...effectiveBetas, ANTHROPIC_FINE_GRAINED_TOOL_STREAMING_BETA]),
-    ];
+    const mergedBetas = shouldIncludeFineGrainedToolStreamingBeta(def.id, effectiveBetas)
+      ? [...new Set([...effectiveBetas, ANTHROPIC_FINE_GRAINED_TOOL_STREAMING_BETA])]
+      : effectiveBetas;
     return {
       id: def.id,
       name: def.name,
@@ -384,7 +385,7 @@ export function toProviderModelConfig(
       cost: { ...ZERO_COST },
       contextWindow: def.contextWindow,
       maxTokens: def.maxTokens,
-      headers: { "anthropic-beta": mergedBetas.join(",") },
+      ...(mergedBetas.length > 0 ? { headers: { "anthropic-beta": mergedBetas.join(",") } } : {}),
       // Forward Opus 4.7's xhigh opt-in so pi's `/thinking` selector
       // actually exposes the level that the DEFAULT_THINKING_LEVEL
       // constant wants to ride on.
@@ -465,6 +466,14 @@ export function resolveEffectiveBetas(
       ? modelDefaults
       : modelDefaults.filter((beta) => runtimeOverrides.has(beta));
   return [...new Set([...defaults, ...runtimeExtraBetas])];
+}
+
+function shouldIncludeFineGrainedToolStreamingBeta(
+  modelId: string,
+  effectiveBetas: readonly string[],
+): boolean {
+  if (effectiveBetas.length === 0) return false;
+  return !isOpus47ModelId(modelId);
 }
 
 /** Resolve a short alias to the full beta value. */
@@ -645,14 +654,14 @@ export function inferModelDefinition(id: string): GatewayModelDefinition {
         is46OrNewer);
 
     // Beta headers:
-    //  - Opus 4.7: extended thinking is GA, but we still send
-    //    `context-1m-2025-08-07` to stay on the documented 1M path and to
-    //    keep contextWindow truthful in the catalog.
+    //  - Opus 4.7+: gateway metadata now advertises 1M natively and live
+    //    probes confirm large-context calls work without context-1m, so the
+    //    default path sends no beta headers.
     //  - Opus 4.6: carries the default beta stack (1m + output-128k +
     //    interleaved-thinking) that unlocked its 1M window pre-GA.
     //  - Older reasoning models: interleaved-thinking only.
     const betaHeaders = is47OrNewer
-      ? [ONE_M_CONTEXT_BETA]
+      ? []
       : has1m
         ? [...DEFAULT_ANTHROPIC_BETA_HEADERS]
         : reasoning

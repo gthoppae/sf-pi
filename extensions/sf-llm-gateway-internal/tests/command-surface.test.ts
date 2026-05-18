@@ -35,6 +35,9 @@ describe("gateway command surface", () => {
     expect(getGatewayArgumentCompletions("imp")?.map((item) => item.value)).toContain(
       "import-claude",
     );
+    expect(getGatewayArgumentCompletions("lat")?.map((item) => item.value)).toContain(
+      "latency-probe",
+    );
   });
 
   it("completes beta aliases after a trailing space", () => {

@@ -56,6 +56,7 @@
  * - /sf-llm-gateway-internal tokens <modelId> [prompt]
  * - /sf-llm-gateway-internal onboard
  * - /sf-llm-gateway-internal debug <modelId> [reasoning=<level>] [tool] [adaptive]
+ * - /sf-llm-gateway-internal latency-probe [modelId] [--large] [--beta-compare] [--bedrock]
  *
  * Behavior matrix:
  *
@@ -77,6 +78,7 @@
  *   /command on                 | credentials present                | Save config, set default, register, discover
  *   /command off                | —                                  | Disable, remove pattern, switch to off-default
  *   /command refresh            | —                                  | Re-discover, refresh monthly usage
+ *   /command latency-probe      | —                                  | Run read-only gateway timing probes
  *   /command usage-probe        | —                                  | Force read-only usage probe
  *   /command beta <name> on     | —                                  | Toggle beta, re-register provider
  *   Monthly usage fetch         | cached < 60 s old                  | Use cache
@@ -191,6 +193,11 @@ import {
 import { migrateGatewaySettings } from "./lib/migrate-unify-provider.ts";
 import { fetchTransformReport, formatTransformReport, type TransformProbe } from "./lib/debug.ts";
 import { fetchGatewayDoctorReport, formatGatewayDoctorReport } from "./lib/doctor.ts";
+import {
+  fetchGatewayLatencyProbe,
+  formatGatewayLatencyProbe,
+  parseLatencyProbeArgs,
+} from "./lib/latency-probe.ts";
 import { countTokens, estimateSpend, formatTokenReport } from "./lib/token-counter.ts";
 import { buildOnboardingUrl } from "./lib/onboarding.ts";
 import { openUrlInBrowser } from "./lib/open-url.ts";
@@ -271,6 +278,7 @@ type CommandArgs = {
     | "beta"
     | "models"
     | "debug"
+    | "latency-probe"
     | "doctor"
     | "usage-probe"
     | "tokens"
@@ -614,6 +622,8 @@ async function handleCommand(
       return handleModelsCommand(pi, ctx);
     case "debug":
       return handleDebugCommand(pi, ctx, parsed.positional ?? []);
+    case "latency-probe":
+      return handleLatencyProbeCommand(pi, ctx, parsed.positional ?? []);
     case "doctor":
       return handleDoctorCommand(pi, ctx);
     case "usage-probe":
@@ -692,6 +702,8 @@ async function handlePanelAction(
       return handleModelsCommand(pi, ctx);
     case "debug":
       return handleDebugCommand(pi, ctx, [getPanelDefaultModelId(ctx)]);
+    case "latency-probe":
+      return handleLatencyProbeCommand(pi, ctx, [getPanelDefaultModelId(ctx)]);
     case "doctor":
       return handleDoctorCommand(pi, ctx);
     case "usage-probe":
@@ -1466,6 +1478,24 @@ async function importClaudeCodeGatewayConfig(
   );
 }
 
+async function handleLatencyProbeCommand(
+  pi: ExtensionAPI,
+  ctx: ExtensionCommandContext,
+  args: string[],
+): Promise<void> {
+  const options = parseLatencyProbeArgs(args, getPanelDefaultModelId(ctx));
+  const report = await fetchGatewayLatencyProbe(ctx.cwd, options);
+  await emitCommandOutput(
+    pi,
+    ctx,
+    report.ok
+      ? `Latency probe for ${options.modelId}.`
+      : `Latency probe for ${options.modelId} found issues.`,
+    formatGatewayLatencyProbe(report),
+    report.ok ? "info" : "warning",
+  );
+}
+
 async function handleTokensCommand(
   pi: ExtensionAPI,
   ctx: ExtensionCommandContext,
@@ -1725,6 +1755,9 @@ export function parseCommandArgs(args: string): CommandArgs {
   }
   if (sub === "debug") {
     return { subcommand: "debug", scope, positional: tokens.slice(1) };
+  }
+  if (sub === "latency-probe" || sub === "latency") {
+    return { subcommand: "latency-probe", scope, positional: tokens.slice(1) };
   }
   if (sub === "tokens" || sub === "count") {
     return { subcommand: "tokens", scope, positional: tokens.slice(1) };

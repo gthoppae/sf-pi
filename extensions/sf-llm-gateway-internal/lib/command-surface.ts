@@ -24,6 +24,7 @@ export type GatewayCommandId =
   | "models"
   | "doctor"
   | "usage-probe"
+  | "latency-probe"
   | "tokens"
   | "onboard"
   | "open-token"
@@ -174,6 +175,15 @@ export const GATEWAY_COMMAND_SURFACE: readonly GatewayCommandSurfaceItem[] = [
     description:
       "Inspect the upstream payload the gateway would send for a model without a completion.",
     section: "Discovery & diagnostics",
+  },
+  {
+    id: "latency-probe",
+    label: "Latency probe",
+    usage: "latency-probe [modelId] [--large] [--beta-compare] [--bedrock]",
+    description:
+      "Run read-only gateway timing probes for discovery, a tiny streamed generation, and optional Opus beta / Bedrock comparisons.",
+    section: "Discovery & diagnostics",
+    aliases: ["latency"],
   },
   // ─── Utilities ──────────────────────────────────────────────────────────────────────────────────────────────────
   {

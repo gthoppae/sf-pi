@@ -59,10 +59,10 @@ export const ALWAYS_INCLUDE_MODEL_IDS = [
 export const MODEL_PRESETS: Record<string, Omit<GatewayModelDefinition, "id">> = {
   // --- Opus 4.7 (current default) ---
   //
-  // contextWindow is 1M: live probe confirmed the upstream accepts >500K
-  // input tokens with or without the context-1m beta header, so we surface
-  // 1M to pi-ai. We still set the context-1m beta header in `betaHeaders`
-  // so the request is on the documented 1M path.
+  // contextWindow is 1M: live probes confirmed the upstream accepts >200K
+  // input tokens without the context-1m beta header, and gateway metadata
+  // now advertises 1M natively. Keep default betaHeaders empty so the
+  // default Opus 4.7 path avoids deprecated / unnecessary beta flags.
   //
   // maxTokens is deliberately 64_000 here. Live probes showed
   // `max_tokens: 128000 + effort: "max"` on heavier generations
@@ -77,7 +77,7 @@ export const MODEL_PRESETS: Record<string, Omit<GatewayModelDefinition, "id">> =
     input: ["text", "image"],
     contextWindow: 1_000_000,
     maxTokens: 64_000,
-    betaHeaders: [ONE_M_CONTEXT_BETA],
+    betaHeaders: [],
     thinkingLevelMap: OPUS_47_THINKING_LEVEL_MAP,
   },
   "claude-opus-4-7-v1": {
@@ -87,7 +87,7 @@ export const MODEL_PRESETS: Record<string, Omit<GatewayModelDefinition, "id">> =
     input: ["text", "image"],
     contextWindow: 1_000_000,
     maxTokens: 64_000,
-    betaHeaders: [ONE_M_CONTEXT_BETA],
+    betaHeaders: [],
     thinkingLevelMap: OPUS_47_THINKING_LEVEL_MAP,
   },
   "claude-opus-4-7-20250416": {
@@ -97,7 +97,7 @@ export const MODEL_PRESETS: Record<string, Omit<GatewayModelDefinition, "id">> =
     input: ["text", "image"],
     contextWindow: 1_000_000,
     maxTokens: 64_000,
-    betaHeaders: [ONE_M_CONTEXT_BETA],
+    betaHeaders: [],
     thinkingLevelMap: OPUS_47_THINKING_LEVEL_MAP,
   },
   "us.anthropic.claude-opus-4-7-v1": {
@@ -107,7 +107,7 @@ export const MODEL_PRESETS: Record<string, Omit<GatewayModelDefinition, "id">> =
     input: ["text", "image"],
     contextWindow: 1_000_000,
     maxTokens: 64_000,
-    betaHeaders: [ONE_M_CONTEXT_BETA],
+    betaHeaders: [],
     thinkingLevelMap: OPUS_47_THINKING_LEVEL_MAP,
   },
   // --- Opus 4.6 (previous default) ---

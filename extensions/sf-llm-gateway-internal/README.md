@@ -276,17 +276,17 @@ no-args command falls back to the text status report.
 
 Primary actions are grouped as:
 
-| Group                   | Actions                                               | Purpose                                                                                                         |
-| ----------------------- | ----------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
-| Connect                 | `setup`, `import-claude`, `open-token`, `onboard`     | Single onboarding surface: enter credentials, import from Claude Code, open the token page, copy the root link. |
-| Setup                   | `on`, `off`, `set-default`                            | Post-connect tweaks: enable/disable gateway routing, control gateway defaults.                                  |
-| Discovery & diagnostics | `refresh`, `models`, `doctor`, `usage-probe`, `debug` | Re-probe model discovery, health, usage scope, and transformed upstream payloads.                               |
-| Utilities               | `tokens`, `beta`                                      | Count prompt tokens/cost and manage runtime beta headers.                                                       |
-| Reference               | `status`, `help`                                      | Print complete text reports for copying or headless use.                                                        |
+| Group                   | Actions                                                                | Purpose                                                                                                         |
+| ----------------------- | ---------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------- |
+| Connect                 | `setup`, `import-claude`, `open-token`, `onboard`                      | Single onboarding surface: enter credentials, import from Claude Code, open the token page, copy the root link. |
+| Setup                   | `on`, `off`, `set-default`                                             | Post-connect tweaks: enable/disable gateway routing, control gateway defaults.                                  |
+| Discovery & diagnostics | `refresh`, `models`, `doctor`, `usage-probe`, `debug`, `latency-probe` | Re-probe model discovery, health, usage scope, latency, and transformed upstream payloads.                      |
+| Utilities               | `tokens`, `beta`                                                       | Count prompt tokens/cost and manage runtime beta headers.                                                       |
+| Reference               | `status`, `help`                                                       | Print complete text reports for copying or headless use.                                                        |
 
 Slash completions use the same command metadata as the panel, so subcommands
 such as `tokens`, `onboard`, `open-token`, `import-claude`, `doctor`, `debug`,
-and `usage-probe` show short self-explanatory descriptions while typing.
+`latency-probe`, and `usage-probe` show short self-explanatory descriptions while typing.
 
 ## Behavior Matrix
 
@@ -310,6 +310,7 @@ and `usage-probe` show short self-explanatory descriptions while typing.
 | /command off                 | exclusive scope                       | Disable, restore previous scoped models, switch to off-default                                                                                 |
 | /command refresh             | —                                     | Re-discover, refresh monthly usage                                                                                                             |
 | /command usage-probe         | —                                     | Force a read-only usage probe and classify key/user spend scope                                                                                |
+| /command latency-probe       | —                                     | Run read-only timing probes for discovery and a tiny streamed generation                                                                       |
 | /command usage-probe --trace | —                                     | Render the per-endpoint trace (timings + status) from the last refresh, plus any active key-conflict warning                                   |
 | /command beta \<name\> on    | —                                     | Toggle beta, re-register provider                                                                                                              |
 | Monthly usage fetch          | cached < 60 s old                     | Use cache                                                                                                                                      |
@@ -344,6 +345,7 @@ extensions/sf-llm-gateway-internal/
     discovery.ts            ← implementation module
     doctor.ts               ← implementation module
     gateway-url.ts          ← implementation module
+    latency-probe.ts        ← implementation module
     migrate-unify-provider.ts← implementation module
     models.ts               ← implementation module
     monthly-usage.ts        ← implementation module
@@ -381,6 +383,7 @@ extensions/sf-llm-gateway-internal/
     gateway-url.test.ts     ← unit / smoke test
     global-config.test.ts   ← unit / smoke test
     gpt55-responses.test.ts ← unit / smoke test
+    latency-probe.test.ts   ← unit / smoke test
     migrate-unify-provider.test.ts← unit / smoke test
     model-group-drift.test.ts← unit / smoke test
     models.test.ts          ← unit / smoke test
@@ -481,6 +484,21 @@ Examples:
 This is the fastest way to verify that the shims are producing a payload shape
 the gateway will accept, without burning tokens on a real completion.
 
+## Latency probe: `/sf-llm-gateway-internal latency-probe`
+
+`latency-probe` runs direct gateway timing checks so you can separate provider /
+gateway latency from pi's local transport overhead:
+
+```text
+/sf-llm-gateway-internal latency-probe [modelId] [--large] [--beta-compare] [--bedrock]
+```
+
+Default mode performs metadata probes plus one tiny streamed generation with
+`max_tokens` / `max_output_tokens` set to 1. `--large` adds a large filler
+prompt and should be used sparingly because it still consumes gateway quota.
+For Opus 4.7, `--beta-compare` compares no-beta vs `context-1m-2025-08-07`,
+and `--bedrock` measures the Bedrock compatibility stream's first chunk.
+
 ## Debugging: wire trace
 
 When the gateway returns empty or unexpected responses, enable the opt-in
@@ -564,10 +582,12 @@ overrides stick. If you still see a reset, check your settings for an
 explicit default that could be winning.
 
 **Beta headers aren't taking effect:**
-Check the active betas with `/sf-llm-gateway beta`. pi-ai merges
-the `anthropic-beta` header via `Object.assign`, so the shim always
-includes `fine-grained-tool-streaming-2025-05-14` first to guarantee it
-isn't silently dropped when you add another beta.
+Check the active betas with `/sf-llm-gateway beta`. Opus 4.7 sends no
+Anthropic beta headers by default because the gateway now advertises 1M
+context natively and live probes accept >200K-token prompts without
+`context-1m-2025-08-07`. Older Claude presets that still need model-level
+betas include `fine-grained-tool-streaming-2025-05-14` in the same header so
+pi-ai's `Object.assign` header merge cannot silently drop it.
 
 **Monthly-usage footer is stale or missing:**
 Usage is cached for 60 seconds and refreshes automatically on every

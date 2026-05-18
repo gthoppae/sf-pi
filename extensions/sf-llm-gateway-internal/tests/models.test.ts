@@ -232,67 +232,48 @@ describe("toProviderModelConfig", () => {
     expect(config.cost.input).toBe(0);
   });
 
-  it("returns 1M context / 64K max for Opus 4.7 with the context-1m beta header", () => {
-    // Opus 4.7 runs on the 1M-context path; we surface contextWindow=1M and
-    // keep `anthropic-beta: context-1m-2025-08-07` in headers so the request
-    // is on the documented large-context route. maxTokens is 64K because live
-    // repros showed 128K + effort=max intermittently surfaces
-    // `api_error: Internal server error` from upstream; the model hard
-    // ceiling is 128K and callers can raise per request.
-    //
-    // The anthropic-beta header also carries fine-grained-tool-streaming
-    // because pi-ai's Object.assign-based header merge would otherwise
-    // replace pi-ai's default value with ours. See the note in
-    // toProviderModelConfig().
+  it("returns 1M context / 64K max for Opus 4.7 without default beta headers", () => {
+    // Opus 4.7 now advertises 1M input natively through the gateway, and live
+    // probes confirm >200K-token requests work without context-1m. Keep the
+    // default route free of deprecated / unnecessary beta flags. maxTokens is
+    // still 64K because earlier heavy-generation probes showed 128K output
+    // requests were less reliable; callers can raise per request.
     const config = toProviderModelConfig("claude-opus-4-7", null, new Set());
     expect(config.id).toBe("claude-opus-4-7");
     expect(config.reasoning).toBe(true);
     expect(config.contextWindow).toBe(1_000_000);
     expect(config.maxTokens).toBe(64_000);
-    const beta = config.headers?.["anthropic-beta"] ?? "";
-    expect(beta.split(",")).toContain("context-1m-2025-08-07");
-    expect(beta.split(",")).toContain("fine-grained-tool-streaming-2025-05-14");
+    expect(config.headers).toBeUndefined();
   });
 
-  it("uses the same preset for unknown Opus 4.7 model IDs via inference", () => {
+  it("uses the same no-beta preset for unknown Opus 4.7 model IDs via inference", () => {
     const config = toProviderModelConfig("claude-opus-4-7-preview", null, new Set());
     expect(config.contextWindow).toBe(1_000_000);
     expect(config.maxTokens).toBe(64_000);
-    const beta = config.headers?.["anthropic-beta"] ?? "";
-    expect(beta.split(",")).toContain("context-1m-2025-08-07");
-    expect(beta.split(",")).toContain("fine-grained-tool-streaming-2025-05-14");
+    expect(config.headers).toBeUndefined();
   });
 
-  it("sends the full beta stack for Opus 4.6 and context-1m + fine-grained-tool-streaming for Opus 4.7", () => {
+  it("sends the full beta stack for Opus 4.6 but no default betas for Opus 4.7", () => {
     const opus46 = toProviderModelConfig("claude-opus-4-6-v1", null, new Set());
     const opus47 = toProviderModelConfig("claude-opus-4-7", null, new Set());
     expect(opus46.headers?.["anthropic-beta"]).toContain("context-1m-2025-08-07");
     expect(opus46.headers?.["anthropic-beta"]).toContain("interleaved-thinking-2025-05-14");
     expect(opus46.headers?.["anthropic-beta"]).toContain("fine-grained-tool-streaming-2025-05-14");
-    const opus47Betas = (opus47.headers?.["anthropic-beta"] ?? "").split(",");
-    expect(opus47Betas).toContain("context-1m-2025-08-07");
-    expect(opus47Betas).toContain("fine-grained-tool-streaming-2025-05-14");
+    expect(opus47.headers).toBeUndefined();
   });
 
-  it("always merges fine-grained-tool-streaming into the anthropic-beta list (workaround for pi-ai Object.assign header replace)", () => {
-    // pi-ai sets anthropic-beta to fine-grained-tool-streaming by default and
-    // then merges model.headers on top with Object.assign. Object.assign
-    // replaces the whole anthropic-beta value instead of comma-merging — so
-    // any custom value here silently drops pi-ai's default. We work around
-    // that by always including fine-grained-tool-streaming in our header,
-    // with deduplication so it never appears twice.
-    for (const id of [
-      "claude-opus-4-7",
-      "claude-opus-4-6-v1",
-      "claude-sonnet-4-6",
-      "claude-haiku-4-5-20251001", // non-reasoning, typically empty beta list
-    ]) {
+  it("merges fine-grained-tool-streaming into non-Opus-4.7 beta lists", () => {
+    // When this extension sets model-level beta headers for older models,
+    // include fine-grained-tool-streaming in the same header value so pi-ai's
+    // Object.assign-based merge cannot drop it. Opus 4.7 has no default beta
+    // list, so it should not receive the workaround header by default.
+    for (const id of ["claude-opus-4-6-v1", "claude-sonnet-4-6"]) {
       const beta = toProviderModelConfig(id, null, new Set()).headers?.["anthropic-beta"] ?? "";
       const parts = beta.split(",").filter(Boolean);
       expect(parts).toContain("fine-grained-tool-streaming-2025-05-14");
-      // No duplicates.
       expect(new Set(parts).size).toBe(parts.length);
     }
+    expect(toProviderModelConfig("claude-opus-4-7", null, new Set()).headers).toBeUndefined();
   });
 
   it("returns a valid config for a generic Gemini model", () => {
@@ -426,8 +407,8 @@ describe("toProviderModelConfig", () => {
   });
 
   it("preserves the preset when /v1/model/info reports a lower context window", () => {
-    // LiteLLM's metadata reports max_input_tokens=200000 for Opus 4.7 even
-    // though the upstream serves 1M with the context-1m beta header. The
+    // Some LiteLLM metadata snapshots reported max_input_tokens=200000 for
+    // Opus 4.7 even though the current gateway serves 1M natively. The
     // preset must win so pi-ai does not silently treat 4.7 as a 200K model.
     const cfg = toProviderModelConfig("claude-opus-4-7", null, new Set(), {
       id: "claude-opus-4-7",
@@ -521,5 +502,15 @@ describe("toProviderModelConfig", () => {
 
     expect(config.headers?.["anthropic-beta"]).toContain("interleaved-thinking-2025-05-14");
     expect(config.headers?.["anthropic-beta"]).toContain("prompt-caching-2024-07-31");
+  });
+
+  it("can explicitly inject a runtime beta for Opus 4.7 without default betas", () => {
+    const config = toProviderModelConfig(
+      "claude-opus-4-7",
+      null,
+      new Set(["context-1m-2025-08-07"]),
+    );
+
+    expect(config.headers?.["anthropic-beta"]).toBe("context-1m-2025-08-07");
   });
 });

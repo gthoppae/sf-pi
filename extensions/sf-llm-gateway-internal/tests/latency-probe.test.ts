@@ -1,0 +1,53 @@
+/* SPDX-License-Identifier: Apache-2.0 */
+/** Unit tests for latency-probe argument parsing and report formatting. */
+import { describe, expect, it } from "vitest";
+import { formatGatewayLatencyProbe, parseLatencyProbeArgs } from "../lib/latency-probe.ts";
+
+describe("parseLatencyProbeArgs", () => {
+  it("defaults to the current/default model", () => {
+    expect(parseLatencyProbeArgs([], "claude-opus-4-7")).toEqual({
+      modelId: "claude-opus-4-7",
+      includeLarge: false,
+      includeBetaCompare: false,
+      includeBedrock: false,
+    });
+  });
+
+  it("parses model and flags", () => {
+    expect(
+      parseLatencyProbeArgs(["gpt-5.5", "--large", "--beta-compare", "--bedrock"], "gpt-5"),
+    ).toEqual({
+      modelId: "gpt-5.5",
+      includeLarge: true,
+      includeBetaCompare: true,
+      includeBedrock: true,
+    });
+  });
+});
+
+describe("formatGatewayLatencyProbe", () => {
+  it("renders timing and usage summaries without payload details", () => {
+    const output = formatGatewayLatencyProbe({
+      ok: true,
+      modelId: "claude-opus-4-7",
+      generatedAt: "2026-05-18T00:00:00.000Z",
+      notes: ["example note"],
+      probes: [
+        {
+          label: "small generation",
+          ok: true,
+          status: 200,
+          durationMs: 1234,
+          firstTextMs: 800,
+          usage: { input_tokens: 10, output_tokens: 1, ignored: "nope" },
+        },
+      ],
+    });
+
+    expect(output).toContain("Gateway latency probe for claude-opus-4-7");
+    expect(output).toContain("small generation");
+    expect(output).toContain("firstText=800ms");
+    expect(output).toContain("input_tokens=10");
+    expect(output).not.toContain("ignored");
+  });
+});

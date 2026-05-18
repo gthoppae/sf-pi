@@ -157,6 +157,18 @@ describe("parseCommandArgs", () => {
     expect(result.positional).toEqual([]);
   });
 
+  it("parses 'latency-probe' with positional args", () => {
+    const result = parseCommandArgs("latency-probe claude-opus-4-7 --large --beta-compare");
+    expect(result.subcommand).toBe("latency-probe");
+    expect(result.positional).toEqual(["claude-opus-4-7", "--large", "--beta-compare"]);
+  });
+
+  it("parses 'latency' as latency-probe alias", () => {
+    const result = parseCommandArgs("latency gpt-5.5");
+    expect(result.subcommand).toBe("latency-probe");
+    expect(result.positional).toEqual(["gpt-5.5"]);
+  });
+
   it("parses 'help'", () => {
     const result = parseCommandArgs("help");
     expect(result.subcommand).toBe("help");
