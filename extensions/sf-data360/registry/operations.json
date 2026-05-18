@@ -697,7 +697,8 @@
     "method": "POST",
     "path": "/ssot/calculated-insights/{ciName}/actions/run",
     "requiredParams": ["ciName"],
-    "safety": "confirmed"
+    "safety": "confirmed",
+    "tips": "Run after validating and creating/enabling the calculated insight. Use dry_run first; execution can consume compute and update downstream results."
   },
   {
     "name": "d360_ci_enable",
@@ -706,7 +707,8 @@
     "method": "POST",
     "path": "/ssot/calculated-insights/{ciName}/actions/enable",
     "requiredParams": ["ciName"],
-    "safety": "confirmed"
+    "safety": "confirmed",
+    "tips": "Use dry_run first; enabling a calculated insight can make it available to downstream segments and activations."
   },
   {
     "name": "d360_ci_disable",
@@ -715,7 +717,8 @@
     "method": "POST",
     "path": "/ssot/calculated-insights/{ciName}/actions/disable",
     "requiredParams": ["ciName"],
-    "safety": "confirmed"
+    "safety": "confirmed",
+    "tips": "Use dry_run first; disabling a calculated insight can affect dependent segments and activations."
   },
   {
     "name": "d360_segment_create",

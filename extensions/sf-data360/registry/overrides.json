@@ -319,15 +319,18 @@
   },
   "d360_ci_run": {
     "requiredParams": ["ciName"],
-    "safety": "confirmed"
+    "safety": "confirmed",
+    "tips": "Run after validating and creating/enabling the calculated insight. Use dry_run first; execution can consume compute and update downstream results."
   },
   "d360_ci_enable": {
     "requiredParams": ["ciName"],
-    "safety": "confirmed"
+    "safety": "confirmed",
+    "tips": "Use dry_run first; enabling a calculated insight can make it available to downstream segments and activations."
   },
   "d360_ci_disable": {
     "requiredParams": ["ciName"],
-    "safety": "confirmed"
+    "safety": "confirmed",
+    "tips": "Use dry_run first; disabling a calculated insight can affect dependent segments and activations."
   },
   "d360_segment_create": {
     "requiredParams": ["body"],

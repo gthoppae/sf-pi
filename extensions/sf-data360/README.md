@@ -125,13 +125,26 @@ a small number of verified non-sensitive fields.
 | Headless mutating call requiring confirmation                                  | Blocked unless `SF_D360_ALLOW_HEADLESS_WRITE=1`. |
 
 Use `dry_run: true` before mutating calls to inspect the exact method, path,
-target org, org type, and safety decision.
+target org, org type, and safety decision. For registry-backed `d360 execute`
+operations with `safety: "confirmed"`, actual execution also requires
+`allow_confirmed: true`; dry-run is the default review step, not the approval.
+
+## Facade Operation Coverage
+
+The `d360` facade registry is intentionally progressive: read-only operations
+first, safe validation/test/search/query POST operations second,
+non-destructive confirmed lifecycle operations third, and destructive operations
+last only after stricter review UX exists.
+
+The current coverage matrix, confirmed-operation workflow, and per-family
+"what to run first" checklist live in
+`skills/sf-data360/references/facade-coverage.md`.
 
 ## Skill and References
 
 The bundled `sf-data360` skill is intentionally short. It points agents to
 reference files under `skills/sf-data360/references/` for endpoint families,
-workflow recipes, action coverage, request-body shapes, query patterns, examples,
+workflow recipes, action coverage, facade coverage, request-body shapes, query patterns, examples,
 safety rules, Agentforce Session Tracing (STDM), and Agent Platform Tracing.
 
 When local references are not enough, use the public upstream Data 360 MCP server

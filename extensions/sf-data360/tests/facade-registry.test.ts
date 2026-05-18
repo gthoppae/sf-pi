@@ -170,6 +170,28 @@ describe("d360 facade registry", () => {
     }
   });
 
+  it("keeps confirmed operations reviewable", () => {
+    const examples = getD360Examples();
+
+    for (const operation of getD360Operations().filter((entry) => entry.safety === "confirmed")) {
+      expect(
+        operation.requiredParams?.length,
+        `${operation.name} missing required params`,
+      ).toBeGreaterThan(0);
+      expect(operation.tips, `${operation.name} missing safety tips`).toBeTruthy();
+      expect(
+        examples[operation.name],
+        `${operation.name} missing public-safe example`,
+      ).toBeTruthy();
+    }
+  });
+
+  it("keeps destructive operations out of the facade until stricter review UX exists", () => {
+    expect(getD360Operations().filter((operation) => operation.safety === "destructive")).toEqual(
+      [],
+    );
+  });
+
   it("validates registry integrity", () => {
     const families = new Set(getD360Families().map((family) => family.name));
 

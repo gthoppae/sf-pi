@@ -768,5 +768,160 @@
       "connectorType": "SNOWFLAKE",
       "limit": 10
     }
+  },
+  "d360_ci_update": {
+    "operation": "d360_ci_update",
+    "params": {
+      "ciName": "Example_Score__cio",
+      "body": {
+        "displayName": "Example Score Updated",
+        "description": "Dry-run placeholder only. Reuse validated SQL before execution.",
+        "expression": "SELECT SomeDmo__dlm.Id__c AS id__c, COUNT(*) AS count__c FROM SomeDmo__dlm GROUP BY SomeDmo__dlm.Id__c"
+      }
+    }
+  },
+  "d360_ci_enable": {
+    "operation": "d360_ci_enable",
+    "params": {
+      "ciName": "Example_Score__cio"
+    }
+  },
+  "d360_ci_disable": {
+    "operation": "d360_ci_disable",
+    "params": {
+      "ciName": "Example_Score__cio"
+    }
+  },
+  "d360_segment_update": {
+    "operation": "d360_segment_update",
+    "params": {
+      "segmentId": "ExampleSegmentId",
+      "body": {
+        "displayName": "Example Segment Updated",
+        "description": "Dry-run placeholder only."
+      }
+    }
+  },
+  "d360_segment_deactivate": {
+    "operation": "d360_segment_deactivate",
+    "params": {
+      "segmentApiName": "Example_Segment"
+    }
+  },
+  "d360_activation_update": {
+    "operation": "d360_activation_update",
+    "params": {
+      "activationId": "ExampleActivationId",
+      "body": {
+        "displayName": "Example Activation Updated",
+        "description": "Dry-run placeholder only."
+      }
+    }
+  },
+  "d360_activation_target_update": {
+    "operation": "d360_activation_target_update",
+    "params": {
+      "activationTargetId": "ExampleActivationTargetId",
+      "body": {
+        "displayName": "Example Activation Target Updated",
+        "description": "Dry-run placeholder only."
+      }
+    }
+  },
+  "d360_transform_update": {
+    "operation": "d360_transform_update",
+    "params": {
+      "transformId": "ExampleTransformId",
+      "body": {
+        "label": "Example Transform Updated",
+        "description": "Dry-run placeholder only."
+      }
+    }
+  },
+  "d360_transform_run": {
+    "operation": "d360_transform_run",
+    "params": {
+      "transformId": "ExampleTransformId"
+    }
+  },
+  "d360_dataaction_target_update": {
+    "operation": "d360_dataaction_target_update",
+    "params": {
+      "dataActionTargetId": "ExampleDataActionTargetId",
+      "body": {
+        "label": "Example Data Action Target Updated",
+        "config": {
+          "targetEndpoint": "https://example.invalid/data-action-updated",
+          "apiContract": "ExampleContract"
+        }
+      }
+    }
+  },
+  "d360_retriever_update": {
+    "operation": "d360_retriever_update",
+    "params": {
+      "retrieverIdOrName": "ExampleRetriever",
+      "body": {
+        "label": "Example Retriever Updated",
+        "description": "Dry-run placeholder only."
+      }
+    }
+  },
+  "d360_retriever_config_update": {
+    "operation": "d360_retriever_config_update",
+    "params": {
+      "retrieverIdOrName": "ExampleRetriever",
+      "configurationIdOrName": "ExampleConfiguration",
+      "body": {
+        "isActive": true
+      }
+    }
+  },
+  "d360_search_index_update": {
+    "operation": "d360_search_index_update",
+    "params": {
+      "searchIndexApiNameOrId": "Example_Search_Index",
+      "body": {
+        "label": "Example Search Index Updated",
+        "developerName": "Example_Search_Index",
+        "description": "Dry-run placeholder only. Populate required config fields from d360_search_index_config before execution.",
+        "sourceDmoDeveloperName": "ExampleSource__dlm",
+        "chunkDmoName": "Example Chunk DMO",
+        "chunkDmoDeveloperName": "Example_Chunk",
+        "vectorDmoName": "Example Vector DMO",
+        "vectorDmoDeveloperName": "Example_Vector",
+        "searchType": "HYBRID",
+        "chunkingConfiguration": {
+          "fieldLevelConfigurations": []
+        },
+        "vectorEmbedding": {
+          "vectorEmbeddingRelatedFields": []
+        },
+        "vectorEmbeddingConfiguration": {
+          "embeddingModel": {
+            "id": "example_embedding_model",
+            "userValues": []
+          },
+          "index": {
+            "id": "HNSW",
+            "userValues": []
+          },
+          "similarityMetric": "COSINE"
+        },
+        "transformConfigurations": []
+      }
+    }
+  },
+  "d360_datastream_update": {
+    "operation": "d360_datastream_update",
+    "params": {
+      "dataStreamId": "ExampleDataStreamId",
+      "body": {
+        "label": "Example Data Stream Updated",
+        "refreshConfig": {
+          "refreshMode": "TOTAL_REPLACE"
+        }
+      }
+    }
   }
 }

@@ -119,6 +119,7 @@ Read these only when needed:
 - `references/endpoint-families.md` — endpoint family map.
 - `references/workflows.md` — read-only smoke matrix and recursive validation recipe.
 - `references/action-coverage.md` — verified live-mutation lifecycle proofs.
+- `references/facade-coverage.md` — operation coverage matrix, confirmed-operation workflow, and per-family pre-flight checklist.
 - `references/safety.md` — mutating-operation safety policy.
 - `references/readiness.md` — how to interpret `d360_probe` output.
 - `references/troubleshooting.md` — symptom → cause → fix index.
