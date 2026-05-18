@@ -18,26 +18,16 @@ export function getRecentSessions(maxCount: number = 3): RecentSession[] {
     join(dirname(globalAgentDir()), "sessions"),
   ];
 
-  const sessions: { name: string; mtime: number }[] = [];
+  const sessions: { path: string; projectDir: string; mtime: number }[] = [];
 
-  function scanDir(dir: string) {
-    if (!existsSync(dir)) return;
+  function scanSessionsRoot(rootDir: string) {
+    if (!existsSync(rootDir)) return;
     try {
-      for (const entry of readdirSync(dir)) {
-        const entryPath = join(dir, entry);
+      for (const entry of readdirSync(rootDir)) {
+        const projectDir = join(rootDir, entry);
         try {
-          const stats = statSync(entryPath);
-          if (stats.isDirectory()) {
-            scanDir(entryPath);
-          } else if (entry.endsWith(".jsonl")) {
-            const parentName = basename(dir);
-            let projectName = parentName;
-            if (parentName.startsWith("--")) {
-              const parts = parentName.split("-").filter(Boolean);
-              projectName = parts[parts.length - 1] || parentName;
-            }
-            sessions.push({ name: projectName, mtime: stats.mtimeMs });
-          }
+          if (!statSync(projectDir).isDirectory()) continue;
+          scanProjectSessionDir(projectDir);
         } catch {
           // Skip unreadable entries; the splash screen should stay best-effort.
         }
@@ -47,8 +37,29 @@ export function getRecentSessions(maxCount: number = 3): RecentSession[] {
     }
   }
 
+  function scanProjectSessionDir(projectDir: string) {
+    // Pi's project session directory stores real sessions as direct JSONL
+    // children. Nested directories are extension/subagent artifacts, so do
+    // not recurse or the splash can show labels like run-0/run-1.
+    try {
+      for (const entry of readdirSync(projectDir)) {
+        if (!entry.endsWith(".jsonl")) continue;
+        const sessionPath = join(projectDir, entry);
+        try {
+          const stats = statSync(sessionPath);
+          if (!stats.isFile()) continue;
+          sessions.push({ path: sessionPath, projectDir, mtime: stats.mtimeMs });
+        } catch {
+          // Skip unreadable session files.
+        }
+      }
+    } catch {
+      // Ignore unreadable project session directories.
+    }
+  }
+
   for (const sessionsDir of sessionsDirs) {
-    scanDir(sessionsDir);
+    scanSessionsRoot(sessionsDir);
   }
 
   if (sessions.length === 0) return [];
@@ -56,19 +67,45 @@ export function getRecentSessions(maxCount: number = 3): RecentSession[] {
   sessions.sort((left, right) => right.mtime - left.mtime);
 
   const seen = new Set<string>();
-  const uniqueSessions: typeof sessions = [];
+  const uniqueSessions: { name: string; mtime: number }[] = [];
   for (const session of sessions) {
-    if (!seen.has(session.name)) {
-      seen.add(session.name);
-      uniqueSessions.push(session);
+    const name = readProjectName(session.path, session.projectDir);
+    if (!seen.has(name)) {
+      seen.add(name);
+      uniqueSessions.push({ name, mtime: session.mtime });
+      if (uniqueSessions.length >= maxCount) break;
     }
   }
 
   const now = Date.now();
-  return uniqueSessions.slice(0, maxCount).map((session) => ({
+  return uniqueSessions.map((session) => ({
     name: session.name.length > 20 ? session.name.slice(0, 17) + "…" : session.name,
     timeAgo: formatTimeAgo(now - session.mtime),
   }));
+}
+
+function readProjectName(sessionPath: string, projectDir: string): string {
+  try {
+    const firstLine = readFileSync(sessionPath, "utf-8").split("\n", 1)[0];
+    if (firstLine) {
+      const header = JSON.parse(firstLine) as { cwd?: unknown };
+      if (typeof header.cwd === "string" && header.cwd.trim()) {
+        return basename(header.cwd) || header.cwd;
+      }
+    }
+  } catch {
+    // Fall through to the directory-derived label below.
+  }
+  return projectNameFromSessionDir(projectDir);
+}
+
+function projectNameFromSessionDir(projectDir: string): string {
+  const parentName = basename(projectDir);
+  if (parentName.startsWith("--") && parentName.endsWith("--")) {
+    const parts = parentName.slice(2, -2).split("-").filter(Boolean);
+    return parts[parts.length - 1] || parentName;
+  }
+  return parentName;
 }
 
 export function estimateMonthlyCost(): number {

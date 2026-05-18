@@ -175,6 +175,7 @@ extensions/sf-welcome/
     font-installer.test.ts  ← unit / smoke test
     recommendations-status.test.ts← unit / smoke test
     sdk-migration.test.ts   ← unit / smoke test
+    session-data.test.ts    ← unit / smoke test
     sf-cli-status.test.ts   ← unit / smoke test
     sf-skills-status.test.ts← unit / smoke test
     smoke.test.ts           ← unit / smoke test
