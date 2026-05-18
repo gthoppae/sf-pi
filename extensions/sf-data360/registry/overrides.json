@@ -76,7 +76,7 @@
   },
   "d360_datakits_list": {
     "safety": "read",
-    "optionalParams": ["limit", "offset"]
+    "optionalParams": ["dataspace", "limit", "offset"]
   },
   "d360_query_sql_status": {
     "requiredParams": ["queryId"],
@@ -231,27 +231,33 @@
   },
   "d360_datakit_get": {
     "requiredParams": ["dataKitId"],
-    "safety": "read"
+    "safety": "read",
+    "optionalParams": ["dataspace"]
   },
   "d360_datakit_manifest": {
     "requiredParams": ["dataKitId"],
-    "safety": "read"
+    "safety": "read",
+    "optionalParams": ["dataspace"]
   },
   "d360_datakit_deploy_status": {
     "requiredParams": ["jobId"],
-    "safety": "read"
+    "safety": "read",
+    "optionalParams": ["dataspace"]
   },
   "d360_datakit_components": {
     "requiredParams": ["dataKitId"],
-    "safety": "read"
+    "safety": "read",
+    "optionalParams": ["dataspace"]
   },
   "d360_datakit_component_status": {
     "requiredParams": ["dataKitId", "componentId"],
-    "safety": "read"
+    "safety": "read",
+    "optionalParams": ["dataspace"]
   },
   "d360_datakit_component_deps": {
     "requiredParams": ["dataKitId", "componentId"],
-    "safety": "read"
+    "safety": "read",
+    "optionalParams": ["dataspace"]
   },
   "d360_profile_metadata": {
     "safety": "read"
@@ -810,5 +816,16 @@
     "optionalParams": ["dataspace"],
     "safety": "confirmed",
     "tips": "Dry-run first; relationship changes affect joins and semantic query results."
+  },
+  "d360_datakit_list": {
+    "optionalParams": ["dataspace", "limit", "offset"],
+    "safety": "read",
+    "tips": "Use this to discover dataKitId values before component, manifest, or deployment-status operations."
+  },
+  "d360_datakit_deploy": {
+    "requiredParams": ["body"],
+    "optionalParams": ["dataspace"],
+    "safety": "confirmed",
+    "tips": "Review the manifest, component dependencies, and target dataspace before deployment. Use dry_run before execution."
   }
 }

@@ -1278,5 +1278,28 @@
         }
       }
     }
+  },
+  "d360_datakit_deploy": {
+    "operation": "d360_datakit_deploy",
+    "params": {
+      "body": {
+        "components": [
+          {
+            "type": "SemanticModel",
+            "info": {
+              "name": "ExampleSemanticModel",
+              "dataSpaceName": "default",
+              "description": "Example component placeholder. Replace with reviewed manifest component info before execution."
+            }
+          }
+        ]
+      }
+    }
+  },
+  "d360_datakit_list": {
+    "operation": "d360_datakit_list",
+    "params": {
+      "limit": 10
+    }
   }
 }

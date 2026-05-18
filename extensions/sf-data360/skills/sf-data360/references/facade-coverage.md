@@ -8,7 +8,7 @@ should be added to the JSON registry, not as new Pi tools.
 
 ## Operation coverage matrix
 
-Current generated registry size: **164 operations**.
+Current generated registry size: **166 operations**.
 
 | Family                 | Read | Safe POST | Confirmed | Destructive |
 | ---------------------- | ---: | --------: | --------: | ----------: |
@@ -22,7 +22,7 @@ Current generated registry size: **164 operations**.
 | Transforms and Actions |    2 |         0 |         0 |           0 |
 | Identity Resolution    |    3 |         0 |         5 |           0 |
 | Semantic Retrieval     |   30 |         3 |        19 |           0 |
-| DataKit                |    7 |         0 |         0 |           0 |
+| DataKit                |    8 |         0 |         1 |           0 |
 | DMO                    |    2 |         0 |         2 |           0 |
 | DLO                    |    2 |         0 |         2 |           0 |
 | Mappings               |    2 |         0 |         3 |           0 |
@@ -132,6 +132,13 @@ Never add `allow_confirmed: true` to a placeholder payload.
 3. List/search indexes before retriever create.
 4. For retriever configurations, verify `queryType`, input search index,
    output fields, and `isActive` behavior.
+
+### DataKits
+
+1. Inspect the data kit, manifest, components, and dependencies before deploying.
+2. Dry-run `d360_datakit_deploy` and review every component in the request body.
+3. Monitor deployment with deployment job and component status operations.
+4. Undeploy remains omitted until destructive review UX exists.
 
 ### Semantic Data Models
 

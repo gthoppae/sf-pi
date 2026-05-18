@@ -46,7 +46,7 @@ describe("d360 facade registry", () => {
     });
     expect(searchRegistry("datakit bundle deploy")[0]).toMatchObject({
       family: "DataKit",
-      operations: expect.arrayContaining(["d360_datakits_list"]),
+      operations: expect.arrayContaining(["d360_datakits_list", "d360_datakit_list"]),
     });
   });
 
@@ -190,6 +190,10 @@ describe("d360 facade registry", () => {
         "d360_sdm_metric_create",
         "d360_sdm_relationship_create",
       ]),
+    });
+    expect(searchRegistry("deploy update components datakit bundle package")[0]).toMatchObject({
+      family: "DataKit",
+      operations: expect.arrayContaining(["d360_datakit_deploy"]),
     });
   });
 

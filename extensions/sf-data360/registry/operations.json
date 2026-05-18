@@ -161,7 +161,7 @@
     "method": "GET",
     "path": "/ssot/data-kits",
     "safety": "read",
-    "optionalParams": ["limit", "offset"]
+    "optionalParams": ["dataspace", "limit", "offset"]
   },
   {
     "name": "d360_query_sql_status",
@@ -501,7 +501,8 @@
     "method": "GET",
     "path": "/ssot/data-kits/{dataKitId}",
     "requiredParams": ["dataKitId"],
-    "safety": "read"
+    "safety": "read",
+    "optionalParams": ["dataspace"]
   },
   {
     "name": "d360_datakit_manifest",
@@ -510,7 +511,8 @@
     "method": "GET",
     "path": "/ssot/data-kits/{dataKitId}/manifest",
     "requiredParams": ["dataKitId"],
-    "safety": "read"
+    "safety": "read",
+    "optionalParams": ["dataspace"]
   },
   {
     "name": "d360_datakit_deploy_status",
@@ -519,7 +521,8 @@
     "method": "GET",
     "path": "/ssot/data-kits/deployment-jobs/{jobId}",
     "requiredParams": ["jobId"],
-    "safety": "read"
+    "safety": "read",
+    "optionalParams": ["dataspace"]
   },
   {
     "name": "d360_datakit_components",
@@ -528,7 +531,8 @@
     "method": "GET",
     "path": "/ssot/data-kits/{dataKitId}/components",
     "requiredParams": ["dataKitId"],
-    "safety": "read"
+    "safety": "read",
+    "optionalParams": ["dataspace"]
   },
   {
     "name": "d360_datakit_component_status",
@@ -537,7 +541,8 @@
     "method": "GET",
     "path": "/ssot/data-kits/{dataKitId}/components/{componentId}/deployment-status",
     "requiredParams": ["dataKitId", "componentId"],
-    "safety": "read"
+    "safety": "read",
+    "optionalParams": ["dataspace"]
   },
   {
     "name": "d360_datakit_component_deps",
@@ -546,7 +551,8 @@
     "method": "GET",
     "path": "/ssot/data-kits/{dataKitId}/components/{componentId}/dependencies",
     "requiredParams": ["dataKitId", "componentId"],
-    "safety": "read"
+    "safety": "read",
+    "optionalParams": ["dataspace"]
   },
   {
     "name": "d360_profile_metadata",
@@ -1633,5 +1639,26 @@
     "optionalParams": ["dataspace"],
     "safety": "confirmed",
     "tips": "Dry-run first; relationship changes affect joins and semantic query results."
+  },
+  {
+    "name": "d360_datakit_list",
+    "family": "DataKit",
+    "description": "List all data kits.",
+    "method": "GET",
+    "path": "/ssot/data-kits",
+    "optionalParams": ["dataspace", "limit", "offset"],
+    "safety": "read",
+    "tips": "Use this to discover dataKitId values before component, manifest, or deployment-status operations."
+  },
+  {
+    "name": "d360_datakit_deploy",
+    "family": "DataKit",
+    "description": "Deploy or update data kit components.",
+    "method": "POST",
+    "path": "/ssot/data-kits/update-components",
+    "requiredParams": ["body"],
+    "optionalParams": ["dataspace"],
+    "safety": "confirmed",
+    "tips": "Review the manifest, component dependencies, and target dataspace before deployment. Use dry_run before execution."
   }
 ]
