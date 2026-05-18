@@ -22,7 +22,6 @@
  * Net effect: the dialog never fires for an ID we've already seen by name.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { setSlackFetchForTests } from "../lib/http-dispatcher.ts";
 import {
   getChannelCache,
   warmChannelCacheFromMatches,
@@ -73,14 +72,12 @@ describe("warmChannelCacheFromMatches", () => {
 });
 
 describe("resolveChannel — cache-by-ID short-circuit", () => {
-  // fetch override now goes through setSlackFetchForTests
-
   beforeEach(() => {
     getChannelCache().clear();
   });
 
   afterEach(() => {
-    setSlackFetchForTests(null);
+    vi.unstubAllGlobals();
   });
 
   it("returns a 1.0-confidence candidate without a network call when the ID is cached", async () => {
@@ -88,7 +85,8 @@ describe("resolveChannel — cache-by-ID short-circuit", () => {
     warmChannelCacheFromMatches([{ channel_id: "C0AAA00001", channel_name: "alpha-dev" }]);
 
     // Network is a hard failure — proves we don't need it.
-    setSlackFetchForTests(
+    vi.stubGlobal(
+      "fetch",
       vi.fn(async () => {
         throw new Error("fetch must not be called when the ID is already cached");
       }),
@@ -105,7 +103,8 @@ describe("resolveChannel — cache-by-ID short-circuit", () => {
   });
 
   it("falls through to conversations.info when the cache is empty", async () => {
-    setSlackFetchForTests(
+    vi.stubGlobal(
+      "fetch",
       vi.fn(async (_url: unknown, init: unknown) => {
         const body = String((init as { body?: unknown } | undefined)?.body ?? "");
         if (body.includes("channel=")) {
@@ -138,7 +137,8 @@ describe("resolveChannel — cache-by-ID short-circuit", () => {
     warmChannelCacheFromMatches([{ channel_id: "C0AAA00001", channel_name: "alpha-dev" }]);
 
     // Make conversations.info explicitly fail — if we hit it, the test fails.
-    setSlackFetchForTests(
+    vi.stubGlobal(
+      "fetch",
       vi.fn(async () => {
         return new Response(JSON.stringify({ ok: false, error: "team_access_not_granted" }), {
           status: 200,

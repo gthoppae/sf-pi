@@ -6,7 +6,7 @@
  * helpers (`computeGatedTools`, `computeMissingGrantedScopes`) here.
  * Integration with live Slack is covered by the smoke test.
  */
-import { afterEach, describe, it, expect } from "vitest";
+import { afterEach, describe, it, expect, vi } from "vitest";
 import {
   computeGatedTools,
   computeGrantedRequestedScopeCount,
@@ -16,9 +16,7 @@ import {
   probeAndGateTools,
 } from "../lib/scope-probe.ts";
 import { _resetGrantedScopes, slackApi } from "../lib/api.ts";
-import { setSlackFetchForTests } from "../lib/http-dispatcher.ts";
-
-// fetch override now goes through setSlackFetchForTests
+// global fetch is stubbed via vi.stubGlobal.
 
 class FakePi {
   private active: string[];
@@ -40,19 +38,19 @@ class FakePi {
 }
 
 function mockAuthTestScopes(scopesHeader: string): void {
-  setSlackFetchForTests(async () => ({
-    status: 200,
-    ok: true,
-    headers: { get: (n: string) => (n.toLowerCase() === "x-oauth-scopes" ? scopesHeader : null) },
-    json: async () => ({ ok: true }),
-    text: async () => JSON.stringify({ ok: true }),
-    arrayBuffer: async () => new ArrayBuffer(0),
-  }));
+  vi.stubGlobal(
+    "fetch",
+    async () =>
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "x-oauth-scopes": scopesHeader },
+      }),
+  );
 }
 
 describe("scope-probe", () => {
   afterEach(() => {
-    setSlackFetchForTests(null);
+    vi.unstubAllGlobals();
     _resetGrantedScopes();
   });
   it("module exports probeAndGateTools function", async () => {
@@ -166,19 +164,12 @@ describe("scope-probe", () => {
   describe("active tool application", () => {
     it("gates tools from scopes already captured by auth.test without a second probe", async () => {
       let calls = 0;
-      setSlackFetchForTests(async () => {
+      vi.stubGlobal("fetch", async () => {
         calls += 1;
-        return {
+        return new Response(JSON.stringify({ ok: true }), {
           status: 200,
-          ok: true,
-          headers: {
-            get: (n: string) =>
-              n.toLowerCase() === "x-oauth-scopes" ? "search:read.public" : null,
-          },
-          json: async () => ({ ok: true }),
-          text: async () => JSON.stringify({ ok: true }),
-          arrayBuffer: async () => new ArrayBuffer(0),
-        };
+          headers: { "x-oauth-scopes": "search:read.public" },
+        });
       });
       const pi = new FakePi(["bash", "slack", "slack_file", "slack_send"]);
 

@@ -31,7 +31,7 @@ export function buildSlackDoctor(context: SlackDoctorContext) {
         severity: "warn",
         title: "No Slack token configured",
         detail: "Slack tools are not registered until a token resolves.",
-        fix: "Run /login sf-slack, set SLACK_USER_TOKEN, or store the token in macOS Keychain.",
+        fix: "Run /login sf-slack or set SLACK_USER_TOKEN for automation.",
       });
       return {
         extensionId: "sf-slack",

@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /** Tests for sf-slack resolver helpers. */
 import { describe, expect, it } from "vitest";
-import { setSlackFetchForTests } from "../lib/http-dispatcher.ts";
 import {
   buildChannelDiscoveryQueries,
   isSlackChannelId,
@@ -53,17 +52,16 @@ import { afterEach, vi } from "vitest";
 import { resolveChannel } from "../lib/resolve.ts";
 
 describe("resolveChannel — raw ID verification (Bug #1 regression guard)", () => {
-  // fetch override now goes through setSlackFetchForTests
-
   afterEach(() => {
-    setSlackFetchForTests(null);
+    vi.unstubAllGlobals();
   });
 
   it("does not fabricate a candidate when conversations.info fails", async () => {
     // Every Slack API call in this test returns an error envelope so all
     // resolution strategies (conversations.info, conversations.list,
     // assistant.search.context) fail cleanly.
-    setSlackFetchForTests(
+    vi.stubGlobal(
+      "fetch",
       vi.fn(async () => {
         return new Response(JSON.stringify({ ok: false, error: "team_access_not_granted" }), {
           status: 200,
@@ -90,7 +88,8 @@ describe("resolveChannel — raw ID verification (Bug #1 regression guard)", () 
     // whole resolve hung forever; now each strategy returns `ok: false`
     // with error=request_timeout and the resolver surfaces "not resolved"
     // instead of hanging the tool call.
-    setSlackFetchForTests(
+    vi.stubGlobal(
+      "fetch",
       vi.fn(async () => {
         throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
       }),
@@ -107,7 +106,8 @@ describe("resolveChannel — raw ID verification (Bug #1 regression guard)", () 
   it("still populates candidates when the ID is valid", async () => {
     // conversations.info returns a real channel; the resolver should keep
     // the 1.0-confidence candidate without any fabrication.
-    setSlackFetchForTests(
+    vi.stubGlobal(
+      "fetch",
       vi.fn(async (_url: unknown, init: unknown) => {
         const body = String((init as { body?: unknown } | undefined)?.body ?? "");
         if (body.includes("channel=")) {

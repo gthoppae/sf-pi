@@ -7,8 +7,6 @@
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import {
   PROVIDER_NAME,
-  KEYCHAIN_SERVICE,
-  KEYCHAIN_ACCOUNT,
   ENV_TOKEN,
   type SlackSearchMatch,
   type SlackMessage,
@@ -369,17 +367,13 @@ export async function buildAuthStatus(ctx: ExtensionContext): Promise<string> {
     lines.push("");
     lines.push("Recommended setup:");
     lines.push(`  1. Pi auth: /login ${PROVIDER_NAME}`);
-    lines.push(
-      `  2. macOS Keychain: security add-generic-password -a "${KEYCHAIN_ACCOUNT}" -s "${KEYCHAIN_SERVICE}" -w "xoxp-token" -U`,
-    );
-    lines.push(`  3. Environment: export ${ENV_TOKEN}=xoxp-...`);
+    lines.push(`  2. Environment: export ${ENV_TOKEN}=xoxp-...`);
     lines.push("");
     lines.push(`Requested scopes: ${oauthScopes()}`);
     return lines.join("\n");
   }
 
   const sourceLabel: Record<TokenSource, string> = {
-    keychain: "✓ macOS Keychain (hardware-backed) 🔒",
     env: `✓ Environment variable (${ENV_TOKEN})`,
     "pi-auth": "✓ Pi auth store (via /login) ★ recommended",
     none: "✓ Configured",

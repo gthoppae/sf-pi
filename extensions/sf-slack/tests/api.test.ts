@@ -28,7 +28,6 @@ import {
   _resetGrantedScopes,
   DEFAULT_ASSISTANT_CHANNEL_TYPES,
 } from "../lib/api.ts";
-import { setSlackFetchForTests } from "../lib/http-dispatcher.ts";
 
 describe("api", () => {
   describe("clampLimit", () => {
@@ -200,10 +199,8 @@ describe("api", () => {
   });
 
   describe("per-request timeout (issue #17 regression guard)", () => {
-    // fetch override now goes through setSlackFetchForTests
-
     afterEach(() => {
-      setSlackFetchForTests(null);
+      vi.unstubAllGlobals();
     });
 
     it("maps a TimeoutError from AbortSignal.timeout to request_timeout", async () => {
@@ -211,7 +208,8 @@ describe("api", () => {
       // fetch rejects with a DOMException name="TimeoutError" (Node/undici
       // semantics). classifyFetchError must turn that into a typed
       // ApiResult error so callers can continue instead of hanging.
-      setSlackFetchForTests(
+      vi.stubGlobal(
+        "fetch",
         vi.fn(async () => {
           throw new DOMException("The operation was aborted due to timeout", "TimeoutError");
         }),
@@ -229,7 +227,8 @@ describe("api", () => {
       // Some Node / undici versions surface timeout aborts as AbortError
       // rather than TimeoutError. Both must map to request_timeout when
       // the caller did not request the abort.
-      setSlackFetchForTests(
+      vi.stubGlobal(
+        "fetch",
         vi.fn(async () => {
           throw new DOMException("Aborted", "AbortError");
         }),
@@ -247,7 +246,8 @@ describe("api", () => {
       // When the caller's own AbortController fires, the call must throw
       // (so user cancel / pi tool-cancel semantics are preserved) rather
       // than turn into a typed ApiResult error.
-      setSlackFetchForTests(
+      vi.stubGlobal(
+        "fetch",
         vi.fn(
           (_url: unknown, init: unknown) =>
             new Promise<Response>((_resolve, reject) => {
@@ -266,7 +266,8 @@ describe("api", () => {
     });
 
     it("maps a generic fetch rejection to network_error", async () => {
-      setSlackFetchForTests(
+      vi.stubGlobal(
+        "fetch",
         vi.fn(async () => {
           throw new TypeError("fetch failed");
         }),
@@ -300,16 +301,15 @@ describe("api", () => {
   });
 
   describe("granted-scope cache (X-OAuth-Scopes header capture)", () => {
-    // fetch override now goes through setSlackFetchForTests
-
     afterEach(() => {
-      setSlackFetchForTests(null);
+      vi.unstubAllGlobals();
       _resetGrantedScopes();
     });
 
     it("populates the granted-scope cache from the response header", async () => {
       _resetGrantedScopes();
-      setSlackFetchForTests(
+      vi.stubGlobal(
+        "fetch",
         vi.fn(
           async () =>
             new Response(JSON.stringify({ ok: true, user: "u" }), {
@@ -346,7 +346,8 @@ describe("api", () => {
     });
 
     it("preserves response_metadata.messages on Slack API errors", async () => {
-      setSlackFetchForTests(
+      vi.stubGlobal(
+        "fetch",
         vi.fn(
           async () =>
             new Response(
@@ -370,7 +371,8 @@ describe("api", () => {
     it("does not wipe the cache when a later response has no header", async () => {
       _resetGrantedScopes();
       let call = 0;
-      setSlackFetchForTests(
+      vi.stubGlobal(
+        "fetch",
         vi.fn(async () => {
           call += 1;
           if (call === 1) {
@@ -470,13 +472,13 @@ describe("api", () => {
     // These tests stub global fetch so we can assert on which user IDs hit the
     // network. The point is to prove the "always resolve missing IDs" contract
     // and that already-cached IDs do NOT trigger additional fetches.
-    // fetch override now goes through setSlackFetchForTests
     const calls: string[] = [];
 
     beforeEach(() => {
       calls.length = 0;
       getUserCache().clear();
-      setSlackFetchForTests(
+      vi.stubGlobal(
+        "fetch",
         vi.fn(async (_url: unknown, init: unknown) => {
           const body = String((init as { body?: unknown } | undefined)?.body ?? "");
           const userMatch = body.match(/user=([^&]+)/);
@@ -495,7 +497,7 @@ describe("api", () => {
     });
 
     afterEach(() => {
-      setSlackFetchForTests(null);
+      vi.unstubAllGlobals();
     });
 
     it("fetches only the IDs that are not already cached", async () => {

@@ -13,13 +13,7 @@
 import { type Focusable, matchesKey, visibleWidth } from "@earendil-works/pi-tui";
 import type { Theme } from "@earendil-works/pi-coding-agent";
 import type { ConfigPanelFactory, ConfigPanelResult } from "../../../catalog/registry.ts";
-import {
-  PROVIDER_NAME,
-  KEYCHAIN_SERVICE,
-  KEYCHAIN_ACCOUNT,
-  ENV_TOKEN,
-  ENV_TEAM_ID,
-} from "./types.ts";
+import { PROVIDER_NAME, ENV_TOKEN, ENV_TEAM_ID } from "./types.ts";
 import {
   type TokenSource,
   detectTokenSource,
@@ -66,7 +60,6 @@ class SlackConfigPanelComponent implements Focusable {
     if (configuredToken) {
       // Connected state
       const sourceLabels: Record<TokenSource, string> = {
-        keychain: `macOS Keychain (${KEYCHAIN_SERVICE})`,
         env: `Environment (${ENV_TOKEN})`,
         "pi-auth": "Pi auth store (/login) ★ recommended",
         none: "Unknown",
@@ -106,12 +99,7 @@ class SlackConfigPanelComponent implements Focusable {
       );
       lines.push(
         pad(
-          `   ${t.fg("dim", "2.")} ${t.fg("text", "macOS Keychain:")} ${t.fg("dim", `security add-generic-password -a "${KEYCHAIN_ACCOUNT}" -s "${KEYCHAIN_SERVICE}" -w "xoxp-..." -U`)}`,
-        ),
-      );
-      lines.push(
-        pad(
-          `   ${t.fg("dim", "3.")} ${t.fg("text", "Environment:")} ${t.fg("dim", `export ${ENV_TOKEN}=xoxp-...`)}`,
+          `   ${t.fg("dim", "2.")} ${t.fg("text", "Environment:")} ${t.fg("dim", `export ${ENV_TOKEN}=xoxp-...`)}`,
         ),
       );
     }

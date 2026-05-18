@@ -11,26 +11,16 @@
  *      no change.
  *   2. Environment variable (SLACK_USER_TOKEN) — best for automation / CI.
  *
- * macOS Keychain was retired as a runtime resolution path in v0.56.0. If a
- * user previously stored their token via `security add-generic-password`,
- * `migrateLegacyKeychainToken()` runs once on session_start, copies the
- * token into pi's auth store, and surfaces a one-time migration
- * notification. The Keychain entry itself is left intact — we don't reach
- * into a system credential store and delete things silently.
  */
 import type { OAuthCredentials, OAuthLoginCallbacks } from "@earendil-works/pi-ai";
 import type { ExtensionContext } from "@earendil-works/pi-coding-agent";
 import { existsSync, readFileSync } from "node:fs";
-import { execSync } from "node:child_process";
 import { globalAgentPath } from "../../../lib/common/pi-paths.ts";
-import { slackFetch } from "./http-dispatcher.ts";
 import {
   PROVIDER_NAME,
   SLACK_API_BASE,
   LONG_LIVED_EXPIRY_MS,
   MANUAL_REFRESH_SENTINEL,
-  KEYCHAIN_SERVICE,
-  KEYCHAIN_ACCOUNT,
   ENV_TOKEN,
   ENV_CLIENT_ID,
   ENV_CLIENT_SECRET,
@@ -62,35 +52,9 @@ export function oauthScopes(): string {
   return getEnv(ENV_SCOPES) || DEFAULT_SCOPES;
 }
 
-// ─── Local token sources ────────────────────────────────────────────────────────
-
-/**
- * Read token from macOS Keychain.
- *
- * Used only by `migrateLegacyKeychainToken()` for one-shot migration into
- * pi's central auth store. Not read at runtime anymore (see file docstring).
- */
-function getTokenFromKeychain(): string | null {
-  if (process.platform !== "darwin") return null;
-  try {
-    const token = execSync(
-      `security find-generic-password -a "${KEYCHAIN_ACCOUNT}" -s "${KEYCHAIN_SERVICE}" -w 2>/dev/null`,
-      { encoding: "utf-8", timeout: 5000 },
-    ).trim();
-    return token || null;
-  } catch {
-    return null;
-  }
-}
-
 // ─── Token source detection (for runtime + status display) ─────────────────────
 
-// Note: "keychain" stays in the union to preserve compatibility with
-// callers (and serialized state) that still narrow on it. The runtime
-// resolution path no longer returns it; only `migrateLegacyKeychainToken()`
-// observes a Keychain token, and only long enough to copy it into pi's
-// auth store before the next resolution pass.
-export type TokenSource = "keychain" | "env" | "pi-auth" | "none";
+export type TokenSource = "env" | "pi-auth" | "none";
 
 export interface TokenResolution {
   source: Exclude<TokenSource, "none">;
@@ -126,13 +90,10 @@ export function getTokenFromPiAuthStore(): string | null {
 
 export function resolveTokenCandidates(candidates: {
   piAuthToken?: string | null;
-  keychainToken?: string | null;
   envToken?: string | null;
 }): TokenResolution | null {
-  // ADR 0007: pi auth store is the canonical primary source; env var is
-  // the explicit automation/CI fallback. Keychain is retained in the
-  // candidate shape for compatibility with `migrateLegacyKeychainToken`
-  // but no longer participates in runtime resolution.
+  // Pi auth store is the canonical persistent source; env var is the
+  // explicit automation/CI fallback.
   const orderedSources: TokenResolution[] = [
     { source: "pi-auth", token: candidates.piAuthToken || "" },
     { source: "env", token: candidates.envToken || "" },
@@ -153,64 +114,6 @@ export function resolveConfiguredToken(): TokenResolution | null {
     piAuthToken: getTokenFromPiAuthStore(),
     envToken: getEnv(ENV_TOKEN),
   });
-}
-
-/**
- * One-shot migration of a legacy macOS Keychain token into pi's central
- * auth store. Runs from session_start so existing users keep working
- * without manual reconfiguration.
- *
- * Behavior:
- *   - macOS only, fast no-op on Linux/Windows.
- *   - Skips if pi auth already has a sf-slack credential (we never
- *     overwrite a current credential with an older Keychain copy).
- *   - On a successful copy, returns `{ migrated: true, hint }` so the
- *     extension can surface a one-time notification. The Keychain entry
- *     is left in place — deletion is the user's choice via
- *     `security delete-generic-password ...`.
- */
-export interface KeychainMigrationResult {
-  migrated: boolean;
-  hint?: string;
-}
-
-/**
- * Minimal subset of pi's `AuthStorage` we need for migration. Keeping it
- * structural makes the helper unit-testable without spinning up pi's full
- * file-locked storage backend, and survives signature changes in pi as long
- * as `has` and `set` keep their shapes.
- */
-export interface AuthStorageLike {
-  has(provider: string): boolean;
-  // The real `AuthStorage.set` accepts a discriminated union; we forward an
-  // OAuth-shaped credential and rely on structural typing.
-  set(provider: string, credential: { type: "oauth" } & OAuthCredentials): void;
-}
-
-export function migrateLegacyKeychainToken(authStorage: AuthStorageLike): KeychainMigrationResult {
-  if (process.platform !== "darwin") return { migrated: false };
-  if (authStorage.has(PROVIDER_NAME)) return { migrated: false };
-
-  const token = getTokenFromKeychain();
-  if (!token) return { migrated: false };
-
-  // Store as a long-lived OAuth-style credential so the existing token
-  // resolution path picks it up. Keeps storage shape consistent with
-  // tokens written by `loginSlack`.
-  authStorage.set(PROVIDER_NAME, {
-    type: "oauth",
-    access: token,
-    refresh: MANUAL_REFRESH_SENTINEL,
-    expires: Date.now() + LONG_LIVED_EXPIRY_MS,
-  });
-
-  return {
-    migrated: true,
-    hint:
-      `Found a Slack token in macOS Keychain (service "${KEYCHAIN_SERVICE}") and copied it into pi's central auth store. ` +
-      `Future sessions will read from pi's store. The Keychain entry was left in place — you can remove it manually with: ` +
-      `security delete-generic-password -a "${KEYCHAIN_ACCOUNT}" -s "${KEYCHAIN_SERVICE}".`,
-  };
 }
 
 export function detectTokenSource(): TokenSource {
@@ -239,8 +142,7 @@ export async function getSlackToken(
         "Slack auth is not configured.",
         "Recommended setup:",
         `1. Run /login ${PROVIDER_NAME}`,
-        `2. Or store in macOS Keychain: security add-generic-password -a "${KEYCHAIN_ACCOUNT}" -s "${KEYCHAIN_SERVICE}" -w "xoxp-your-token" -U`,
-        `3. Or set ${ENV_TOKEN}=xoxp-... for automation`,
+        `2. Or set ${ENV_TOKEN}=xoxp-... for automation`,
       ].join("\n"),
     };
   }
@@ -319,7 +221,7 @@ export async function loginSlack(callbacks: OAuthLoginCallbacks): Promise<OAuthC
     const code = new URL(callbackUrl).searchParams.get("code");
     if (!code) throw new Error("No OAuth code found in callback URL.");
 
-    const tokenResponse = await slackFetch(`${SLACK_API_BASE}/oauth.v2.access`, {
+    const tokenResponse = await fetch(`${SLACK_API_BASE}/oauth.v2.access`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({
@@ -377,7 +279,7 @@ export async function refreshSlackToken(credentials: OAuthCredentials): Promise<
     clientId &&
     clientSecret
   ) {
-    const response = await slackFetch(`${SLACK_API_BASE}/oauth.v2.access`, {
+    const response = await fetch(`${SLACK_API_BASE}/oauth.v2.access`, {
       method: "POST",
       headers: { "Content-Type": "application/x-www-form-urlencoded" },
       body: new URLSearchParams({

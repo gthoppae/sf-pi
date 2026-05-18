@@ -78,14 +78,14 @@
     "generate-d360-parity:check": "node scripts/generate-d360-parity.mjs --check"
   },
   "peerDependencies": {
-    "@earendil-works/pi-coding-agent": ">=0.75.0",
+    "@earendil-works/pi-coding-agent": ">=0.75.3",
     "typebox": "*"
   },
   "devDependencies": {
     "@commitlint/cli": "^21.0.0",
     "@commitlint/config-conventional": "^21.0.0",
     "@earendil-works/pi-ai": "^0.75.0",
-    "@earendil-works/pi-coding-agent": "^0.75.0",
+    "@earendil-works/pi-coding-agent": "^0.75.3",
     "@earendil-works/pi-tui": "^0.75.0",
     "@eslint/js": "^10.0.1",
     "@types/node": "^25.7.0",

@@ -37,7 +37,6 @@ Extension loads
   │  system prompt Slack-free when sf-slack is not configured.
   │
   └─ on("session_start")
-       ├─ Migrate any pre-v0.56 macOS Keychain token into pi auth store (one-shot)
        ├─ Resolve token (pi auth → SLACK_USER_TOKEN env)
        ├─ If no token → keep footer hidden, DO NOT register tools
        └─ If token found:
@@ -99,18 +98,6 @@ exists. They are not advertised to first-time users.
 
 If both are present, the pi auth store wins so the panel stays the source of
 truth.
-
-### macOS Keychain (retired in v0.56.0)
-
-Keychain is no longer in the runtime resolution chain. If you previously
-stored a token via `security add-generic-password`, the extension migrates it
-into pi's auth store automatically on the next session start and surfaces a
-one-time notification. The Keychain entry is left intact — remove it manually
-when you no longer need it:
-
-```bash
-security delete-generic-password -a "sf-slack-token" -s "pi-sf-slack"
-```
 
 ## Obtaining an `xoxp-` User Token
 
@@ -496,7 +483,6 @@ extensions/sf-slack/
     extension-doctor.ts     ← implementation module
     file-tool.ts            ← implementation module
     format.ts               ← implementation module
-    http-dispatcher.ts      ← implementation module
     preferences-panel.ts    ← implementation module
     preferences.ts          ← implementation module
     recipient-confirm.ts    ← implementation module
@@ -584,12 +570,13 @@ via the `/sf-slack` panel's **Connect to Slack** action or by setting
 `SLACK_USER_TOKEN`, then run `/sf-slack refresh` to register tools without
 restarting.
 
-**Footer shows `✓ Connected` with fewer approved scopes than requested:**
-Your token has fewer scopes than `DEFAULT_SCOPES` requests. This may be normal
-when your OAuth app or workspace is approved for only a subset of scopes.
-`/sf-slack` shows which capabilities are available and which requested scopes
-are not included in the current grant; re-auth only adds scopes if those scopes
-are approved for your app/workspace.
+**Footer shows `✓ Connected` with fewer known scopes than expected:**
+The footer counts known scopes: the union of scopes `sf-slack` requested and
+additional scopes Slack returned for the token. A partial count usually means
+Slack did not grant one or more requested scopes. `/sf-slack` shows which
+capabilities are available and which requested scopes are not included in the
+current grant; re-auth only adds scopes if those scopes are approved for your
+app/workspace.
 
 **`slack_send action=dm` says `im:write` is missing:**
 `im:write` is only needed to open a new 1:1 DM. If the token has DM search
@@ -642,7 +629,6 @@ appends a typed audit entry to the session branch.
 - NEVER exposes full tokens — always masked in display
 - Recommended auth path is the `/sf-slack` panel's **Connect to Slack** action
   (writes to pi's central auth store — same destination /login used to write to)
-- macOS Keychain support was retired in v0.56.0; existing tokens auto-migrate
 - All tools are read-only except `slack_canvas` create/edit and `slack_send`
 - `slack_send` always requires an explicit user confirmation in interactive
   mode; headless mode refuses unless `SLACK_ALLOW_HEADLESS_SEND=1`

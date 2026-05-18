@@ -7,8 +7,7 @@
  *
  * Token resolution chain (checked in order):
  *   1. Pi auth store (~/.pi/agent/auth.json via /login sf-slack)
- *   2. macOS Keychain (hardware-backed)
- *   3. Environment variable (SLACK_USER_TOKEN)
+ *   2. Environment variable (SLACK_USER_TOKEN)
  *
  * Registration model (Option B — conditional registration):
  *   Slack tools are registered only after a token resolves on session_start.
@@ -36,7 +35,7 @@
  * Security:
  *   - NEVER exposes full tokens — always masked in display
  *   - Read-only except slack_canvas create/edit
- *   - Supports Pi auth storage by default, with optional Keychain / env fallbacks
+ *   - Supports Pi auth storage by default, with an env fallback for automation
  */
 import type {
   ExtensionAPI,
@@ -58,7 +57,6 @@ import {
   detectTokenSource,
   getSlackToken,
   loginSlack,
-  migrateLegacyKeychainToken,
   oauthScopes,
   refreshSlackToken,
 } from "./lib/auth.ts";
@@ -146,8 +144,8 @@ type SlackCommandAction =
 
 const SLACK_COMMAND_ACTIONS: CommandPanelAction<SlackCommandAction>[] = [
   // Connect group at the top of every panel render so users have a single,
-  // obvious entry point for auth. ADR 0007 retires /login sf-slack and
-  // macOS Keychain as recommended onboarding paths in favor of this row.
+  // obvious entry point for auth. ADR 0007 makes pi's native auth store the
+  // only persistent credential path.
   {
     value: "connect",
     label: "Connect to Slack",
@@ -231,9 +229,12 @@ export default function sfSlack(pi: ExtensionAPI) {
   let missingGrantedScopeCount = 0;
   // Scope counts + token type fuel the sf-devbar Slack pill. Token type
   // (user/bot/app/unknown) is decoded from the xox*- prefix so the pill
-  // can color-code risk; count drives the `granted/requested scopes` chip.
+  // can color-code risk. The detailed status keeps requested-scope coverage;
+  // the compact pill shows known-scope coverage (requested ∪ Slack-returned extras).
   let grantedScopeCount = 0;
   let requestedScopeCount = 0;
+  let knownGrantedScopeCount = 0;
+  let knownScopeCount = 0;
   let tokenType: SlackTokenType = "unknown";
   let widgetCtx: ExtensionContext | null = null;
   let widgetGeneration = 0;
@@ -338,6 +339,17 @@ export default function sfSlack(pi: ExtensionAPI) {
     });
   }
 
+  function updateScopeCounts(
+    grantedScopes: Set<string> | null,
+    requestedScopes: string[],
+    missingRequestedScopeCount: number,
+  ): void {
+    missingGrantedScopeCount = missingRequestedScopeCount;
+    grantedScopeCount = computeGrantedRequestedScopeCount(grantedScopes, requestedScopes);
+    knownGrantedScopeCount = grantedScopes?.size ?? 0;
+    knownScopeCount = grantedScopes ? grantedScopes.size + missingRequestedScopeCount : 0;
+  }
+
   async function refreshSlackIdentityAndScopes(options: {
     token: string;
     requestedScopes: string[];
@@ -372,8 +384,7 @@ export default function sfSlack(pi: ExtensionAPI) {
 
       const probeResult = gateToolsFromGrantedScopes(pi, requestedScopes, tokenType);
       const grantedScopes = getGrantedScopes();
-      missingGrantedScopeCount = probeResult.missingGrantedScopes.length;
-      grantedScopeCount = computeGrantedRequestedScopeCount(grantedScopes, requestedScopes);
+      updateScopeCounts(grantedScopes, requestedScopes, probeResult.missingGrantedScopes.length);
 
       writeSlackRuntimeCache({
         token,
@@ -477,8 +488,8 @@ export default function sfSlack(pi: ExtensionAPI) {
         break;
       case "connected": {
         // Pill format (surfaced on sf-devbar's right side):
-        //   💬 Slack ✓ Connected @handle [user] 21/22 approved scopes
-        //       └dim    └─success          └accent └─token-type    └─neutral scope grant
+        //   💬 Slack ✓ Connected @handle [user] 29/30 known scopes
+        //       └dim    └─success          └accent └─token-type    └─neutral known-scope coverage
         //                                    color depends on
         //                                    token risk:
         //                                      success → xoxp- user
@@ -493,13 +504,9 @@ export default function sfSlack(pi: ExtensionAPI) {
           tokenType === "user" ? "success" : tokenType === "bot" ? "warning" : "error";
         const tokenBracket = t.fg(tokenColor, `[${tokenType}]`);
         const scopeColor: "success" | "dim" =
-          requestedScopeCount > 0 && grantedScopeCount >= requestedScopeCount ? "success" : "dim";
+          knownScopeCount > 0 && knownGrantedScopeCount >= knownScopeCount ? "success" : "dim";
         const scopeText =
-          requestedScopeCount > 0
-            ? `${grantedScopeCount}/${requestedScopeCount} approved scopes`
-            : grantedScopeCount > 0
-              ? `${grantedScopeCount} approved scopes`
-              : "";
+          knownScopeCount > 0 ? `${knownGrantedScopeCount}/${knownScopeCount} known scopes` : "";
         const scopeSegment = scopeText ? ` ${t.fg(scopeColor, scopeText)}` : "";
         const handleSegment = handle ? ` ${t.fg("accent", handle)}` : "";
         const labelColor: "success" | "dim" =
@@ -542,6 +549,8 @@ export default function sfSlack(pi: ExtensionAPI) {
     missingGrantedScopeCount = 0;
     grantedScopeCount = 0;
     requestedScopeCount = 0;
+    knownGrantedScopeCount = 0;
+    knownScopeCount = 0;
     tokenType = "unknown";
     widgetCtx = ctx;
     widgetGeneration = generation;
@@ -549,19 +558,6 @@ export default function sfSlack(pi: ExtensionAPI) {
     setStatsListener(() => renderResearchWidget());
     restorePreferences(ctx);
     renderResearchWidget();
-
-    // ADR 0007: one-shot migration of any pre-v0.56 Keychain token into
-    // pi's central auth store. Best-effort — if it fails (Keychain locked,
-    // user denied access, etc.) we keep going and the user can reconnect
-    // via the panel's Connect action.
-    try {
-      const migration = migrateLegacyKeychainToken(ctx.modelRegistry.authStorage);
-      if (migration.migrated && migration.hint) {
-        ctx.ui.notify(`SF Slack credential migrated\n\n${migration.hint}`, "info");
-      }
-    } catch {
-      // Best-effort — migration failures must not block session start.
-    }
 
     const auth = await getSlackToken(ctx);
     if (!isActiveSession(ctx, generation)) return;
@@ -591,8 +587,7 @@ export default function sfSlack(pi: ExtensionAPI) {
       seedGrantedScopesForStartup(cached.grantedScopes);
       const probeResult = gateToolsFromGrantedScopes(pi, requestedScopes, tokenType);
       const grantedScopes = getGrantedScopes();
-      missingGrantedScopeCount = probeResult.missingGrantedScopes.length;
-      grantedScopeCount = computeGrantedRequestedScopeCount(grantedScopes, requestedScopes);
+      updateScopeCounts(grantedScopes, requestedScopes, probeResult.missingGrantedScopes.length);
       lastError = null;
       updateStatus(ctx, "connected", generation);
 
@@ -661,6 +656,8 @@ export default function sfSlack(pi: ExtensionAPI) {
     missingGrantedScopeCount = 0;
     grantedScopeCount = 0;
     requestedScopeCount = 0;
+    knownGrantedScopeCount = 0;
+    knownScopeCount = 0;
     tokenType = "unknown";
     if (ctx.hasUI) {
       ctx.ui.setStatus(WIDGET_KEY, undefined);
@@ -779,7 +776,7 @@ export default function sfSlack(pi: ExtensionAPI) {
           await emitSlackOutput(
             ctx,
             "Slack token not found",
-            "No Slack token found. Run /login sf-slack, use macOS Keychain, or set SLACK_USER_TOKEN.",
+            "No Slack token found. Run /login sf-slack or set SLACK_USER_TOKEN.",
             "warning",
             fromPanel,
           );
@@ -812,8 +809,11 @@ export default function sfSlack(pi: ExtensionAPI) {
             ]);
             if (!isActiveSession(ctx, generation)) return;
             const grantedScopes = getGrantedScopes();
-            missingGrantedScopeCount = probeResult.missingGrantedScopes.length;
-            grantedScopeCount = computeGrantedRequestedScopeCount(grantedScopes, requestedScopes);
+            updateScopeCounts(
+              grantedScopes,
+              requestedScopes,
+              probeResult.missingGrantedScopes.length,
+            );
             writeSlackRuntimeCache({ token, tokenType, identity, grantedScopes });
             lastError = null;
             updateStatus(ctx, "connected", generation);
@@ -1005,6 +1005,8 @@ export default function sfSlack(pi: ExtensionAPI) {
     identity = null;
     grantedScopeCount = 0;
     requestedScopeCount = 0;
+    knownGrantedScopeCount = 0;
+    knownScopeCount = 0;
     missingGrantedScopeCount = 0;
     tokenType = "unknown";
     lastError = null;

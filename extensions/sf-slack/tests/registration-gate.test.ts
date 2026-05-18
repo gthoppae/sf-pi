@@ -122,7 +122,7 @@ describe("sf-slack session_start error handling", () => {
   });
 
   it("bails out when live auth.test returns ok:false", () => {
-    // Regression for the symptom 'Slack ? Scopes unknown 0/22 approved scopes':
+    // Regression for the symptom 'Slack ? Scopes unknown' persisting after auth.test fails:
     // slackApi maps timeouts / network failures / HTTP errors into a non-throwing
     // {ok:false, error: "request_timeout" | "network_error" | ...} envelope.
     // Contract: a failed live auth.test must set auth-error status instead of

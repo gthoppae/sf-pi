@@ -14,26 +14,25 @@
  * That gives a fast, deterministic signal that future refactors didn't
  * silently drop the safety rails.
  */
-import { afterEach, beforeEach, describe, it, expect } from "vitest";
+import { afterEach, beforeEach, describe, it, expect, vi } from "vitest";
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { _resetGrantedScopes, slackApi } from "../lib/api.ts";
-import { setSlackFetchForTests } from "../lib/http-dispatcher.ts";
 import { buildExistingDmSearchQueries, preflightSend } from "../lib/send-tool.ts";
 import { computeGatedTools } from "../lib/scope-probe.ts";
 
-// fetch override now goes through setSlackFetchForTests
+// global fetch is stubbed via vi.stubGlobal.
 
 function mockFetchWithScopes(scopesHeader: string): void {
-  setSlackFetchForTests(async () => ({
-    status: 200,
-    ok: true,
-    headers: { get: (n: string) => (n.toLowerCase() === "x-oauth-scopes" ? scopesHeader : null) },
-    json: async () => ({ ok: true }),
-    text: async () => JSON.stringify({ ok: true }),
-    arrayBuffer: async () => new ArrayBuffer(0),
-  }));
+  vi.stubGlobal(
+    "fetch",
+    async () =>
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "x-oauth-scopes": scopesHeader },
+      }),
+  );
 }
 
 // send-tool.ts was split into a registration/audit/confirmation module
@@ -57,7 +56,7 @@ describe("preflightSend", () => {
     _resetGrantedScopes();
   });
   afterEach(() => {
-    setSlackFetchForTests(null);
+    vi.unstubAllGlobals();
     _resetGrantedScopes();
   });
 

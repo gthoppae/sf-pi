@@ -28,7 +28,12 @@ import {
   type UsersInfoResponse,
   type UsersListResponse,
 } from "./types.ts";
-import { slackFetch, type SlackFetchResponse } from "./http-dispatcher.ts";
+// Outbound HTTP uses Node's global fetch. Since pi 0.75.x, pi sets a
+// process-wide undici dispatcher (`allowH2: false` + `undici.install()`)
+// that pins HTTP/1.1 and unifies fetch globals — both fixes that previously
+// forced a node:https-backed shim here. See pi 0.75.1 (#4650-#4653) and
+// pi 0.75.3 (#4681) in the pi changelog. sf-pi's package.json peer-deps
+// pin pi >= 0.75.3 so users on older pi don't reach this code path.
 
 interface SlackApiEnvelope {
   ok?: boolean;
@@ -101,7 +106,7 @@ export function _resetGrantedScopes(): void {
   grantedScopes = null;
 }
 
-function captureAuthHeaders(response: SlackFetchResponse): void {
+function captureAuthHeaders(response: Response): void {
   // Slack sends this header on every OK response and on many error responses
   // as well. Only overwrite the cache when the header is present so a 5xx
   // without the header doesn't wipe a previously-known good value.
@@ -191,17 +196,10 @@ function withRequestTimeout(signal: AbortSignal | undefined): {
 async function fetchWithRetry(
   buildRequest: () => { url: string; init: RequestInit },
   signal?: AbortSignal,
-): Promise<SlackFetchResponse> {
+): Promise<Response> {
   const first = buildRequest();
   const firstBudget = withRequestTimeout(signal);
-  // We use a node:https-backed fetch (slackFetch) instead of undici's
-  // global fetch — see ./http-dispatcher.ts for the H2 hang on Node 26.
-  let response: SlackFetchResponse = await slackFetch(first.url, {
-    method: first.init.method,
-    headers: first.init.headers as Record<string, string>,
-    body: first.init.body as string | undefined,
-    signal: firstBudget.signal,
-  });
+  let response: Response = await fetch(first.url, { ...first.init, signal: firstBudget.signal });
 
   if (response.status !== 429) return response;
 
@@ -217,12 +215,7 @@ async function fetchWithRetry(
 
   const second = buildRequest();
   const secondBudget = withRequestTimeout(signal);
-  response = await slackFetch(second.url, {
-    method: second.init.method,
-    headers: second.init.headers as Record<string, string>,
-    body: second.init.body as string | undefined,
-    signal: secondBudget.signal,
-  });
+  response = await fetch(second.url, { ...second.init, signal: secondBudget.signal });
   return response;
 }
 
@@ -378,7 +371,7 @@ function classifyFetchError<T>(error: unknown, callerSignal?: AbortSignal): ApiR
 }
 
 /** Slack sometimes returns non-JSON bodies on 4xx/5xx. Parse defensively. */
-async function safeJson(response: SlackFetchResponse): Promise<unknown> {
+async function safeJson(response: Response): Promise<unknown> {
   try {
     return await response.json();
   } catch {
@@ -386,7 +379,7 @@ async function safeJson(response: SlackFetchResponse): Promise<unknown> {
   }
 }
 
-function toApiResult<T>(response: SlackFetchResponse, json: unknown): ApiResult<T> {
+function toApiResult<T>(response: Response, json: unknown): ApiResult<T> {
   const envelope = isSlackApiEnvelope(json) ? json : {};
 
   // Slack sometimes surfaces rate limits as HTTP 429 (with no JSON body) and
@@ -759,7 +752,7 @@ export function summarizeSlackError(
     case "not_authed":
     case "invalid_auth":
     case "token_revoked":
-      return "Slack auth is invalid or missing. Run /login sf-slack, use macOS Keychain, or set SLACK_USER_TOKEN.";
+      return "Slack auth is invalid or missing. Run /login sf-slack or set SLACK_USER_TOKEN.";
     case "token_expired":
       return "Slack token expired. Run /login sf-slack, or try /sf-slack refresh to re-auth.";
     case "bot_scopes_not_found":

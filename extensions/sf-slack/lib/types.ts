@@ -32,11 +32,6 @@ export const ENV_CLIENT_SECRET = "SLACK_CLIENT_SECRET";
 export const ENV_REDIRECT_URI = "SLACK_REDIRECT_URI";
 export const ENV_SCOPES = "SLACK_SCOPES";
 
-// ─── Keychain ───────────────────────────────────────────────────────────────────
-
-export const KEYCHAIN_SERVICE = "pi-sf-slack";
-export const KEYCHAIN_ACCOUNT = "sf-slack-token";
-
 // ─── Default scopes ─────────────────────────────────────────────────────────────
 
 // Default scope set requested at OAuth time. We intentionally use the

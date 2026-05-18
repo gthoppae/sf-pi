@@ -102,7 +102,7 @@ export function registerSlackTool(pi: ExtensionAPI): void {
     // parameters so the flat Guidelines section does not repeat the same routing rule.
     promptGuidelines: [
       "All Slack tools are read-only except slack_canvas create/edit. No message posting.",
-      "If auth fails for any Slack tool, tell the user to run `/login sf-slack` (recommended), use macOS Keychain, or set SLACK_USER_TOKEN.",
+      "If auth fails for any Slack tool, tell the user to run `/login sf-slack` (recommended) or set SLACK_USER_TOKEN for automation.",
       "Prefer slack_research for natural-language Slack research: it compiles operators, resolves channels, and falls back strict→broad. Do not hand-roll Slack search queries when slack_research can run the plan.",
       "Use slack_resolve to turn a fuzzy channel or person reference into a Slack ID before calling slack/slack_channel/slack_file/slack_user.",
       "Use slack_time_range first for any relative or human date expression, then pass the returned oldest/latest to slack action:'history', or since/before to slack_research.",

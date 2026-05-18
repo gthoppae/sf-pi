@@ -3,20 +3,12 @@
  * Tests for sf-slack auth module.
  *
  * Tests local auth-file parsing, precedence helpers, and display helpers.
- * System-backed sources such as Keychain are intentionally not exercised here.
  */
 import { afterEach, describe, it, expect } from "vitest";
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
-import {
-  maskToken,
-  formatExpiry,
-  readPiAuthToken,
-  resolveTokenCandidates,
-  migrateLegacyKeychainToken,
-  type AuthStorageLike,
-} from "../lib/auth.ts";
+import { maskToken, formatExpiry, readPiAuthToken, resolveTokenCandidates } from "../lib/auth.ts";
 
 const tempDirs: string[] = [];
 
@@ -96,71 +88,8 @@ describe("auth", () => {
       ).toEqual({ source: "env", token: "xoxp-env-token" });
     });
 
-    it("ignores keychainToken at runtime (ADR 0007)", () => {
-      // Keychain stays in the candidate shape for migration compatibility,
-      // but is no longer in the runtime resolution chain. A keychain-only
-      // candidate must resolve to null so callers know there's no live
-      // credential — the migration helper takes the only legitimate path
-      // for a keychain token to reach pi-auth.
-      expect(
-        resolveTokenCandidates({
-          keychainToken: "xoxp-keychain-token",
-        }),
-      ).toBeNull();
-    });
-
-    it("ignores keychainToken even when paired with env", () => {
-      // Confirm pi-auth absent + keychain present + env present picks env,
-      // not keychain.
-      expect(
-        resolveTokenCandidates({
-          keychainToken: "xoxp-keychain-token",
-          envToken: "xoxp-env-token",
-        }),
-      ).toEqual({ source: "env", token: "xoxp-env-token" });
-    });
-  });
-
-  describe("migrateLegacyKeychainToken", () => {
-    function makeStubStorage(initialHas: boolean): {
-      storage: AuthStorageLike;
-      setCalls: Array<{ provider: string; access: string }>;
-    } {
-      const setCalls: Array<{ provider: string; access: string }> = [];
-      let hasFlag = initialHas;
-      const storage: AuthStorageLike = {
-        has: () => hasFlag,
-        set: (provider, credential) => {
-          setCalls.push({ provider, access: credential.access });
-          hasFlag = true;
-        },
-      };
-      return { storage, setCalls };
-    }
-
-    it("is a no-op on non-darwin platforms", () => {
-      // The helper short-circuits on non-darwin before touching storage,
-      // so a Linux/Windows test environment exercises the early-return path
-      // regardless of what's stubbed.
-      const { storage, setCalls } = makeStubStorage(false);
-      const originalPlatform = Object.getOwnPropertyDescriptor(process, "platform");
-      Object.defineProperty(process, "platform", { value: "linux", configurable: true });
-      try {
-        const result = migrateLegacyKeychainToken(storage);
-        expect(result).toEqual({ migrated: false });
-        expect(setCalls).toHaveLength(0);
-      } finally {
-        if (originalPlatform) Object.defineProperty(process, "platform", originalPlatform);
-      }
-    });
-
-    it("is a no-op when pi auth already has the provider", () => {
-      const { storage, setCalls } = makeStubStorage(true);
-      const result = migrateLegacyKeychainToken(storage);
-      // Doesn't matter what platform we're on — the has(provider) gate is
-      // checked early enough that the keychain probe never runs.
-      expect(result).toEqual({ migrated: false });
-      expect(setCalls).toHaveLength(0);
+    it("returns null when no candidate is configured", () => {
+      expect(resolveTokenCandidates({})).toBeNull();
     });
   });
 

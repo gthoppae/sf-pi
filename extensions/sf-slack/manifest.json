@@ -21,7 +21,7 @@
   ],
   "events": ["session_start", "session_shutdown", "before_agent_start"],
   "docs": {
-    "summary": "Full Slack integration. Read-only search/thread/history/channel/user/file/canvas plus send-with-confirm. Tools register only after a token resolves (Pi auth store -> Keychain -> SLACK_USER_TOKEN), keeping the system prompt cache stable when Slack is not configured.",
+    "summary": "Full Slack integration. Read-only search/thread/history/channel/user/file/canvas plus send-with-confirm. Tools register only after a token resolves (Pi auth store -> SLACK_USER_TOKEN), keeping the system prompt cache stable when Slack is not configured.",
     "primaryFiles": [
       "index.ts",
       "lib/auth.ts",
@@ -35,7 +35,6 @@
     ],
     "stateFiles": [
       "Pi auth store via /login sf-slack",
-      "macOS Keychain (optional)",
       "session entries: SlackSendAuditEntry, SlackPreferences"
     ],
     "env": ["SLACK_USER_TOKEN", "SLACK_TEAM_ID", "SLACK_ALLOW_HEADLESS_SEND"],

@@ -30,7 +30,6 @@
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { getUserCache, warmUserCacheFromMatches } from "../lib/api.ts";
-import { setSlackFetchForTests } from "../lib/http-dispatcher.ts";
 import { resolveUser } from "../lib/resolve.ts";
 
 describe("warmUserCacheFromMatches", () => {
@@ -83,20 +82,19 @@ describe("warmUserCacheFromMatches", () => {
 });
 
 describe("resolveUser — grid-safe search fallback", () => {
-  // fetch override now goes through setSlackFetchForTests
-
   beforeEach(() => {
     getUserCache().clear();
   });
 
   afterEach(() => {
-    setSlackFetchForTests(null);
+    vi.unstubAllGlobals();
   });
 
   it("returns search-based candidates when users.list is blocked by team_access_not_granted", async () => {
     // Simulate enterprise grid: directory is gated, but search works and
     // surfaces the real author from a message hit.
-    setSlackFetchForTests(
+    vi.stubGlobal(
+      "fetch",
       vi.fn(async (url: unknown) => {
         const urlStr = String(url);
         if (urlStr.includes("users.list")) {
@@ -145,7 +143,8 @@ describe("resolveUser — grid-safe search fallback", () => {
   });
 
   it("populates the user cache from search so future resolves short-circuit", async () => {
-    setSlackFetchForTests(
+    vi.stubGlobal(
+      "fetch",
       vi.fn(async (url: unknown) => {
         const urlStr = String(url);
         if (urlStr.includes("users.list")) {
@@ -183,7 +182,8 @@ describe("resolveUser — grid-safe search fallback", () => {
   });
 
   it("still returns zero candidates and a helpful warning when search also fails", async () => {
-    setSlackFetchForTests(
+    vi.stubGlobal(
+      "fetch",
       vi.fn(async () => {
         return new Response(JSON.stringify({ ok: false, error: "team_access_not_granted" }), {
           status: 200,

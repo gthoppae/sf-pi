@@ -6,22 +6,21 @@
  * precise, actionable error (\"use a user token\" / \"scope needs admin approval\")
  * instead of relaying Slack's raw bot_scopes_not_found or missing_scope.
  */
-import { afterEach, beforeAll, beforeEach, describe, it, expect } from "vitest";
+import { afterEach, beforeAll, beforeEach, describe, it, expect, vi } from "vitest";
 import { buildCanvasLookupCriteria, preflightCanvasWrite } from "../lib/canvas-tool.ts";
 import { _resetGrantedScopes, slackApi } from "../lib/api.ts";
-import { setSlackFetchForTests } from "../lib/http-dispatcher.ts";
-
-// fetch override now goes through setSlackFetchForTests
+// global fetch is stubbed via vi.stubGlobal so the granted-scope cache
+// captureAuthHeaders() picks up X-OAuth-Scopes from the mocked Response.
 
 function mockFetchWithScopes(scopesHeader: string): void {
-  setSlackFetchForTests(async () => ({
-    status: 200,
-    ok: true,
-    headers: { get: (n: string) => (n.toLowerCase() === "x-oauth-scopes" ? scopesHeader : null) },
-    json: async () => ({ ok: true }),
-    text: async () => JSON.stringify({ ok: true }),
-    arrayBuffer: async () => new ArrayBuffer(0),
-  }));
+  vi.stubGlobal(
+    "fetch",
+    async () =>
+      new Response(JSON.stringify({ ok: true }), {
+        status: 200,
+        headers: { "x-oauth-scopes": scopesHeader },
+      }),
+  );
 }
 
 describe("buildCanvasLookupCriteria", () => {
@@ -71,7 +70,7 @@ describe("preflightCanvasWrite", () => {
   });
 
   afterEach(() => {
-    setSlackFetchForTests(null);
+    vi.unstubAllGlobals();
     _resetGrantedScopes();
   });
 
