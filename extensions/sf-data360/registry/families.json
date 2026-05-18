@@ -109,5 +109,18 @@
       "field mapping",
       "dlo dmo"
     ]
+  },
+  {
+    "name": "Smart",
+    "summary": "Local helper algorithms for field matching, mapping suggestions, and data stream payload enhancement.",
+    "keywords": [
+      "smart",
+      "suggest",
+      "preview",
+      "field match",
+      "event date",
+      "mapping",
+      "datastream"
+    ]
   }
 ]

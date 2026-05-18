@@ -1511,5 +1511,152 @@
       "retrieverIdOrName": "ExampleRetriever",
       "configurationIdOrName": "ExampleConfiguration"
     }
+  },
+  "d360_standard_mapping_preview": {
+    "operation": "d360_standard_mapping_preview",
+    "params": {
+      "sourceObjectName": "Account",
+      "targetDmoName": "AccountDmo"
+    }
+  },
+  "d360_preview_field_matches": {
+    "operation": "d360_preview_field_matches",
+    "params": {
+      "sourceFields": [
+        {
+          "name": "Id__c",
+          "label": "Id",
+          "dataType": "Text"
+        },
+        {
+          "name": "Name__c",
+          "label": "Name",
+          "dataType": "Text"
+        },
+        {
+          "name": "CreatedDate__c",
+          "label": "Created Date",
+          "dataType": "DateTime"
+        }
+      ],
+      "targetFields": [
+        {
+          "name": "Id__c",
+          "label": "Id",
+          "dataType": "Text"
+        },
+        {
+          "name": "Name__c",
+          "label": "Name",
+          "dataType": "Text"
+        },
+        {
+          "name": "CreatedDate__c",
+          "label": "Created Date",
+          "dataType": "DateTime"
+        }
+      ],
+      "sourceDloName": "Example_Profile__dll",
+      "targetDmoName": "Example_Profile__dlm",
+      "threshold": 0.45
+    }
+  },
+  "d360_smart_mapping_suggest": {
+    "operation": "d360_smart_mapping_suggest",
+    "params": {
+      "sourceFields": [
+        {
+          "name": "Id__c",
+          "label": "Id",
+          "dataType": "Text"
+        },
+        {
+          "name": "Name__c",
+          "label": "Name",
+          "dataType": "Text"
+        },
+        {
+          "name": "CreatedDate__c",
+          "label": "Created Date",
+          "dataType": "DateTime"
+        }
+      ],
+      "targetFields": [
+        {
+          "name": "Id__c",
+          "label": "Id",
+          "dataType": "Text"
+        },
+        {
+          "name": "Name__c",
+          "label": "Name",
+          "dataType": "Text"
+        },
+        {
+          "name": "CreatedDate__c",
+          "label": "Created Date",
+          "dataType": "DateTime"
+        }
+      ],
+      "sourceDloName": "Example_Profile__dll",
+      "targetDmoName": "Example_Profile__dlm",
+      "threshold": 0.45
+    }
+  },
+  "d360_event_date_recommend": {
+    "operation": "d360_event_date_recommend",
+    "params": {
+      "category": "Engagement",
+      "fields": [
+        {
+          "name": "Id__c",
+          "label": "Id",
+          "dataType": "Text"
+        },
+        {
+          "name": "Name__c",
+          "label": "Name",
+          "dataType": "Text"
+        },
+        {
+          "name": "CreatedDate__c",
+          "label": "Created Date",
+          "dataType": "DateTime"
+        }
+      ]
+    }
+  },
+  "d360_smart_datastream_create": {
+    "operation": "d360_smart_datastream_create",
+    "params": {
+      "body": {
+        "name": "Example_Engagement_Stream",
+        "label": "Example Engagement Stream",
+        "datastreamType": "EXTERNAL",
+        "dataLakeObjectInfo": {
+          "name": "Example_Engagement_Stream__dll",
+          "label": "Example Engagement Stream",
+          "category": "Engagement"
+        },
+        "sourceFields": [
+          {
+            "name": "Id__c",
+            "label": "Id",
+            "dataType": "Text"
+          },
+          {
+            "name": "Name__c",
+            "label": "Name",
+            "dataType": "Text"
+          },
+          {
+            "name": "CreatedDate__c",
+            "label": "Created Date",
+            "dataType": "DateTime"
+          }
+        ]
+      },
+      "autoSelectEventDate": true
+    }
   }
 }

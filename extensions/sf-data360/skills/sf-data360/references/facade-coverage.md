@@ -8,7 +8,7 @@ should be added to the JSON registry, not as new Pi tools.
 
 ## Operation coverage matrix
 
-Current generated registry size: **198 operations**.
+Current generated registry size: **203 operations**.
 
 | Family                 | Read | Safe POST | Confirmed | Destructive |
 | ---------------------- | ---: | --------: | --------: | ----------: |
@@ -32,7 +32,8 @@ Current generated registry size: **198 operations**.
 | DataTransform          |    3 |         1 |         4 |           1 |
 | DataAction             |    4 |         0 |         3 |           1 |
 | Profile and Data Graph |    9 |         0 |         0 |           0 |
-| StandardMappings       |    0 |         0 |         1 |           0 |
+| StandardMappings       |    0 |         1 |         1 |           0 |
+| Smart                  |    0 |         4 |         0 |           0 |
 
 Destructive operations are exposed only behind stricter guardrails: dry-run
 review, `allow_confirmed: true`, `target_org: "AgentforceSTDM"`, and an
@@ -201,14 +202,21 @@ Never add `allow_confirmed: true` to a placeholder payload.
 4. For Snowflake, pass private key content only when actually executing and only
    after reviewing the resolved request shape. Keep docs/examples placeholder-only.
 
-## Current non-REST upstream helpers
+## Local helper operations
 
-The upstream MCP server also exposes smart helper operations such as standard
-mapping preview, smart mapping suggestion, field-match preview, smart data stream
-body enhancement, and event-date recommendation. These are local helper
-algorithms, not plain REST endpoints. They are not represented as executable
-`d360 execute` registry entries until the facade grows a local helper execution
-path.
+The facade supports local helper operations alongside REST-backed registry
+operations. These helpers run deterministic TypeScript logic and return payloads
+or recommendations for the next REST operation:
+
+- `d360_standard_mapping_preview`
+- `d360_preview_field_matches`
+- `d360_smart_mapping_suggest`
+- `d360_smart_datastream_create`
+- `d360_event_date_recommend`
+
+Use them with the same `d360 search -> examples -> execute` flow. Their output
+includes `next` hints so agents can continue with a dry-run of the appropriate
+REST operation.
 
 ## Expansion rule for the 190-operation goal
 

@@ -1384,5 +1384,40 @@
     "description": "Delete one retriever configuration.",
     "method": "DELETE",
     "path": "/ssot/machine-learning/retrievers/{retrieverIdOrName}/configurations/{configurationIdOrName}"
+  },
+  {
+    "name": "d360_standard_mapping_preview",
+    "family": "StandardMappings",
+    "description": "Preview bundled standard DLO-to-DMO mappings for a source object.",
+    "method": "POST",
+    "path": "/local/standard-mapping-preview"
+  },
+  {
+    "name": "d360_preview_field_matches",
+    "family": "Smart",
+    "description": "Preview DLO-to-DMO field matches with confidence scores.",
+    "method": "POST",
+    "path": "/local/preview-field-matches"
+  },
+  {
+    "name": "d360_smart_mapping_suggest",
+    "family": "Smart",
+    "description": "Suggest DLO-to-DMO field mappings and produce a mapping create payload.",
+    "method": "POST",
+    "path": "/local/smart-mapping-suggest"
+  },
+  {
+    "name": "d360_event_date_recommend",
+    "family": "Smart",
+    "description": "Recommend the best event date field for engagement streams.",
+    "method": "POST",
+    "path": "/local/event-date-recommend"
+  },
+  {
+    "name": "d360_smart_datastream_create",
+    "family": "Smart",
+    "description": "Enhance a data stream create body with smart event date selection.",
+    "method": "POST",
+    "path": "/local/smart-datastream-create"
   }
 ]

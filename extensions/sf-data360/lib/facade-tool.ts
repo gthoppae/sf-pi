@@ -40,6 +40,7 @@ import {
   type D360Operation,
 } from "./facade/registry.ts";
 import { runAgentObservabilityRunbook } from "./facade/agent-observability.ts";
+import { isLocalD360Helper, runLocalD360Helper } from "./facade/local-helpers.ts";
 
 export const D360_FACADE_TOOL_NAME = "d360";
 
@@ -202,6 +203,28 @@ async function runExecute(
   );
   if (!targetOrg) throw new Error("No Salesforce target org is configured.");
   const params = input.params ?? {};
+
+  if (isLocalD360Helper(operation.name)) {
+    if (input.dry_run) {
+      return {
+        ok: true,
+        action: "execute",
+        dryRun: true,
+        targetOrg,
+        apiVersion,
+        operation,
+        request: { method: "LOCAL", path: operation.path, params },
+        summary: `Resolved local helper ${operation.name}`,
+      };
+    }
+    return {
+      ...runLocalD360Helper(operation.name, params),
+      targetOrg,
+      apiVersion,
+      operation: operation.name,
+    };
+  }
+
   const { path, query, body } = resolveOperationRequest(operation, params);
   const apiPath = buildApiPath(path, apiVersion, query);
   if (input.dry_run) {

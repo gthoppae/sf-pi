@@ -195,9 +195,23 @@ describe("d360 facade registry", () => {
       family: "DataKit",
       operations: expect.arrayContaining(["d360_datakit_deploy"]),
     });
-    expect(searchRegistry("standard mapping create field mapping dlo dmo")[0]).toMatchObject({
+    expect(
+      searchRegistry("standard mapping create preview field mapping dlo dmo")[0],
+    ).toMatchObject({
       family: "StandardMappings",
-      operations: expect.arrayContaining(["d360_standard_mapping_create"]),
+      operations: expect.arrayContaining([
+        "d360_standard_mapping_preview",
+        "d360_standard_mapping_create",
+      ]),
+    });
+    expect(searchRegistry("smart field match event date recommend mapping")[0]).toMatchObject({
+      family: "Smart",
+      operations: expect.arrayContaining([
+        "d360_preview_field_matches",
+        "d360_smart_mapping_suggest",
+        "d360_event_date_recommend",
+        "d360_smart_datastream_create",
+      ]),
     });
   });
 

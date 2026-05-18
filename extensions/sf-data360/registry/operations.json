@@ -1992,5 +1992,60 @@
     "requiredParams": ["retrieverIdOrName", "configurationIdOrName"],
     "safety": "destructive",
     "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_standard_mapping_preview",
+    "family": "StandardMappings",
+    "description": "Preview bundled standard DLO-to-DMO mappings for a source object.",
+    "method": "POST",
+    "path": "/local/standard-mapping-preview",
+    "requiredParams": ["sourceObjectName"],
+    "optionalParams": ["targetDmoName"],
+    "safety": "safe_post",
+    "tips": "Local helper. Preview standard mappings first, then dry-run d360_standard_mapping_create with a reviewed payload."
+  },
+  {
+    "name": "d360_preview_field_matches",
+    "family": "Smart",
+    "description": "Preview DLO-to-DMO field matches with confidence scores.",
+    "method": "POST",
+    "path": "/local/preview-field-matches",
+    "requiredParams": ["sourceFields", "targetFields"],
+    "optionalParams": ["sourceDloName", "targetDmoName", "threshold"],
+    "safety": "safe_post",
+    "tips": "Local helper. Use before smart mapping suggest to inspect confidence and unmatched fields."
+  },
+  {
+    "name": "d360_smart_mapping_suggest",
+    "family": "Smart",
+    "description": "Suggest DLO-to-DMO field mappings and produce a mapping create payload.",
+    "method": "POST",
+    "path": "/local/smart-mapping-suggest",
+    "requiredParams": ["sourceFields", "targetFields", "sourceDloName", "targetDmoName"],
+    "optionalParams": ["threshold", "fieldOverrides"],
+    "safety": "safe_post",
+    "tips": "Local helper. Review mappingPayload, then dry-run d360_dmo_mapping_create."
+  },
+  {
+    "name": "d360_event_date_recommend",
+    "family": "Smart",
+    "description": "Recommend the best event date field for engagement streams.",
+    "method": "POST",
+    "path": "/local/event-date-recommend",
+    "requiredParams": ["fields"],
+    "optionalParams": ["category"],
+    "safety": "safe_post",
+    "tips": "Local helper. Prefer immutable event/created date fields over modified/updated fields."
+  },
+  {
+    "name": "d360_smart_datastream_create",
+    "family": "Smart",
+    "description": "Enhance a data stream create body with smart event date selection.",
+    "method": "POST",
+    "path": "/local/smart-datastream-create",
+    "requiredParams": ["body"],
+    "optionalParams": ["autoSelectEventDate"],
+    "safety": "safe_post",
+    "tips": "Local helper. Review enhancedBody, then dry-run d360_datastream_create."
   }
 ]
