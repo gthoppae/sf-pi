@@ -160,5 +160,49 @@
         }
       }
     }
+  },
+  "d360_dataaction_target_create": {
+    "operation": "d360_dataaction_target_create",
+    "params": {
+      "body": {
+        "apiName": "Example_Data_Action_Target",
+        "label": "Example Data Action Target",
+        "type": "WebHook",
+        "subType": "Rest",
+        "externalRecordIdentifier": "example-target-external-id",
+        "config": {
+          "targetEndpoint": "https://example.invalid/data-action",
+          "apiContract": "ExampleContract"
+        }
+      }
+    }
+  },
+  "d360_dataaction_create": {
+    "operation": "d360_dataaction_create",
+    "params": {
+      "body": {
+        "dataActionName": "Example Data Action",
+        "developerName": "Example_Data_Action",
+        "dataspace": "default",
+        "masterLabel": "Example Data Action",
+        "description": "Example data action payload placeholder. Verify source, condition, projected fields, and target names before execution.",
+        "actionConditionExpression": "1 = 1",
+        "eventTriggerCondition": "ON_CREATE",
+        "externalRecordIdentifier": "example-action-external-id",
+        "subscriberKey": "ExampleSubscriberKey",
+        "isRealTimeAction": true,
+        "shouldProcessDayZero": false,
+        "shouldTriggerEventOnlyFirstTime": true,
+        "dataActionSources": [
+          {
+            "sourceName": "ExampleSource__dlm"
+          }
+        ],
+        "actionConditions": [],
+        "dataActionTargetNames": ["Example_Data_Action_Target"],
+        "dataActionProjectedFields": [],
+        "dataActionEnrichmentProperties": []
+      }
+    }
   }
 }

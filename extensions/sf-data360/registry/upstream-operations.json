@@ -621,5 +621,26 @@
     "description": "Set or update the schedule for a data transform.",
     "method": "PUT",
     "path": "/ssot/data-transforms/{transformId}/schedule"
+  },
+  {
+    "name": "d360_dataaction_create",
+    "family": "DataAction",
+    "description": "Create a data action. Requires a configured data action target.",
+    "method": "POST",
+    "path": "/ssot/data-actions"
+  },
+  {
+    "name": "d360_dataaction_target_create",
+    "family": "DataAction",
+    "description": "Create a data action target for event-triggered payload delivery.",
+    "method": "POST",
+    "path": "/ssot/data-action-targets"
+  },
+  {
+    "name": "d360_dataaction_target_update",
+    "family": "DataAction",
+    "description": "Update a data action target by id.",
+    "method": "PATCH",
+    "path": "/ssot/data-action-targets/{dataActionTargetId}"
   }
 ]

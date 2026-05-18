@@ -824,5 +824,38 @@
     "optionalParams": ["dataspace"],
     "safety": "confirmed",
     "tips": "Use dry_run first; schedule changes can trigger recurring downstream processing."
+  },
+  {
+    "name": "d360_dataaction_create",
+    "family": "DataAction",
+    "description": "Create a data action. Requires a configured data action target.",
+    "method": "POST",
+    "path": "/ssot/data-actions",
+    "requiredParams": ["body"],
+    "optionalParams": ["dataspace"],
+    "safety": "confirmed",
+    "tips": "Create or verify a data action target first. Use dry_run before execution."
+  },
+  {
+    "name": "d360_dataaction_target_create",
+    "family": "DataAction",
+    "description": "Create a data action target for event-triggered payload delivery.",
+    "method": "POST",
+    "path": "/ssot/data-action-targets",
+    "requiredParams": ["body"],
+    "optionalParams": ["dataspace"],
+    "safety": "confirmed",
+    "tips": "Data action targets are for event-triggered payloads, not segment activation targets. Use dry_run first."
+  },
+  {
+    "name": "d360_dataaction_target_update",
+    "family": "DataAction",
+    "description": "Update a data action target by id.",
+    "method": "PATCH",
+    "path": "/ssot/data-action-targets/{dataActionTargetId}",
+    "requiredParams": ["dataActionTargetId", "body"],
+    "optionalParams": ["dataspace"],
+    "safety": "confirmed",
+    "tips": "Use dry_run first; endpoint, credential, or payload changes can affect event delivery."
   }
 ]

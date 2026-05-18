@@ -89,6 +89,14 @@ describe("d360 facade registry", () => {
         "d360_transform_schedule_set",
       ]),
     });
+    expect(searchRegistry("create update data action target event delivery")[0]).toMatchObject({
+      family: "DataAction",
+      operations: expect.arrayContaining([
+        "d360_dataaction_create",
+        "d360_dataaction_target_create",
+        "d360_dataaction_target_update",
+      ]),
+    });
     expect(searchRegistry("connection test connector")[0]).toMatchObject({
       family: "Connection",
       operations: expect.arrayContaining(["d360_connection_test"]),

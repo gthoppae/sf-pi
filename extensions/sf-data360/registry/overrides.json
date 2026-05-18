@@ -375,5 +375,23 @@
     "optionalParams": ["dataspace"],
     "safety": "confirmed",
     "tips": "Use dry_run first; schedule changes can trigger recurring downstream processing."
+  },
+  "d360_dataaction_create": {
+    "requiredParams": ["body"],
+    "optionalParams": ["dataspace"],
+    "safety": "confirmed",
+    "tips": "Create or verify a data action target first. Use dry_run before execution."
+  },
+  "d360_dataaction_target_create": {
+    "requiredParams": ["body"],
+    "optionalParams": ["dataspace"],
+    "safety": "confirmed",
+    "tips": "Data action targets are for event-triggered payloads, not segment activation targets. Use dry_run first."
+  },
+  "d360_dataaction_target_update": {
+    "requiredParams": ["dataActionTargetId", "body"],
+    "optionalParams": ["dataspace"],
+    "safety": "confirmed",
+    "tips": "Use dry_run first; endpoint, credential, or payload changes can affect event delivery."
   }
 }
