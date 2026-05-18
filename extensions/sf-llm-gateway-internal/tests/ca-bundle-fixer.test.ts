@@ -198,10 +198,12 @@ describe("buildZshenvBlock + applyZshenvBlock", () => {
 // install locations \u2014 tells us at a glance if someone reordered or
 // removed a path that downstream users rely on.
 describe("default candidate layout", () => {
-  it("includes the well-known aisuite paths under the user's home dir", () => {
+  it("includes the well-known aisuite, Claude Code, and DevBar paths under the user's home dir", () => {
     mkdirSync(path.join(tmpDir, ".aisuite", "conf"), { recursive: true });
     const out = buildCandidatePaths([], tmpDir);
     expect(out).toContain(path.join(tmpDir, ".aisuite", "conf", "npm-sfdc-certs.pem"));
     expect(out).toContain(path.join(tmpDir, ".aisuite", "conf", "internal.pem"));
+    expect(out).toContain(path.join(tmpDir, ".claude", "ca-bundle.pem"));
+    expect(out).toContain(path.join(tmpDir, ".devbar", "ca-bundle.pem"));
   });
 });

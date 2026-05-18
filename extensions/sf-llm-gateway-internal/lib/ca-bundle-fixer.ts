@@ -35,6 +35,22 @@ const DEFAULT_CANDIDATE_RELATIVE_PATHS = [
   ".aisuite/conf/npm-sfdc-certs.pem",
   ".aisuite/conf/internal.pem",
   ".aisuite/conf/ca-bundle.pem",
+  ".claude/npm-sfdc-certs.pem",
+  ".claude/internal.pem",
+  ".claude/ca-bundle.pem",
+  ".claude/conf/npm-sfdc-certs.pem",
+  ".claude/conf/internal.pem",
+  ".claude/conf/ca-bundle.pem",
+  ".claude/certs/internal.pem",
+  ".claude/certs/ca-bundle.pem",
+  ".devbar/npm-sfdc-certs.pem",
+  ".devbar/internal.pem",
+  ".devbar/ca-bundle.pem",
+  ".devbar/conf/npm-sfdc-certs.pem",
+  ".devbar/conf/internal.pem",
+  ".devbar/conf/ca-bundle.pem",
+  ".devbar/certs/internal.pem",
+  ".devbar/certs/ca-bundle.pem",
 ] as const;
 
 /**

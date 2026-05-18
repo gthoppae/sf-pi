@@ -37,6 +37,7 @@ Repo-level rules still apply; see root `AGENTS.md`.
 | `/sf-llm-gateway-internal doctor` diagnostics  | `lib/doctor.ts`                 |
 | `/sf-llm-gateway-internal tokens` counter      | `lib/token-counter.ts`          |
 | `/sf-llm-gateway-internal onboard` SSO link    | `lib/onboarding.ts`             |
+| Existing setup discovery (Claude/DevBar/CA)    | `lib/onboarding-sources.ts`     |
 | Provider-telemetry (429/5xx footer badge)      | `lib/provider-telemetry.ts`     |
 | Transparent inner-stream retry telemetry       | `lib/retry-telemetry.ts`        |
 | Wire-level request/response tracing            | `lib/wire-trace.ts`             |

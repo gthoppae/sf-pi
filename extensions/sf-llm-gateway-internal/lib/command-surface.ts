@@ -73,7 +73,7 @@ export const GATEWAY_COMMAND_SURFACE: readonly GatewayCommandSurfaceItem[] = [
     label: "Import from Claude Code",
     usage: "import-claude [global|project]",
     description:
-      "One-click import of a cleansed gateway base URL and API token from local Claude Code settings.",
+      "Import a cleansed gateway base URL and API token from local Claude Code settings, save detected CA bundle candidates, run doctor, and set the gateway default only when preflight passes.",
     section: "Connect",
     aliases: ["import-claude-code"],
     acceptsScope: true,
@@ -92,7 +92,7 @@ export const GATEWAY_COMMAND_SURFACE: readonly GatewayCommandSurfaceItem[] = [
     label: "Fix corporate CA (macOS)",
     usage: "fix-ca-bundle",
     description:
-      "Wire NODE_EXTRA_CA_CERTS into both the LaunchAgent (Dock/Spotlight launches) and ~/.zshenv (Terminal launches) for the configured CA bundle. Adopts an existing PEM if found at a well-known path; otherwise downloads from sfPi.gateway.caBundleSource (or the matching env var) when set. Each disk-mutating step requires explicit confirmation.",
+      "Wire NODE_EXTRA_CA_CERTS into both the LaunchAgent (Dock/Spotlight launches) and ~/.zshenv (Terminal launches). Adopts an existing PEM from saved candidates, shell exports, or bounded Claude Code / DevBar / AI Suite locations; otherwise downloads from sfPi.gateway.caBundleSource (or the matching env var) when set. Each disk-mutating step requires explicit confirmation.",
     section: "Connect",
     aliases: ["fix-ca", "ca-bundle"],
   },
@@ -101,7 +101,7 @@ export const GATEWAY_COMMAND_SURFACE: readonly GatewayCommandSurfaceItem[] = [
     label: "One-shot onboard",
     usage: "onboard [global|project]",
     description:
-      "Chain Claude Code import \u2192 register provider \u2192 doctor preflight \u2192 set default in one keystroke. Falls back to clear next-step hints when any step needs attention (TLS \u2192 fix-ca-bundle, auth \u2192 rotate key, redirect \u2192 fix base URL).",
+      "Chain Claude Code import + CA candidate discovery \u2192 register provider \u2192 doctor preflight \u2192 set default in one keystroke. Falls back to clear next-step hints when any step needs attention (TLS \u2192 fix-ca-bundle, auth \u2192 rotate key, redirect \u2192 fix base URL).",
     section: "Connect",
     acceptsScope: true,
   },

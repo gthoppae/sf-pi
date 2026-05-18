@@ -128,6 +128,7 @@ import {
   describeConfigValue,
   describeApiKey,
   asOptionalString,
+  type SavedGatewayConfig,
 } from "./lib/config.ts";
 
 /**
@@ -219,6 +220,11 @@ import {
 } from "./lib/ca-bundle-fixer.ts";
 import { writeCaBundleFixerState } from "./lib/ca-bundle-fixer-state.ts";
 import { writeCaProbeState } from "./lib/ca-probe-state.ts";
+import {
+  collectUsableCaBundlePaths,
+  discoverGatewayOnboardingSources,
+  formatDiscoveredCaBundleSummary,
+} from "./lib/onboarding-sources.ts";
 import {
   getGatewayArgumentCompletions,
   formatGatewayAliasReference,
@@ -960,6 +966,24 @@ async function handleOnboardCommand(
  * chain. Kept as a small helper so other call sites (panel action,
  * tests) can invoke the chain without re-deriving the deps.
  */
+function mergeDiscoveredCaBundleCandidates(
+  saved: SavedGatewayConfig,
+  cwd: string,
+): { added: string[]; summary: string[] } {
+  const existing = Array.isArray(saved.caBundleCandidates)
+    ? saved.caBundleCandidates.filter(
+        (entry): entry is string => typeof entry === "string" && entry.trim().length > 0,
+      )
+    : [];
+  const discovery = discoverGatewayOnboardingSources({ cwd, caBundleCandidates: existing });
+  const usablePaths = collectUsableCaBundlePaths(discovery);
+  const added = usablePaths.filter((candidate) => !existing.includes(candidate));
+  if (added.length > 0) {
+    saved.caBundleCandidates = [...existing, ...added];
+  }
+  return { added, summary: formatDiscoveredCaBundleSummary(discovery) };
+}
+
 async function executeOnboardChain(
   pi: ExtensionAPI,
   ctx: ExtensionCommandContext,
@@ -984,11 +1008,18 @@ async function executeOnboardChain(
         saved.apiKey = imported.apiKey;
         changed.push("API key");
       }
+      const caDiscovery = mergeDiscoveredCaBundleCandidates(saved, ctx.cwd);
+      if (caDiscovery.added.length > 0) {
+        changed.push(
+          `${caDiscovery.added.length} CA bundle candidate${caDiscovery.added.length === 1 ? "" : "s"}`,
+        );
+      }
       if (changed.length === 0) {
         return {
           ok: true,
           importedAny: false,
-          detail: "Claude Code settings present, but no gateway URL/token detected.",
+          detail:
+            "Claude Code settings present, but no new gateway URL, token, or CA bundle candidate was detected.",
         };
       }
       writeGatewaySavedConfig(configPath, saved);
@@ -1010,7 +1041,7 @@ async function executeOnboardChain(
       return { allOk, failureClass: report.failureClass, summary };
     },
     setDefault: async (setScope) => {
-      await handleSetDefaultCommand(pi, ctx, setScope);
+      await applyGatewayDefault(pi, ctx, setScope);
     },
     hasUsableSavedConfig: () => {
       const config = getGatewayConfig(ctx.cwd);
@@ -1056,9 +1087,15 @@ async function handleFixCaBundleCommand(
   }
 
   const config = getGatewayConfig(ctx.cwd);
+  const sourceDiscovery = discoverGatewayOnboardingSources({
+    cwd: ctx.cwd,
+    caBundleCandidates: config.caBundleCandidates,
+  });
+  const discoveredCandidates = collectUsableCaBundlePaths(sourceDiscovery);
+  const candidateExtras = [...config.caBundleCandidates, ...discoveredCandidates];
 
   // Step 1 — probe candidates.
-  const candidates = probeBundleCandidates(config.caBundleCandidates);
+  const candidates = probeBundleCandidates(candidateExtras);
   const adopted = candidates.find((entry) => entry.valid);
   let bundlePath: string | undefined = adopted?.path;
   let source: "adopt" | "bootstrap" = "adopt";
@@ -1067,6 +1104,7 @@ async function handleFixCaBundleCommand(
     "",
     `Probed candidates (${candidates.length}):`,
     ...candidates.map((entry) => formatProbeRow(entry)),
+    ...formatDiscoveredCaBundleSummary(sourceDiscovery).map((line) => `  • ${line}`),
     "",
   ];
 
@@ -1367,6 +1405,12 @@ async function importClaudeCodeGatewayConfig(
     saved.apiKey = imported.apiKey;
     changed.push(`API key from ${imported.apiKeyPath ?? "Claude Code settings"}`);
   }
+  const caDiscovery = mergeDiscoveredCaBundleCandidates(saved, ctx.cwd);
+  if (caDiscovery.added.length > 0) {
+    changed.push(
+      `${caDiscovery.added.length} CA bundle candidate${caDiscovery.added.length === 1 ? "" : "s"}`,
+    );
+  }
 
   if (changed.length === 0) {
     await emitCommandOutput(
@@ -1383,6 +1427,18 @@ async function importClaudeCodeGatewayConfig(
   await discoverAndRegister(pi, getBetaOverrides(), getBetaExtras(), ctx.cwd);
   await updateFooterStatus(ctx, false);
   const config = getGatewayConfig(ctx.cwd);
+  const doctor = await fetchGatewayDoctorReport(ctx.cwd);
+  const doctorPassed = doctor.checks.length > 0 && doctor.checks.every((check) => check.ok);
+  const defaultLines = doctorPassed ? await applyGatewayDefault(pi, ctx, scope) : [];
+  const followUp = doctorPassed
+    ? "Gateway preflight passed; gateway default was applied automatically."
+    : doctor.failureClass === "tls"
+      ? `Gateway preflight found a TLS issue. Next: /${FRIENDLY_COMMAND_NAME} fix-ca-bundle.`
+      : doctor.failureClass === "auth"
+        ? `Gateway preflight found an auth issue. Next: rotate or re-paste the key via /${FRIENDLY_COMMAND_NAME} setup.`
+        : doctor.failureClass === "redirect"
+          ? "Gateway preflight hit an SSO/browser redirect. Confirm the saved URL is the API gateway root."
+          : "Gateway preflight did not pass; default provider was not changed.";
 
   const report = [
     `Imported Claude Code gateway settings into ${scope} scope.`,
@@ -1391,12 +1447,23 @@ async function importClaudeCodeGatewayConfig(
     `- Imported: ${changed.join(", ")}`,
     `- Base URL: ${describeConfigValue(config.baseUrl, config.baseUrlSource)}`,
     `- API key: ${describeApiKey(config.apiKey, config.apiKeySource)}`,
+    ...caDiscovery.summary.map((line) => `- ${line}`),
     "",
-    `Next: run /${FRIENDLY_COMMAND_NAME} and choose Save + enable, or run /${FRIENDLY_COMMAND_NAME} on ${scope}.`,
+    `Doctor: ${doctorPassed ? "passed" : `needs attention (${doctor.failureClass ?? "unknown"})`}`,
+    followUp,
+    ...(defaultLines.length > 0 ? ["", ...defaultLines] : []),
     ...imported.warnings.map((warning) => `Warning: ${warning}`),
   ].join("\n");
 
-  await emitCommandOutput(pi, ctx, "Claude Code gateway settings imported.", report, "info");
+  await emitCommandOutput(
+    pi,
+    ctx,
+    doctorPassed
+      ? "Claude Code gateway settings imported and configured."
+      : "Claude Code gateway settings imported.",
+    report,
+    doctorPassed ? "info" : "warning",
+  );
 }
 
 async function handleTokensCommand(
@@ -1523,11 +1590,11 @@ async function handleDebugCommand(
   );
 }
 
-async function handleSetDefaultCommand(
+async function applyGatewayDefault(
   pi: ExtensionAPI,
   ctx: ExtensionCommandContext,
   scope: "global" | "project",
-): Promise<void> {
+): Promise<string[]> {
   const settingsPath = scope === "project" ? projectSettingsPath(ctx.cwd) : globalSettingsPath();
 
   await discoverAndRegister(pi, getBetaOverrides(), getBetaExtras(), ctx.cwd);
@@ -1559,7 +1626,7 @@ async function handleSetDefaultCommand(
 
   await updateFooterStatus(ctx, true);
 
-  const report = [
+  return [
     `Default updated in ${scope} settings.`,
     `- Provider: ${effectiveProviderName}`,
     `- Model: ${effectiveModelId}${effectiveModelId !== DEFAULT_MODEL_ID ? ` (resolved from ${DEFAULT_MODEL_ID})` : ""}`,
@@ -1567,8 +1634,15 @@ async function handleSetDefaultCommand(
     `- Context: ${effectiveModel.contextWindow.toLocaleString()} tokens`,
     `- Max output: ${effectiveModel.maxTokens.toLocaleString()} tokens`,
     `- Route: Global`,
-  ].join("\n");
+  ];
+}
 
+async function handleSetDefaultCommand(
+  pi: ExtensionAPI,
+  ctx: ExtensionCommandContext,
+  scope: "global" | "project",
+): Promise<void> {
+  const report = (await applyGatewayDefault(pi, ctx, scope)).join("\n");
   await emitCommandOutput(pi, ctx, "SF LLM Gateway Internal default updated.", report, "info");
 }
 

@@ -5,7 +5,7 @@
  *   2. Surfaces the Heads-up about the LaunchAgent + ~/.zshenv pair
  *   3. Persists a `gatewayCaProbe` snapshot that the welcome splash can read
  *
- * The original Slack-thread bug fingerprint was an undici "fetch failed"
+ * The original user-reported bug fingerprint was an undici "fetch failed"
  * thrown during the first call \u2014 these tests replay that fingerprint via
  * a fetch stub and assert on the user-visible outcomes.
  */

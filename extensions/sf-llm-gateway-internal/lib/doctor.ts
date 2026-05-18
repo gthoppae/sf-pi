@@ -14,6 +14,12 @@ import {
 import { toGatewayOpenAiBaseUrl, toGatewayRootBaseUrl } from "./gateway-url.ts";
 import { fetchWithTimeout } from "./models.ts";
 import { type GatewayCaProbeFailureClass, writeCaProbeState } from "./ca-probe-state.ts";
+import {
+  collectUsableCaBundlePaths,
+  discoverGatewayOnboardingSources,
+  findShellOnlyNodeExtraCaCerts,
+  formatDiscoveredCaBundleSummary,
+} from "./onboarding-sources.ts";
 
 const DOCTOR_TIMEOUT_MS = 8_000;
 const BODY_PREVIEW_LIMIT = 240;
@@ -190,6 +196,10 @@ export async function fetchGatewayDoctorReport(cwd: string): Promise<GatewayDoct
   }
 
   const failureClass = aggregateFailureClass(checks.map((check) => check.failureClass));
+  const discovery = discoverGatewayOnboardingSources({
+    cwd,
+    caBundleCandidates: config.caBundleCandidates,
+  });
 
   const recommendations: string[] = [];
   if (!config.baseUrl) {
@@ -204,7 +214,7 @@ export async function fetchGatewayDoctorReport(cwd: string): Promise<GatewayDoct
     if (!check.ok) recommendations.push(`${check.name}: ${check.interpretation}`);
   }
   recommendations.push(...buildDoctorKeySourceRecommendations(cwd));
-  recommendations.push(...buildTlsHintRecommendations(failureClass));
+  recommendations.push(...buildTlsHintRecommendations(failureClass, discovery));
   if (config.helpUrl) {
     recommendations.push(`More info: ${config.helpUrl}`);
   }
@@ -242,14 +252,39 @@ export async function fetchGatewayDoctorReport(cwd: string): Promise<GatewayDoct
  * Other platforms inherit OpenSSL's keychain integration so the hint
  * would be a red herring there. Static prose; no live work.
  */
-function buildTlsHintRecommendations(failureClass: GatewayCaProbeFailureClass): string[] {
+function buildTlsHintRecommendations(
+  failureClass: GatewayCaProbeFailureClass,
+  discovery: ReturnType<typeof discoverGatewayOnboardingSources>,
+): string[] {
   if (failureClass !== "tls") return [];
   if (process.platform !== "darwin") return [];
   if (process.env.NODE_EXTRA_CA_CERTS) return [];
-  return [
+
+  const validCandidatePaths = collectUsableCaBundlePaths(discovery);
+  const shellOnly = findShellOnlyNodeExtraCaCerts(discovery);
+  const discoveredCaLines = formatDiscoveredCaBundleSummary(discovery);
+  const recommendations = [
     `TLS verification failed and NODE_EXTRA_CA_CERTS is not set. macOS Node does not trust the system keychain. If your org issues a private CA bundle, point NODE_EXTRA_CA_CERTS at it (one-shot fix: /${FRIENDLY_COMMAND_NAME} fix-ca-bundle).`,
     `Heads up: NODE_EXTRA_CA_CERTS must be set in two places to cover every launch path \u2014 a LaunchAgent for Dock/Spotlight launches and an export in ~/.zshenv for Terminal launches. The fix-ca-bundle action handles both. Override the bundle source via ${CA_BUNDLE_SOURCE_ENV} if you maintain your own.`,
   ];
+
+  if (shellOnly.length > 0) {
+    recommendations.push(
+      `NODE_EXTRA_CA_CERTS is present in ${shellOnly
+        .map((finding) => finding.location)
+        .join(
+          ", ",
+        )}, but pi may not see it for every launch path. Run /${FRIENDLY_COMMAND_NAME} fix-ca-bundle to mirror the valid bundle into ~/.zshenv and the LaunchAgent.`,
+    );
+  }
+  if (validCandidatePaths.length > 0) {
+    recommendations.push(
+      `A valid CA bundle candidate was found at ${validCandidatePaths[0]}. /${FRIENDLY_COMMAND_NAME} fix-ca-bundle will adopt it instead of asking for a download URL.`,
+    );
+    recommendations.push(...discoveredCaLines);
+  }
+
+  return recommendations;
 }
 
 function buildDoctorKeySourceRecommendations(cwd: string): string[] {
