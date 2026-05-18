@@ -331,5 +331,25 @@
     "requiredParams": ["segmentApiName"],
     "safety": "confirmed",
     "tips": "Deactivate uses segment API/developer name, not always the internal id."
+  },
+  "d360_activation_create": {
+    "requiredParams": ["body"],
+    "safety": "confirmed",
+    "tips": "Requires an active segment and a valid activation target. Use dry_run first."
+  },
+  "d360_activation_update": {
+    "requiredParams": ["activationId", "body"],
+    "safety": "confirmed",
+    "tips": "Use dry_run first; updating activations can affect downstream delivery."
+  },
+  "d360_activation_target_create": {
+    "requiredParams": ["body"],
+    "safety": "confirmed",
+    "tips": "Must reference a valid connection/connector target. Use dry_run first."
+  },
+  "d360_activation_target_update": {
+    "requiredParams": ["activationTargetId", "body"],
+    "safety": "confirmed",
+    "tips": "Use dry_run first; activation target changes can affect downstream delivery."
   }
 }

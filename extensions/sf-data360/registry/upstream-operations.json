@@ -565,5 +565,33 @@
     "description": "Deactivate a segment by API name.",
     "method": "POST",
     "path": "/ssot/segments/{segmentApiName}/actions/deactivate"
+  },
+  {
+    "name": "d360_activation_create",
+    "family": "Activation",
+    "description": "Create an activation. Requires an active segment and an activation target.",
+    "method": "POST",
+    "path": "/ssot/activations"
+  },
+  {
+    "name": "d360_activation_update",
+    "family": "Activation",
+    "description": "Update an activation by id.",
+    "method": "PATCH",
+    "path": "/ssot/activations/{activationId}"
+  },
+  {
+    "name": "d360_activation_target_create",
+    "family": "Activation",
+    "description": "Create an activation target. Must reference a valid destination/connection shape.",
+    "method": "POST",
+    "path": "/ssot/activation-targets"
+  },
+  {
+    "name": "d360_activation_target_update",
+    "family": "Activation",
+    "description": "Update an activation target by id.",
+    "method": "PUT",
+    "path": "/ssot/activation-targets/{activationTargetId}"
   }
 ]

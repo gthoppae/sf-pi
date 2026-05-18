@@ -102,5 +102,29 @@
     "params": {
       "segmentId": "ExampleSegmentId"
     }
+  },
+  "d360_activation_create": {
+    "operation": "d360_activation_create",
+    "params": {
+      "body": {
+        "displayName": "Example Activation",
+        "segmentApiName": "Example_Segment",
+        "activationTargetId": "ExampleTargetId",
+        "dataSpaceName": "default",
+        "description": "Example activation payload placeholder. Replace ids and target config with verified values before execution."
+      }
+    }
+  },
+  "d360_activation_target_create": {
+    "operation": "d360_activation_target_create",
+    "params": {
+      "body": {
+        "displayName": "Example Activation Target",
+        "targetType": "ExampleTargetType",
+        "connectionId": "ExampleConnectionId",
+        "dataSpaceName": "default",
+        "description": "Example activation target payload placeholder. Replace destination fields with values from the selected connector."
+      }
+    }
   }
 }

@@ -740,5 +740,45 @@
     "requiredParams": ["segmentApiName"],
     "safety": "confirmed",
     "tips": "Deactivate uses segment API/developer name, not always the internal id."
+  },
+  {
+    "name": "d360_activation_create",
+    "family": "Activation",
+    "description": "Create an activation. Requires an active segment and an activation target.",
+    "method": "POST",
+    "path": "/ssot/activations",
+    "requiredParams": ["body"],
+    "safety": "confirmed",
+    "tips": "Requires an active segment and a valid activation target. Use dry_run first."
+  },
+  {
+    "name": "d360_activation_update",
+    "family": "Activation",
+    "description": "Update an activation by id.",
+    "method": "PATCH",
+    "path": "/ssot/activations/{activationId}",
+    "requiredParams": ["activationId", "body"],
+    "safety": "confirmed",
+    "tips": "Use dry_run first; updating activations can affect downstream delivery."
+  },
+  {
+    "name": "d360_activation_target_create",
+    "family": "Activation",
+    "description": "Create an activation target. Must reference a valid destination/connection shape.",
+    "method": "POST",
+    "path": "/ssot/activation-targets",
+    "requiredParams": ["body"],
+    "safety": "confirmed",
+    "tips": "Must reference a valid connection/connector target. Use dry_run first."
+  },
+  {
+    "name": "d360_activation_target_update",
+    "family": "Activation",
+    "description": "Update an activation target by id.",
+    "method": "PUT",
+    "path": "/ssot/activation-targets/{activationTargetId}",
+    "requiredParams": ["activationTargetId", "body"],
+    "safety": "confirmed",
+    "tips": "Use dry_run first; activation target changes can affect downstream delivery."
   }
 ]
