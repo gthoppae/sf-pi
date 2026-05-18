@@ -37,12 +37,19 @@ export function facadeResultToLlmText(
 function searchCard(result: Record<string, unknown>, opts: FacadeCardBuildOptions): D360ResultCard {
   const query = stringValue(result.query) ?? "";
   const matches = arrayValue(result.results);
-  const lines = matches.slice(0, 6).map((entry, index) => {
+  const rows = matches.slice(0, 6).map((entry) => {
     const row = objectValue(entry);
-    const family = stringValue(row.family) ?? "Unknown";
-    const runbooks = arrayValue(row.runbooks).length;
-    const operations = arrayValue(row.operations).length;
-    return `${index + 1}. ${family} · ${operations} operation(s) · ${runbooks} runbook(s)`;
+    return {
+      family: stringValue(row.family) ?? "Unknown",
+      runbooks: arrayValue(row.runbooks).length,
+      operations: arrayValue(row.operations).length,
+    };
+  });
+  const familyWidth = Math.min(28, Math.max(...rows.map((row) => row.family.length), 6));
+  const lines = rows.map((row, index) => {
+    const family =
+      row.family.length > familyWidth ? `${row.family.slice(0, familyWidth - 1)}…` : row.family;
+    return `${index + 1}. ${family.padEnd(familyWidth)}  operations ${String(row.operations).padStart(2)}   runbooks ${String(row.runbooks).padStart(2)}`;
   });
   return withArtifacts(
     {
@@ -51,6 +58,23 @@ function searchCard(result: Record<string, unknown>, opts: FacadeCardBuildOption
       title: "Data 360 search",
       subtitle: query ? `query: ${query}` : undefined,
       summary: `${matches.length} Data 360 family match(es).`,
+      stage: {
+        key: "discover",
+        label: "Discover",
+        index: 2,
+        total: 5,
+      },
+      lineage: {
+        lines: [
+          "Tool call",
+          "  ↳ d360 search",
+          "     ↳ Local Data 360 operation registry",
+          ...matches.slice(0, 4).map((entry) => {
+            const row = objectValue(entry);
+            return `        ↳ Family: ${stringValue(row.family) ?? "Unknown"}`;
+          }),
+        ],
+      },
       sections: [{ title: "Matches", icon: "🔎", lines }],
       nextSteps: ["Use d360 examples with an operation or runbook name."],
     },
@@ -78,6 +102,19 @@ function examplesCard(
       title: "Data 360 examples",
       subtitle: name,
       summary: stringValue(result.summary) ?? `Example for ${name}`,
+      stage: {
+        key: "resolve",
+        label: "Resolve",
+        index: 3,
+        total: 5,
+      },
+      lineage: {
+        lines: [
+          "Tool call",
+          "  ↳ d360 examples",
+          operation.name ? `     ↳ Operation: ${name}` : `     ↳ Runbook: ${name}`,
+        ],
+      },
       sections: [{ title: "Shape", icon: "📘", lines }],
       nextSteps: [
         runbook.name
@@ -102,8 +139,6 @@ function executeCard(
   const helperSections = summarizeHelperResult(result);
   if (helperSections.length) sections.push(...helperSections);
   const responseLines = summarizeResponse(response);
-  if (responseLines.length)
-    sections.push({ title: "Result", icon: ok ? "✅" : "❌", lines: responseLines });
   const preflight = objectValue(result.preflight);
   if (Object.keys(preflight).length) {
     sections.push({
@@ -115,17 +150,11 @@ function executeCard(
       ],
     });
   }
-  if (result.dryRun === true) {
-    const request = objectValue(result.request);
-    sections.push({
-      title: "Resolved request",
-      icon: "🧭",
-      lines: [
-        `${stringValue(request.method) ?? "?"} ${stringValue(request.path) ?? "?"}`,
-        request.body ? `body: ${JSON.stringify(request.body)}` : "body: none",
-      ],
-    });
-  }
+  const request = objectValue(result.request);
+  const effectiveRequest = Object.keys(request).length ? request : preflight;
+  const hasRequest = Boolean(
+    stringValue(effectiveRequest.method) || stringValue(effectiveRequest.path),
+  );
   return withArtifacts(
     {
       status: ok ? "success" : "error",
@@ -135,8 +164,48 @@ function executeCard(
         .filter(Boolean)
         .join(" · "),
       summary: stringValue(result.summary) ?? `${operation}${status ? ` HTTP ${status}` : ""}`,
+      stage:
+        result.dryRun === true
+          ? {
+              key: "resolve",
+              label: "Resolve",
+              index: 3,
+              total: 5,
+              description:
+                "Resolving the facade operation into the exact request before execution.",
+            }
+          : {
+              key: ok ? "summarize" : "execute",
+              label: ok ? "Summarize" : "Execute",
+              index: ok ? 5 : 4,
+              total: 5,
+              description: ok
+                ? "Summarizing the operation response and preserving raw output in artifacts."
+                : "Execution failed or was blocked; keeping the request, safety, and error context together.",
+            },
+      request: hasRequest
+        ? {
+            method: stringValue(effectiveRequest.method),
+            path: stringValue(effectiveRequest.path),
+            targetOrg: stringValue(result.targetOrg),
+            apiVersion: stringValue(result.apiVersion),
+            safety: stringValue(result.safety),
+            operation,
+            payload: request.body ?? null,
+          }
+        : undefined,
+      response: { lines: responseLines },
+      lineage: hasRequest
+        ? operationLineage(operation, effectiveRequest, response, opts.fullOutputPath)
+        : localOperationLineage(operation, opts.fullOutputPath),
       sections,
-      nextSteps: ok ? helperNextSteps(result) : ["Inspect the full JSON for raw error details."],
+      nextSteps: ok
+        ? (helperNextSteps(result) ?? [
+            result.dryRun === true
+              ? "Run d360 execute without dry_run after reviewing the resolved request."
+              : "Inspect the full JSON only if raw rows or response shape are needed.",
+          ])
+        : ["Inspect the full JSON for raw error details."],
     },
     opts,
   );
@@ -150,7 +219,8 @@ function runbookCard(
   const ok = result.ok !== false;
   const runbookResult = objectValue(result.result);
   const markdown = stringValue(runbookResult.markdown);
-  const lines = markdown ? markdown.split("\n").slice(1).filter(Boolean) : [];
+  const previewLines = markdown ? markdown.split("\n").slice(1).filter(Boolean) : [];
+  const lines = formatRunbookPreviewLines(runbook, previewLines);
   const data = objectValue(runbookResult.data);
   const rowCount = (numberValue(data.rowCount) ?? arrayValue(data.rows).length) || undefined;
   const facts = [
@@ -168,6 +238,23 @@ function runbookCard(
         .filter(Boolean)
         .join(" · "),
       summary: ok ? (stringValue(result.summary) ?? runbook) : (error ?? `${runbook} failed`),
+      stage: {
+        key: "summarize",
+        label: "Summarize",
+        index: 5,
+        total: 5,
+        description:
+          "Turning the runbook output into a readable workflow summary with raw rows saved separately.",
+      },
+      request: {
+        method: "POST",
+        path: "/services/data/v*/ssot/query-sql",
+        targetOrg: stringValue(result.targetOrg),
+        apiVersion: stringValue(result.apiVersion),
+        operation: runbook,
+        payload: null,
+      },
+      lineage: runbookLineage(runbook, opts.fullOutputPath),
       facts,
       sections: lines.length
         ? [{ title: "Preview", icon: "💬", lines }]
@@ -180,6 +267,32 @@ function runbookCard(
     },
     opts,
   );
+}
+
+function formatRunbookPreviewLines(runbook: string, lines: string[]): string[] {
+  if (!runbook.endsWith("stdm_session_timeline")) return lines;
+  return lines.flatMap((line, index) => {
+    const parsed = parseTimelinePreviewLine(line);
+    if (!parsed) return [line];
+    return [
+      `${index + 1}. ${parsed.icon} ${parsed.role}${parsed.label ? ` · ${parsed.label}` : ""}`,
+      `   ${parsed.message || "(empty)"}`,
+      "",
+    ];
+  });
+}
+
+function parseTimelinePreviewLine(
+  line: string,
+): { icon: string; role: string; label?: string; message: string } | undefined {
+  const match = line.trim().match(/^([^\s]+)\s+(?:\[([^\]]+)\]\s*)?(.*)$/u);
+  if (!match) return undefined;
+  const icon = match[1];
+  const rawLabel = match[2];
+  const label = rawLabel && rawLabel !== "NOT_SET" ? rawLabel : undefined;
+  const message = match[3] ?? "";
+  const role = icon === "👤" ? "User" : icon === "🤖" ? "Agent" : "Event";
+  return { icon, role, label, message };
 }
 
 function genericCard(
@@ -206,6 +319,87 @@ function withArtifacts(card: D360ResultCard, opts: FacadeCardBuildOptions): D360
       { label: "Full JSON", path: opts.fullOutputPath, kind: "json" },
     ],
   };
+}
+
+function operationLineage(
+  operation: string,
+  request: Record<string, unknown>,
+  response: Record<string, unknown>,
+  fullOutputPath: string | undefined,
+): D360ResultCard["lineage"] {
+  const method = stringValue(request.method) ?? "?";
+  const path = stringValue(request.path) ?? "?";
+  const objects = extractDataCloudObjects([path, safeJson(request.body), safeJson(response)]);
+  return {
+    lines: [
+      "Tool call",
+      `  ↳ d360 execute: ${operation}`,
+      `     ↳ Data 360 REST: ${method} ${stripServicesPrefix(path)}`,
+      ...objects.slice(0, 6).map((name) => `        ↳ Object: ${name}`),
+      ...(fullOutputPath ? [`           ↳ Artifact: ${fullOutputPath}`] : []),
+    ],
+  };
+}
+
+function localOperationLineage(
+  operation: string,
+  fullOutputPath: string | undefined,
+): D360ResultCard["lineage"] {
+  return {
+    lines: [
+      "Tool call",
+      `  ↳ d360 execute: ${operation}`,
+      "     ↳ Local Data 360 helper",
+      ...(fullOutputPath ? [`        ↳ Artifact: ${fullOutputPath}`] : []),
+    ],
+  };
+}
+
+function runbookLineage(
+  runbook: string,
+  fullOutputPath: string | undefined,
+): D360ResultCard["lineage"] {
+  return {
+    lines: [
+      "Runbook",
+      `  ↳ ${runbook}`,
+      "     ↳ Data 360 SQL / observability workflow",
+      ...runbookObjects(runbook).map((name) => `        ↳ Object: ${name}`),
+      ...(fullOutputPath ? [`           ↳ Artifact: ${fullOutputPath}`] : []),
+    ],
+  };
+}
+
+function runbookObjects(runbook: string): string[] {
+  if (runbook.includes("stdm") || runbook.includes("interaction")) {
+    return ["ssot__AiAgentSession__dlm", "ssot__AiAgentInteraction__dlm"];
+  }
+  if (runbook.includes("trace") || runbook.includes("latency")) {
+    return ["ssot__TelemetryTraceSpan__dlm"];
+  }
+  return [];
+}
+
+function stripServicesPrefix(path: string): string {
+  return path.replace(/^\/services\/data\/v\d+\.\d+/u, "");
+}
+
+function extractDataCloudObjects(values: string[]): string[] {
+  const found = new Set<string>();
+  const pattern = /\b[A-Za-z0-9_]+__(?:dlm|dll|cio)\b/gu;
+  for (const value of values) {
+    for (const match of value.matchAll(pattern)) found.add(match[0]);
+  }
+  return [...found];
+}
+
+function safeJson(value: unknown): string {
+  if (value === undefined) return "";
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
+  }
 }
 
 function summarizeHelperResult(result: Record<string, unknown>): D360ResultSection[] {

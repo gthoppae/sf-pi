@@ -6,6 +6,8 @@ import type { D360ResultCard, D360ResultSection } from "./card.ts";
 
 export interface MetadataCardOptions {
   targetOrg?: string;
+  apiVersion?: string;
+  requestPath?: string;
   rawOutputPath?: string;
 }
 
@@ -53,6 +55,21 @@ function metadataListCard(
         .filter(Boolean)
         .join(" · "),
       summary: firstLine(summaryText) ?? `Found ${count ?? 0} ${label}.`,
+      stage: {
+        key: "discover",
+        label: "Discover",
+        index: 2,
+        total: 5,
+        description: "Discovering Data 360 metadata before choosing a more specific workflow step.",
+      },
+      request: {
+        method: "GET",
+        path: opts.requestPath ?? metadataPathForInput(input),
+        targetOrg: opts.targetOrg,
+        apiVersion: opts.apiVersion,
+        payload: null,
+      },
+      lineage: metadataLineage(input, opts.rawOutputPath),
       facts: [
         fact("Count", count),
         fact("Showing", shown),
@@ -93,6 +110,22 @@ function metadataDescribeCard(
         .filter(Boolean)
         .join(" · "),
       summary: header.label ? `${header.label} schema.` : `Metadata for ${apiName}.`,
+      stage: {
+        key: "discover",
+        label: "Discover",
+        index: 2,
+        total: 5,
+        description:
+          "Verifying schema before querying, so field names and object availability are not guessed.",
+      },
+      request: {
+        method: "GET",
+        path: opts.requestPath ?? metadataPathForInput(input),
+        targetOrg: opts.targetOrg,
+        apiVersion: opts.apiVersion,
+        payload: null,
+      },
+      lineage: metadataLineage(input, opts.rawOutputPath),
       facts: [
         { label: "API name", value: apiName },
         header.category ? { label: "Category", value: header.category } : undefined,
@@ -114,6 +147,38 @@ function withArtifact(card: D360ResultCard, rawOutputPath: string | undefined): 
   return {
     ...card,
     artifacts: [{ label: "Full JSON", path: rawOutputPath, kind: "json" }],
+  };
+}
+
+function metadataPathForInput(input: D360MetadataInput): string {
+  switch (input.action) {
+    case "list_dmos":
+      return "/ssot/metadata-entities?entityType=DataModelObject";
+    case "list_dlos":
+      return "/ssot/metadata-entities?entityType=DataLakeObject";
+    case "describe_dmo":
+      return `/ssot/data-model-objects/${input.api_name ?? "?"}`;
+    case "describe_dlo":
+      return `/ssot/data-lake-objects/${input.api_name ?? "?"}`;
+    default:
+      return "/ssot/metadata-entities";
+  }
+}
+
+function metadataLineage(
+  input: D360MetadataInput,
+  rawOutputPath: string | undefined,
+): D360ResultCard["lineage"] {
+  const kind = input.action.endsWith("dmos") || input.action.endsWith("dmo") ? "DMO" : "DLO";
+  const subject = input.api_name ?? (kind === "DMO" ? "Data Model Objects" : "Data Lake Objects");
+  return {
+    lines: [
+      "Tool call",
+      `  ↳ d360_metadata ${input.action}`,
+      "     ↳ Data 360 metadata endpoint",
+      `        ↳ ${kind}: ${subject}`,
+      ...(rawOutputPath ? [`           ↳ Artifact: ${rawOutputPath}`] : []),
+    ],
   };
 }
 

@@ -163,7 +163,7 @@ export function registerD360ProbeTool(pi: ExtensionAPI): void {
         { text: compactText, fullOutputPath, outputMode: "summary" },
       );
       sfPi.data = { card };
-      sfPi.renderHints = { profile: "balanced", collapsedLines: 8, expandedMaxLines: 40 };
+      sfPi.renderHints = { profile: "balanced", collapsedLines: 48, expandedMaxLines: 120 };
       return {
         content: [{ type: "text", text: compactText }],
         details: {

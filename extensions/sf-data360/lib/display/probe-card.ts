@@ -30,6 +30,39 @@ export function probeResultToCard(input: ProbeCardInput, fullOutputPath?: string
     title: "Data 360 readiness",
     subtitle: `${input.targetOrg} · API v${input.apiVersion} · ${input.state}`,
     summary: input.guidance,
+    stage: {
+      key: "readiness",
+      label: "Readiness",
+      index: 1,
+      total: 5,
+      description:
+        "Checking which Data 360 surfaces are reachable before running workflow-specific calls.",
+    },
+    request: {
+      method: "GET",
+      path: `${input.probes.length} curated read-only /ssot probes`,
+      targetOrg: input.targetOrg,
+      apiVersion: input.apiVersion,
+      payload: null,
+    },
+    response: {
+      lines: [
+        `Ready/populated=${counts.ready}`,
+        `Empty=${counts.empty}`,
+        `Feature gated=${counts.gated}`,
+        `Failed/unavailable=${counts.failed}`,
+      ],
+    },
+    lineage: {
+      lines: [
+        "Tool call",
+        "  ↳ d360_probe",
+        "     ↳ Data 360 readiness probes",
+        ...input.probes.slice(0, 6).map((probe) => `        ↳ ${probe.name}: ${probe.path}`),
+        ...(input.probes.length > 6 ? [`        ↳ … ${input.probes.length - 6} more probes`] : []),
+        ...(fullOutputPath ? [`           ↳ Artifact: ${fullOutputPath}`] : []),
+      ],
+    },
     facts: [
       { label: "Ready/populated", value: String(counts.ready) },
       { label: "Empty", value: String(counts.empty) },

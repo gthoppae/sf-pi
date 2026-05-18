@@ -30,6 +30,8 @@ describe("d360_metadata result card", () => {
 
     expect(card.title).toBe("Data 360 DMOs");
     expect(rendered).toContain("🗂️ Data 360 DMOs ✅");
+    expect(rendered).toContain("Stage 2/5: Discover");
+    expect(rendered).toContain("GET /ssot/metadata-entities?entityType=DataModelObject");
     expect(rendered).toContain("AI Agent Interaction — ssot__AiAgentInteraction__dlm");
     expect(rendered).toContain("📄 Full JSON: /tmp/pi-d360-meta/output.json");
   });
@@ -63,6 +65,7 @@ describe("d360_metadata result card", () => {
     const expanded = renderCardExpanded(card);
 
     expect(card.title).toBe("Data 360 metadata");
+    expect(expanded).toContain("Stage 2/5: Discover");
     expect(expanded).toContain("AI Agent Interaction schema.");
     expect(expanded).toContain("• API name: ssot__AiAgentInteraction__dlm");
     expect(expanded).toContain("ssot__TelemetryTraceId__c — Telemetry Trace · Text");

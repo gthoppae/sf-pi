@@ -235,6 +235,7 @@ async function runExecute(
       targetOrg,
       apiVersion,
       operation,
+      safety: operation.safety,
       request: { method: operation.method, path: apiPath, body: body ?? null },
       summary: `Resolved ${operation.name}`,
     };
@@ -325,7 +326,9 @@ async function runExecute(
     targetOrg,
     apiVersion,
     operation: operation.name,
+    safety: operation.safety,
     status: resp.status,
+    request: { method: operation.method, path: apiPath, body: body ?? null },
     response: resp.body,
     summary: `${operation.name} HTTP ${resp.status}`,
   };
@@ -696,7 +699,7 @@ async function buildFacadeResult(
   const formatted = { text: compactText, fullOutputPath, outputMode };
   const sfPi = buildD360Envelope(D360_FACADE_TOOL_NAME, ok, compactText, details, formatted);
   sfPi.data = { card };
-  sfPi.renderHints = { profile: "balanced", collapsedLines: 8, expandedMaxLines: 40 };
+  sfPi.renderHints = { profile: "balanced", collapsedLines: 48, expandedMaxLines: 120 };
 
   return {
     content: [{ type: "text" as const, text: compactText }],

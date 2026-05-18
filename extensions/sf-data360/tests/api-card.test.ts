@@ -26,6 +26,8 @@ describe("d360_api result card", () => {
 
     expect(card.status).toBe("success");
     expect(rendered).toContain("🔗 Data 360 API ✅");
+    expect(rendered).toContain("Stage 5/5: Summarize");
+    expect(rendered).toContain("POST /services/data/v67.0/ssot/query-sql?dataspaceName=default");
     expect(rendered).toContain("span_count = 9550");
     expect(rendered).toContain("📄 Full JSON: /tmp/pi-d360-api/output.json");
   });
@@ -70,9 +72,10 @@ describe("d360_api result card", () => {
       { action: "dry_run", ok: true },
     );
 
-    expect(renderCardExpanded(card)).toContain(
-      "Resolved Data 360 REST request without network call.",
-    );
-    expect(renderCardExpanded(card)).toContain("POST /services/data/v67.0/ssot/data-streams");
+    const expanded = renderCardExpanded(card);
+    expect(expanded).toContain("Resolved Data 360 REST request without network call.");
+    expect(expanded).toContain("Stage 3/5: Resolve");
+    expect(expanded).toContain("POST /services/data/v67.0/ssot/data-streams");
+    expect(expanded).toContain('"name": "Example"');
   });
 });

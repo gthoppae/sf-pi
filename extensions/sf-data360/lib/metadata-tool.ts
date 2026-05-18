@@ -167,6 +167,8 @@ export function registerD360MetadataTool(pi: ExtensionAPI): void {
       const summary = summarizeMetadataOutput(input, output, rawOutputPath);
       const card = metadataResultToCard(input, summary.text, summary.details, {
         targetOrg,
+        apiVersion,
+        requestPath: apiPath,
         rawOutputPath,
       });
       const compactText = renderCardForLlm(card);
@@ -184,7 +186,7 @@ export function registerD360MetadataTool(pi: ExtensionAPI): void {
         fullOutputPath: rawOutputPath,
       });
       sfPi.data = { card };
-      sfPi.renderHints = { profile: "balanced", collapsedLines: 8, expandedMaxLines: 40 };
+      sfPi.renderHints = { profile: "balanced", collapsedLines: 48, expandedMaxLines: 120 };
       return {
         content: [{ type: "text" as const, text: compactText }],
         details: {

@@ -138,8 +138,8 @@ export function renderD360CardResult(
   const card = result.details?.card ?? result.details?.sfPi?.data?.card;
   if (card) {
     const rendered = opts.expanded
-      ? renderCardExpanded(card, { expandedMaxLines: 40, indentBody: true })
-      : renderCardCollapsed(card, { collapsedMaxLines: 12, indentBody: true });
+      ? renderCardExpanded(card, { expandedMaxLines: 120, indentBody: true })
+      : renderCardCollapsed(card, { indentBody: true });
     return new Text(styleCardText(rendered, card.status, theme), 0, 0);
   }
 
@@ -151,8 +151,42 @@ export function renderD360CardResult(
 function styleCardText(text: string, status: D360ResultCard["status"], theme: Theme): string {
   const lines = text.split("\n");
   const title = lines[0] ?? "";
-  const titleToken = status === "error" ? "error" : status === "warning" ? "warning" : "toolTitle";
-  return [theme.fg(titleToken, title), ...lines.slice(1)].join("\n");
+  return [
+    styleHeaderLine(title, status, theme),
+    ...lines.slice(1).map((line) => styleBodyLine(line, theme)),
+  ].join("\n");
+}
+
+function styleBodyLine(line: string, theme: Theme): string {
+  if (!line.trim()) return line;
+  if (line.startsWith("╰─ ")) {
+    return `${theme.fg("border", "╰─ ")}${theme.fg("toolTitle", theme.bold(line.slice(3)))}`;
+  }
+  if (!line.startsWith(" ")) return theme.fg("toolTitle", theme.bold(line));
+  return line;
+}
+
+function styleHeaderLine(line: string, status: D360ResultCard["status"], theme: Theme): string {
+  const statusIcon = status === "error" ? "❌" : status === "warning" ? "⚠️" : "✅";
+  const statusToken = status === "error" ? "error" : status === "warning" ? "warning" : "success";
+  const statusIndex = line.indexOf(statusIcon);
+  if (statusIndex < 0) return theme.fg(statusToken, line);
+
+  const borderPrefix = line.startsWith("╭─ ") ? "╭─ " : "";
+  const titleStart = borderPrefix.length;
+  const stageIndex = line.indexOf("  Stage ", statusIndex + statusIcon.length);
+  const statusEnd = stageIndex >= 0 ? stageIndex : line.length;
+  const titleText = line.slice(titleStart, statusIndex).trimEnd();
+  const statusText = line.slice(statusIndex, statusEnd).trim();
+  const stageText = stageIndex >= 0 ? line.slice(stageIndex) : "";
+
+  return [
+    borderPrefix ? theme.fg("border", borderPrefix) : "",
+    theme.fg("toolTitle", theme.bold(titleText)),
+    " ",
+    theme.fg(statusToken, statusText),
+    stageText ? theme.fg("borderAccent", stageText) : "",
+  ].join("");
 }
 
 function firstText(result: D360RenderResult): string {

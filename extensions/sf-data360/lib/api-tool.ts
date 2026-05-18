@@ -155,6 +155,7 @@ export function registerD360ApiTool(pi: ExtensionAPI): void {
         action: "call",
         status,
         resolved,
+        requestBody: input.body ?? null,
       });
     },
   });
@@ -308,14 +309,18 @@ async function buildResult(
     method: resolved?.method,
     path: resolved?.apiPath,
     targetOrg: resolved?.targetOrg,
+    apiVersion: resolved?.apiVersion,
+    orgType: resolved?.orgType,
+    safety: resolved?.safety.level,
     status: typeof details.status === "number" ? details.status : undefined,
     ok,
     action: typeof details.action === "string" ? details.action : undefined,
+    requestBody: details.requestBody,
     fullOutputPath: formatted.fullOutputPath,
   });
   const sfPi = buildD360Envelope(D360_TOOL_NAME, ok, text, details, formatted);
   sfPi.data = { card };
-  sfPi.renderHints = { profile: "balanced", collapsedLines: 8, expandedMaxLines: 40 };
+  sfPi.renderHints = { profile: "balanced", collapsedLines: 48, expandedMaxLines: 120 };
   return {
     content: [{ type: "text" as const, text: formatted.text }],
     details: {

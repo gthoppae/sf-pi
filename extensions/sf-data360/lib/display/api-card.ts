@@ -7,9 +7,13 @@ export interface ApiCardOptions {
   method?: string;
   path?: string;
   targetOrg?: string;
+  apiVersion?: string;
+  orgType?: string;
+  safety?: string;
   status?: number;
   ok?: boolean;
   action?: string;
+  requestBody?: unknown;
   fullOutputPath?: string;
 }
 
@@ -30,10 +34,41 @@ export function apiResultToCard(responseText: string, opts: ApiCardOptions = {})
       title: "Data 360 API",
       subtitle: [opts.targetOrg, method, path, statusText].filter(Boolean).join(" · "),
       summary: summarizeApiResponse(parsed, responseText, opts),
+      stage: isDryRun
+        ? {
+            key: "resolve",
+            label: "Resolve",
+            index: 3,
+            total: 5,
+            description: "Resolving the Data 360 REST request before making a network call.",
+          }
+        : {
+            key: ok ? "summarize" : "execute",
+            label: ok ? "Summarize" : "Execute",
+            index: ok ? 5 : 4,
+            total: 5,
+            description: ok
+              ? "Summarizing the Data 360 API response without dumping the raw JSON."
+              : "The Data 360 API call returned an error; the card keeps the request and error context together.",
+          },
+      request: {
+        method,
+        path,
+        targetOrg: opts.targetOrg,
+        apiVersion: opts.apiVersion,
+        orgType: opts.orgType,
+        safety: opts.safety,
+        payload: requestPayload(parsed, opts),
+      },
+      response: { lines: responseDetailLines(sections, parsed, responseText) },
+      lineage: buildLineage(method, path, parsed, opts),
       facts: buildFacts(parsed, opts),
-      sections,
       nextSteps: ok
-        ? undefined
+        ? [
+            isDryRun
+              ? "Run d360_api without dry_run after reviewing the resolved request."
+              : "Inspect the full JSON only if raw response shape or additional rows are needed.",
+          ]
         : [
             "Inspect the full JSON for raw error details.",
             "Use d360 search/examples when a registry operation exists.",
@@ -41,6 +76,42 @@ export function apiResultToCard(responseText: string, opts: ApiCardOptions = {})
     },
     opts.fullOutputPath,
   );
+}
+
+function requestPayload(parsed: unknown, opts: ApiCardOptions): unknown {
+  if (opts.requestBody !== undefined) return opts.requestBody;
+  const obj = objectValue(parsed);
+  if ("body" in obj) return obj.body;
+  return undefined;
+}
+
+function responseDetailLines(
+  sections: D360ResultSection[],
+  parsed: unknown,
+  responseText: string,
+): string[] {
+  const lines = sections.flatMap((section) => section.lines);
+  if (lines.length) return lines;
+  const keys = Object.keys(objectValue(parsed));
+  if (keys.length) return [`Top-level keys: ${keys.join(", ")}`];
+  return responseText.trim() ? [clip(responseText, 240)] : [];
+}
+
+function buildLineage(
+  method: string,
+  path: string,
+  parsed: unknown,
+  opts: ApiCardOptions,
+): D360ResultCard["lineage"] {
+  const objects = extractDataCloudObjects([path, safeJson(opts.requestBody), safeJson(parsed)]);
+  const lines = [
+    "Tool call",
+    `  ↳ d360_api ${method}`,
+    `     ↳ Data 360 REST: ${method} ${stripServicesPrefix(path)}`,
+    ...objects.slice(0, 5).map((name) => `        ↳ Object: ${name}`),
+    ...(opts.fullOutputPath ? [`           ↳ Artifact: ${opts.fullOutputPath}`] : []),
+  ];
+  return { lines };
 }
 
 function buildSections(
@@ -200,6 +271,28 @@ function cleanErrorMessage(message: string | undefined): string | undefined {
     return parsed.primaryMessage ?? parsed.errorMessage ?? message;
   } catch {
     return message;
+  }
+}
+
+function stripServicesPrefix(path: string): string {
+  return path.replace(/^\/services\/data\/v\d+\.\d+/u, "");
+}
+
+function extractDataCloudObjects(values: string[]): string[] {
+  const found = new Set<string>();
+  const pattern = /\b[A-Za-z0-9_]+__(?:dlm|dll|cio)\b/gu;
+  for (const value of values) {
+    for (const match of value.matchAll(pattern)) found.add(match[0]);
+  }
+  return [...found];
+}
+
+function safeJson(value: unknown): string {
+  if (value === undefined) return "";
+  try {
+    return JSON.stringify(value);
+  } catch {
+    return String(value);
   }
 }
 

@@ -11,6 +11,7 @@ describe("d360 facade result cards", () => {
 
     expect(card.title).toBe("Data 360 search");
     expect(text).toContain("💠 Data 360 search ✅");
+    expect(text).toContain("Stage 2/5: Discover");
     expect(text).toContain("Agent Observability");
     expect(text).toContain("📄 Full JSON: /tmp/pi-d360-search/output.json");
     expect(text).not.toContain('"results"');
@@ -48,6 +49,7 @@ describe("d360 facade result cards", () => {
     });
 
     expect(text).toContain("💠 Data 360 execute ✅");
+    expect(text).toContain("Stage 5/5: Summarize");
     expect(text).toContain("n = 119");
   });
 
@@ -167,8 +169,11 @@ describe("d360 facade result cards", () => {
     );
 
     expect(text).toContain("💬 STDM session timeline ✅");
+    expect(text).toContain("Stage 5/5: Summarize");
+    expect(text).toContain("ssot__AiAgentInteraction__dlm");
     expect(text).toContain("Rows: 8");
-    expect(text).toContain("👤 Hi! What is Agent Script?");
+    expect(text).toContain("1. 👤 User");
+    expect(text).toContain("Hi! What is Agent Script?");
     expect(text).toContain("📄 Full JSON: /tmp/pi-d360-runbook/output.json");
   });
 });

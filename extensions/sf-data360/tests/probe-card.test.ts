@@ -7,14 +7,15 @@ import { probeResultToCard } from "../lib/display/probe-card.ts";
 describe("d360_probe result card", () => {
   it("summarizes readiness counts and keeps artifact visible", () => {
     const card = probeResultToCard(sampleProbe(), "/tmp/pi-d360-probe/output.json");
-    const rendered = renderCardCollapsed(card, { collapsedMaxLines: 8 });
+    const rendered = renderCardCollapsed(card);
 
     expect(card.status).toBe("warning");
     expect(rendered).toContain("📊 Data 360 readiness ⚠️");
     expect(rendered).toContain("AgentforceSTDM · API v66.0 · partial");
     expect(rendered).toContain("agent_platform_tracing_dlo");
     expect(rendered).toContain("📄 Full JSON: /tmp/pi-d360-probe/output.json");
-    expect(rendered.split("\n").length).toBeLessThanOrEqual(12);
+    expect(rendered).toContain("Stage 1/5: Readiness");
+    expect(rendered.split("\n").length).toBeLessThanOrEqual(52);
   });
 
   it("renders expanded surface details", () => {

@@ -81,7 +81,7 @@ describe("d360 renderers", () => {
     expect(rendered).toContain("💬 STDM session timeline ✅");
     expect(rendered).toContain("AgentforceSTDM · default · 8 rows");
     expect(rendered).toContain("📄 Full JSON: /tmp/pi-d360/output.json");
-    expect(rendered.split("\n").length).toBeLessThanOrEqual(12);
+    expect(rendered.split("\n").length).toBeLessThanOrEqual(36);
   });
 
   it("renderResult supports expanded card output", () => {
