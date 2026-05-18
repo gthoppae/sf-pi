@@ -1660,5 +1660,64 @@
     "optionalParams": ["dataspace"],
     "safety": "confirmed",
     "tips": "Review the manifest, component dependencies, and target dataspace before deployment. Use dry_run before execution."
+  },
+  {
+    "name": "d360_metadata",
+    "family": "Query",
+    "description": "Get metadata for one entity. Prefer entityName filters.",
+    "method": "GET",
+    "path": "/ssot/metadata",
+    "optionalParams": ["entityName", "entityType", "dataspace"],
+    "safety": "read",
+    "tips": "Use entityName or entityType to avoid broad metadata payloads. For compact DMO/DLO discovery, prefer the d360_metadata Pi tool."
+  },
+  {
+    "name": "d360_datagraph_lookup",
+    "family": "Profile and Data Graph",
+    "description": "Lookup data graph records by natural key.",
+    "method": "GET",
+    "path": "/ssot/data-graphs/data/{entity}",
+    "requiredParams": ["entity"],
+    "optionalParams": ["dataspace", "lookupKeys", "live", "limit"],
+    "safety": "read",
+    "tips": "Keep lookups bounded with lookupKeys or limit. Set live=true only when real-time graph lookup is required."
+  },
+  {
+    "name": "d360_segment_list",
+    "family": "Segment",
+    "description": "List all segments.",
+    "method": "GET",
+    "path": "/ssot/segments",
+    "optionalParams": ["limit", "offset", "dataspace"],
+    "safety": "read"
+  },
+  {
+    "name": "d360_ci_list",
+    "family": "Calculated Insights",
+    "description": "List all calculated insights.",
+    "method": "GET",
+    "path": "/ssot/calculated-insights",
+    "optionalParams": ["limit", "offset", "dataspace"],
+    "safety": "read"
+  },
+  {
+    "name": "d360_activation_list",
+    "family": "Activation",
+    "description": "List activations.",
+    "method": "GET",
+    "path": "/ssot/activations",
+    "optionalParams": ["limit", "offset", "dataspace"],
+    "safety": "read"
+  },
+  {
+    "name": "d360_standard_mapping_create",
+    "family": "StandardMappings",
+    "description": "Create standard DLO-to-DMO mappings using reviewed mapping payloads.",
+    "method": "POST",
+    "path": "/ssot/data-model-object-mappings",
+    "requiredParams": ["body"],
+    "optionalParams": ["dataspace"],
+    "safety": "confirmed",
+    "tips": "Review standard mapping preview output or verified DLO/DMO field details first. The REST facade sends the reviewed mapping payload; upstream MCP local bulk lookup is not embedded here. Use dry_run before execution."
   }
 ]

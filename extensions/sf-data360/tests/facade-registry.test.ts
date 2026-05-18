@@ -195,6 +195,10 @@ describe("d360 facade registry", () => {
       family: "DataKit",
       operations: expect.arrayContaining(["d360_datakit_deploy"]),
     });
+    expect(searchRegistry("standard mapping create field mapping dlo dmo")[0]).toMatchObject({
+      family: "StandardMappings",
+      operations: expect.arrayContaining(["d360_standard_mapping_create"]),
+    });
   });
 
   it("returns operation and runbook examples that point at registered names", () => {

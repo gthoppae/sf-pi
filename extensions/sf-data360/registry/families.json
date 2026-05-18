@@ -98,5 +98,16 @@
     "name": "Profile and Data Graph",
     "summary": "Read profile, insight, and data graph metadata and records.",
     "keywords": ["profile", "insight", "data graph", "graph", "record", "metadata"]
+  },
+  {
+    "name": "StandardMappings",
+    "summary": "Create standard DLO-to-DMO mappings from predefined mapping definitions.",
+    "keywords": [
+      "standard mapping",
+      "standard mappings",
+      "mapping preview",
+      "field mapping",
+      "dlo dmo"
+    ]
   }
 ]

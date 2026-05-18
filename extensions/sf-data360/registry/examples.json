@@ -1301,5 +1301,39 @@
     "params": {
       "limit": 10
     }
+  },
+  "d360_metadata": {
+    "operation": "d360_metadata",
+    "params": {
+      "entityName": "ssot__Individual__dlm",
+      "entityType": "DataModelObject"
+    }
+  },
+  "d360_datagraph_lookup": {
+    "operation": "d360_datagraph_lookup",
+    "params": {
+      "entity": "ExampleDataGraph",
+      "lookupKeys": "ExampleLookupKey",
+      "limit": 10
+    }
+  },
+  "d360_standard_mapping_create": {
+    "operation": "d360_standard_mapping_create",
+    "params": {
+      "body": {
+        "sourceEntityDeveloperName": "Example_Profile__dll",
+        "targetEntityDeveloperName": "Example_Profile__dlm",
+        "fieldMapping": [
+          {
+            "sourceFieldDeveloperName": "Id__c",
+            "targetFieldDeveloperName": "Id__c"
+          },
+          {
+            "sourceFieldDeveloperName": "Name__c",
+            "targetFieldDeveloperName": "Name__c"
+          }
+        ]
+      }
+    }
   }
 }

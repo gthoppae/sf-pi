@@ -8,16 +8,16 @@ should be added to the JSON registry, not as new Pi tools.
 
 ## Operation coverage matrix
 
-Current generated registry size: **166 operations**.
+Current generated registry size: **172 operations**.
 
 | Family                 | Read | Safe POST | Confirmed | Destructive |
 | ---------------------- | ---: | --------: | --------: | ----------: |
-| Query                  |    2 |         1 |         0 |           0 |
+| Query                  |    3 |         1 |         0 |           0 |
 | Metadata               |    5 |         1 |         0 |           0 |
 | Agent Observability    |    0 |         0 |         0 |           0 |
-| Segment                |    2 |         0 |         4 |           0 |
-| Activation             |    4 |         0 |         4 |           0 |
-| Calculated Insights    |    3 |         1 |         5 |           0 |
+| Segment                |    3 |         0 |         4 |           0 |
+| Activation             |    5 |         0 |         4 |           0 |
+| Calculated Insights    |    4 |         1 |         5 |           0 |
 | Ingestion              |    3 |         0 |         0 |           0 |
 | Transforms and Actions |    2 |         0 |         0 |           0 |
 | Identity Resolution    |    3 |         0 |         5 |           0 |
@@ -31,7 +31,8 @@ Current generated registry size: **166 operations**.
 | Dataspace              |    3 |         0 |         3 |           0 |
 | DataTransform          |    3 |         1 |         4 |           0 |
 | DataAction             |    4 |         0 |         3 |           0 |
-| Profile and Data Graph |    8 |         0 |         0 |           0 |
+| Profile and Data Graph |    9 |         0 |         0 |           0 |
+| StandardMappings       |    0 |         0 |         1 |           0 |
 
 Destructive operations are intentionally omitted until the facade has explicit
 review workflows for delete/deploy/undeploy style actions.
@@ -133,6 +134,14 @@ Never add `allow_confirmed: true` to a placeholder payload.
 4. For retriever configurations, verify `queryType`, input search index,
    output fields, and `isActive` behavior.
 
+### Standard Mappings
+
+1. Preview standard mappings where an upstream/local mapping source is available.
+2. In the REST-backed facade, execute only reviewed mapping payloads against the
+   mapping create endpoint.
+3. Use dry-run before execution and fall back to manual mapping create when a
+   standard mapping cannot be verified.
+
 ### DataKits
 
 1. Inspect the data kit, manifest, components, and dependencies before deploying.
@@ -187,6 +196,15 @@ Never add `allow_confirmed: true` to a placeholder payload.
 3. Dry-run create/update.
 4. For Snowflake, pass private key content only when actually executing and only
    after reviewing the resolved request shape. Keep docs/examples placeholder-only.
+
+## Current non-REST upstream helpers
+
+The upstream MCP server also exposes smart helper operations such as standard
+mapping preview, smart mapping suggestion, field-match preview, smart data stream
+body enhancement, and event-date recommendation. These are local helper
+algorithms, not plain REST endpoints. They are not represented as executable
+`d360 execute` registry entries until the facade grows a local helper execution
+path.
 
 ## Expansion rule for the 190-operation goal
 

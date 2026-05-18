@@ -827,5 +827,34 @@
     "optionalParams": ["dataspace"],
     "safety": "confirmed",
     "tips": "Review the manifest, component dependencies, and target dataspace before deployment. Use dry_run before execution."
+  },
+  "d360_metadata": {
+    "optionalParams": ["entityName", "entityType", "dataspace"],
+    "safety": "read",
+    "tips": "Use entityName or entityType to avoid broad metadata payloads. For compact DMO/DLO discovery, prefer the d360_metadata Pi tool."
+  },
+  "d360_datagraph_lookup": {
+    "requiredParams": ["entity"],
+    "optionalParams": ["dataspace", "lookupKeys", "live", "limit"],
+    "safety": "read",
+    "tips": "Keep lookups bounded with lookupKeys or limit. Set live=true only when real-time graph lookup is required."
+  },
+  "d360_segment_list": {
+    "optionalParams": ["limit", "offset", "dataspace"],
+    "safety": "read"
+  },
+  "d360_ci_list": {
+    "optionalParams": ["limit", "offset", "dataspace"],
+    "safety": "read"
+  },
+  "d360_activation_list": {
+    "optionalParams": ["limit", "offset", "dataspace"],
+    "safety": "read"
+  },
+  "d360_standard_mapping_create": {
+    "requiredParams": ["body"],
+    "optionalParams": ["dataspace"],
+    "safety": "confirmed",
+    "tips": "Review standard mapping preview output or verified DLO/DMO field details first. The REST facade sends the reviewed mapping payload; upstream MCP local bulk lookup is not embedded here. Use dry_run before execution."
   }
 }

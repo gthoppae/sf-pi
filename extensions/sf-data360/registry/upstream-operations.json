@@ -1160,5 +1160,47 @@
     "description": "Deploy or update data kit components.",
     "method": "POST",
     "path": "/ssot/data-kits/update-components"
+  },
+  {
+    "name": "d360_metadata",
+    "family": "Query",
+    "description": "Get metadata for one entity. Prefer entityName filters.",
+    "method": "GET",
+    "path": "/ssot/metadata"
+  },
+  {
+    "name": "d360_datagraph_lookup",
+    "family": "Profile and Data Graph",
+    "description": "Lookup data graph records by natural key.",
+    "method": "GET",
+    "path": "/ssot/data-graphs/data/{entity}"
+  },
+  {
+    "name": "d360_segment_list",
+    "family": "Segment",
+    "description": "List all segments.",
+    "method": "GET",
+    "path": "/ssot/segments"
+  },
+  {
+    "name": "d360_ci_list",
+    "family": "Calculated Insights",
+    "description": "List all calculated insights.",
+    "method": "GET",
+    "path": "/ssot/calculated-insights"
+  },
+  {
+    "name": "d360_activation_list",
+    "family": "Activation",
+    "description": "List activations.",
+    "method": "GET",
+    "path": "/ssot/activations"
+  },
+  {
+    "name": "d360_standard_mapping_create",
+    "family": "StandardMappings",
+    "description": "Create standard DLO-to-DMO mappings using reviewed mapping payloads.",
+    "method": "POST",
+    "path": "/ssot/data-model-object-mappings"
   }
 ]
