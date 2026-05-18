@@ -1335,5 +1335,181 @@
         ]
       }
     }
+  },
+  "d360_query_sql_cancel": {
+    "operation": "d360_query_sql_cancel",
+    "params": {
+      "queryId": "ExampleQueryId"
+    }
+  },
+  "d360_dmo_delete": {
+    "operation": "d360_dmo_delete",
+    "params": {
+      "dmoName": "Example_Profile__dlm"
+    }
+  },
+  "d360_dlo_delete": {
+    "operation": "d360_dlo_delete",
+    "params": {
+      "dloName": "Example_Profile__dll"
+    }
+  },
+  "d360_dmo_mapping_delete": {
+    "operation": "d360_dmo_mapping_delete",
+    "params": {
+      "mappingName": "Example_Profile_mapping"
+    }
+  },
+  "d360_dmo_field_mapping_delete": {
+    "operation": "d360_dmo_field_mapping_delete",
+    "params": {
+      "mappingName": "Example_Profile_mapping",
+      "fieldMappingName": "Name__c_fieldmap_Name__c"
+    }
+  },
+  "d360_datastream_delete": {
+    "operation": "d360_datastream_delete",
+    "params": {
+      "dataStreamId": "ExampleDataStreamId",
+      "shouldDeleteDataLakeObject": false
+    }
+  },
+  "d360_connection_delete": {
+    "operation": "d360_connection_delete",
+    "params": {
+      "connectionId": "ExampleConnectionId",
+      "connectorType": "ExampleConnector"
+    }
+  },
+  "d360_segment_delete": {
+    "operation": "d360_segment_delete",
+    "params": {
+      "segmentApiName": "Example_Segment"
+    }
+  },
+  "d360_ci_delete": {
+    "operation": "d360_ci_delete",
+    "params": {
+      "ciName": "Example_Score__cio"
+    }
+  },
+  "d360_ir_delete": {
+    "operation": "d360_ir_delete",
+    "params": {
+      "identityResolutionId": "ExampleIdentityResolutionId"
+    }
+  },
+  "d360_activation_delete": {
+    "operation": "d360_activation_delete",
+    "params": {
+      "activationId": "ExampleActivationId"
+    }
+  },
+  "d360_activation_target_delete": {
+    "operation": "d360_activation_target_delete",
+    "params": {
+      "activationTargetId": "ExampleActivationTargetId"
+    }
+  },
+  "d360_dataspace_delete": {
+    "operation": "d360_dataspace_delete",
+    "params": {
+      "dataSpaceName": "Example_Data_Space"
+    }
+  },
+  "d360_dataspace_member_remove": {
+    "operation": "d360_dataspace_member_remove",
+    "params": {
+      "dataSpaceName": "Example_Data_Space",
+      "memberId": "ExampleMemberId"
+    }
+  },
+  "d360_transform_delete": {
+    "operation": "d360_transform_delete",
+    "params": {
+      "transformId": "ExampleTransformId"
+    }
+  },
+  "d360_datakit_undeploy": {
+    "operation": "d360_datakit_undeploy",
+    "params": {
+      "dataKitId": "ExampleDataKitId",
+      "body": {
+        "components": [
+          {
+            "type": "SemanticModel",
+            "details": {
+              "name": "ExampleSemanticModel"
+            }
+          }
+        ]
+      }
+    }
+  },
+  "d360_dataaction_target_delete": {
+    "operation": "d360_dataaction_target_delete",
+    "params": {
+      "dataActionTargetId": "ExampleDataActionTargetId"
+    }
+  },
+  "d360_sdm_delete": {
+    "operation": "d360_sdm_delete",
+    "params": {
+      "modelApiNameOrId": "ExampleSemanticModel"
+    }
+  },
+  "d360_sdm_data_object_delete": {
+    "operation": "d360_sdm_data_object_delete",
+    "params": {
+      "modelApiNameOrId": "ExampleSemanticModel",
+      "dataObjectNameOrId": "ExampleIndividual"
+    }
+  },
+  "d360_sdm_calc_dim_delete": {
+    "operation": "d360_sdm_calc_dim_delete",
+    "params": {
+      "modelApiNameOrId": "ExampleSemanticModel",
+      "calculatedDimensionId": "ExampleCalculatedDimensionId"
+    }
+  },
+  "d360_sdm_calc_measure_delete": {
+    "operation": "d360_sdm_calc_measure_delete",
+    "params": {
+      "modelApiNameOrId": "ExampleSemanticModel",
+      "calculatedMeasureId": "ExampleCalculatedMeasureId"
+    }
+  },
+  "d360_sdm_metric_delete": {
+    "operation": "d360_sdm_metric_delete",
+    "params": {
+      "modelApiNameOrId": "ExampleSemanticModel",
+      "metricNameOrId": "ExampleMetric"
+    }
+  },
+  "d360_sdm_relationship_delete": {
+    "operation": "d360_sdm_relationship_delete",
+    "params": {
+      "modelApiNameOrId": "ExampleSemanticModel",
+      "relationshipId": "ExampleRelationshipId"
+    }
+  },
+  "d360_search_index_delete": {
+    "operation": "d360_search_index_delete",
+    "params": {
+      "searchIndexApiNameOrId": "Example_Search_Index"
+    }
+  },
+  "d360_retriever_delete": {
+    "operation": "d360_retriever_delete",
+    "params": {
+      "retrieverIdOrName": "ExampleRetriever"
+    }
+  },
+  "d360_retriever_config_delete": {
+    "operation": "d360_retriever_config_delete",
+    "params": {
+      "retrieverIdOrName": "ExampleRetriever",
+      "configurationIdOrName": "ExampleConfiguration"
+    }
   }
 }

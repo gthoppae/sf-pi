@@ -196,7 +196,10 @@ async function runExecute(
   if (!operation)
     throw new Error(`Unknown Data 360 operation '${operationName}'. Use d360 search first.`);
 
-  const { targetOrg, apiVersion } = await resolveTargetOrgContext(input.target_org, env);
+  const { targetOrg, apiVersion, targetOrgInfo } = await resolveTargetOrgContext(
+    input.target_org,
+    env,
+  );
   if (!targetOrg) throw new Error("No Salesforce target org is configured.");
   const params = input.params ?? {};
   const { path, query, body } = resolveOperationRequest(operation, params);
@@ -225,6 +228,26 @@ async function runExecute(
       summary: `${operation.name} requires dry_run or allow_confirmed`,
       error:
         "Confirmed/destructive operation blocked before network call. Run with dry_run=true first, then pass allow_confirmed=true only if you intentionally want to execute it.",
+    };
+  }
+
+  const destructiveBlock = evaluateDestructiveExecutionGuard({
+    operation,
+    targetOrg,
+    env,
+    targetOrgInfo,
+    hasUI: ctx.hasUI,
+  });
+  if (destructiveBlock.blocked) {
+    return {
+      ok: false,
+      action: "execute",
+      targetOrg,
+      apiVersion,
+      operation: operation.name,
+      safety: operation.safety,
+      summary: destructiveBlock.summary,
+      error: destructiveBlock.error,
     };
   }
 
@@ -350,6 +373,7 @@ function resolveOperationRequest(
 }
 
 function buildOperationBody(operation: D360Operation, params: Record<string, unknown>): unknown {
+  if (operation.method === "DELETE") return undefined;
   if (operation.name === "d360_query_sql") {
     return { sql: params.sql };
   }
@@ -363,6 +387,66 @@ export function shouldBlockConfirmedOperation(
   if (operation.safety === "read" || operation.safety === "safe_post") return false;
   if (input.dry_run) return false;
   return input.allow_confirmed !== true;
+}
+
+const DESTRUCTIVE_ALLOWED_TARGET_ORG = "AgentforceSTDM";
+
+interface DestructiveExecutionGuardInput {
+  operation: Pick<D360Operation, "name" | "safety">;
+  targetOrg: string;
+  env: SfEnvironment;
+  targetOrgInfo?: SfEnvironment["org"];
+  hasUI: boolean;
+}
+
+export function evaluateDestructiveExecutionGuard(input: DestructiveExecutionGuardInput): {
+  blocked: boolean;
+  summary?: string;
+  error?: string;
+} {
+  if (input.operation.safety !== "destructive") return { blocked: false };
+
+  if (!isAgentforceStdmTarget(input.targetOrg, input.env, input.targetOrgInfo)) {
+    return {
+      blocked: true,
+      summary: `${input.operation.name} requires target_org=${DESTRUCTIVE_ALLOWED_TARGET_ORG}`,
+      error:
+        "Destructive Data 360 operations are only allowed against the AgentforceSTDM org. Re-run the dry-run and execution with target_org='AgentforceSTDM'.",
+    };
+  }
+
+  if (!input.hasUI) {
+    return {
+      blocked: true,
+      summary: `${input.operation.name} requires interactive confirmation`,
+      error:
+        "Destructive Data 360 operations require Pi UI human-in-the-loop confirmation and are blocked in headless execution.",
+    };
+  }
+
+  return { blocked: false };
+}
+
+export function isAgentforceStdmTarget(
+  targetOrg: string,
+  env: SfEnvironment,
+  targetOrgInfo?: SfEnvironment["org"],
+): boolean {
+  return (
+    targetOrg === DESTRUCTIVE_ALLOWED_TARGET_ORG ||
+    targetOrgInfo?.alias === DESTRUCTIVE_ALLOWED_TARGET_ORG ||
+    (targetMatchesEnvironmentForGuard(targetOrg, env) &&
+      (env.config.targetOrg === DESTRUCTIVE_ALLOWED_TARGET_ORG ||
+        env.org.alias === DESTRUCTIVE_ALLOWED_TARGET_ORG))
+  );
+}
+
+function targetMatchesEnvironmentForGuard(targetOrg: string, env: SfEnvironment): boolean {
+  return (
+    targetOrg === env.config.targetOrg ||
+    targetOrg === env.org.alias ||
+    targetOrg === env.org.username
+  );
 }
 
 async function enforceOperationSafety(

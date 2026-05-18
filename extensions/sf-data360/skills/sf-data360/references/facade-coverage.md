@@ -8,34 +8,36 @@ should be added to the JSON registry, not as new Pi tools.
 
 ## Operation coverage matrix
 
-Current generated registry size: **172 operations**.
+Current generated registry size: **198 operations**.
 
 | Family                 | Read | Safe POST | Confirmed | Destructive |
 | ---------------------- | ---: | --------: | --------: | ----------: |
-| Query                  |    3 |         1 |         0 |           0 |
+| Query                  |    3 |         1 |         0 |           1 |
 | Metadata               |    5 |         1 |         0 |           0 |
 | Agent Observability    |    0 |         0 |         0 |           0 |
-| Segment                |    3 |         0 |         4 |           0 |
-| Activation             |    5 |         0 |         4 |           0 |
-| Calculated Insights    |    4 |         1 |         5 |           0 |
+| Segment                |    3 |         0 |         4 |           1 |
+| Activation             |    5 |         0 |         4 |           2 |
+| Calculated Insights    |    4 |         1 |         5 |           1 |
 | Ingestion              |    3 |         0 |         0 |           0 |
 | Transforms and Actions |    2 |         0 |         0 |           0 |
-| Identity Resolution    |    3 |         0 |         5 |           0 |
-| Semantic Retrieval     |   30 |         3 |        19 |           0 |
-| DataKit                |    8 |         0 |         1 |           0 |
-| DMO                    |    2 |         0 |         2 |           0 |
-| DLO                    |    2 |         0 |         2 |           0 |
-| Mappings               |    2 |         0 |         3 |           0 |
-| DataStreams            |    2 |         0 |         6 |           0 |
-| Connection             |    6 |         1 |         3 |           0 |
-| Dataspace              |    3 |         0 |         3 |           0 |
-| DataTransform          |    3 |         1 |         4 |           0 |
-| DataAction             |    4 |         0 |         3 |           0 |
+| Identity Resolution    |    3 |         0 |         5 |           1 |
+| Semantic Retrieval     |   30 |         3 |        19 |           9 |
+| DataKit                |    8 |         0 |         1 |           1 |
+| DMO                    |    2 |         0 |         2 |           1 |
+| DLO                    |    2 |         0 |         2 |           1 |
+| Mappings               |    2 |         0 |         3 |           2 |
+| DataStreams            |    2 |         0 |         6 |           1 |
+| Connection             |    6 |         1 |         3 |           1 |
+| Dataspace              |    3 |         0 |         3 |           2 |
+| DataTransform          |    3 |         1 |         4 |           1 |
+| DataAction             |    4 |         0 |         3 |           1 |
 | Profile and Data Graph |    9 |         0 |         0 |           0 |
 | StandardMappings       |    0 |         0 |         1 |           0 |
 
-Destructive operations are intentionally omitted until the facade has explicit
-review workflows for delete/deploy/undeploy style actions.
+Destructive operations are exposed only behind stricter guardrails: dry-run
+review, `allow_confirmed: true`, `target_org: "AgentforceSTDM"`, and an
+interactive Pi confirmation prompt. They are blocked in headless execution and
+for every other org.
 
 ## Confirmed operation workflow
 
@@ -98,8 +100,8 @@ Never add `allow_confirmed: true` to a placeholder payload.
 1. Verify segment status and activation target requirements.
 2. Verify connection/connector target details before target create/update.
 3. Dry-run activation target create/update before activation create/update.
-4. Avoid destructive activation cleanup in the facade until delete operations have
-   a dedicated review flow.
+4. Destructive activation cleanup requires `target_org: "AgentforceSTDM"`,
+   `allow_confirmed: true`, and an interactive Pi confirmation prompt.
 
 ### Data Transforms
 
@@ -147,7 +149,8 @@ Never add `allow_confirmed: true` to a placeholder payload.
 1. Inspect the data kit, manifest, components, and dependencies before deploying.
 2. Dry-run `d360_datakit_deploy` and review every component in the request body.
 3. Monitor deployment with deployment job and component status operations.
-4. Undeploy remains omitted until destructive review UX exists.
+4. Undeploy is destructive and requires `target_org: "AgentforceSTDM"`,
+   `allow_confirmed: true`, and interactive Pi confirmation.
 
 ### Semantic Data Models
 
@@ -158,8 +161,8 @@ Never add `allow_confirmed: true` to a placeholder payload.
    measurements.
 4. Use `d360_sdm_validate` before semantic queries or downstream BI/RAG use.
 5. Dry-run create/update/clone/data-object/calculated-field/metric/relationship
-   operations. Delete operations remain omitted until destructive review UX
-   exists.
+   operations. Delete operations require `target_org: "AgentforceSTDM"`,
+   `allow_confirmed: true`, and interactive Pi confirmation.
 
 ### Dataspaces
 
@@ -168,8 +171,9 @@ Never add `allow_confirmed: true` to a placeholder payload.
    dataspace references.
 3. For member changes, verify member names and filter configuration before
    granting access.
-4. Dry-run create/update/member-add. Dataspace delete and member remove remain
-   omitted until destructive review UX exists.
+4. Dry-run create/update/member-add. Dataspace delete and member remove require
+   `target_org: "AgentforceSTDM"`, `allow_confirmed: true`, and interactive Pi
+   confirmation.
 
 ### Data Streams
 
@@ -221,4 +225,10 @@ Every confirmed operation must have:
 - `tips`
 - a public-safe example payload in `examples.json`
 
-Every destructive operation must remain absent until a stricter policy is added.
+Every destructive operation must have:
+
+- `requiredParams`
+- `tips` that mention the `AgentforceSTDM` restriction
+- a public-safe example payload in `examples.json`
+- runtime blocking outside `target_org: "AgentforceSTDM"`
+- runtime blocking without interactive Pi confirmation

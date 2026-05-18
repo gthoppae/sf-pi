@@ -856,5 +856,148 @@
     "optionalParams": ["dataspace"],
     "safety": "confirmed",
     "tips": "Review standard mapping preview output or verified DLO/DMO field details first. The REST facade sends the reviewed mapping payload; upstream MCP local bulk lookup is not embedded here. Use dry_run before execution."
+  },
+  "d360_query_sql_cancel": {
+    "requiredParams": ["queryId"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_dmo_delete": {
+    "requiredParams": ["dmoName"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_dlo_delete": {
+    "requiredParams": ["dloName"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_dmo_mapping_delete": {
+    "requiredParams": ["mappingName"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_dmo_field_mapping_delete": {
+    "requiredParams": ["mappingName", "fieldMappingName"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_datastream_delete": {
+    "requiredParams": ["dataStreamId"],
+    "optionalParams": ["shouldDeleteDataLakeObject", "dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_connection_delete": {
+    "requiredParams": ["connectionId", "connectorType"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_segment_delete": {
+    "requiredParams": ["segmentApiName"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_ci_delete": {
+    "requiredParams": ["ciName"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_ir_delete": {
+    "requiredParams": ["identityResolutionId"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_activation_delete": {
+    "requiredParams": ["activationId"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_activation_target_delete": {
+    "requiredParams": ["activationTargetId"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_dataspace_delete": {
+    "requiredParams": ["dataSpaceName"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_dataspace_member_remove": {
+    "requiredParams": ["dataSpaceName", "memberId"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_transform_delete": {
+    "requiredParams": ["transformId"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_datakit_undeploy": {
+    "requiredParams": ["dataKitId", "body"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_dataaction_target_delete": {
+    "requiredParams": ["dataActionTargetId"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_sdm_delete": {
+    "requiredParams": ["modelApiNameOrId"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_sdm_data_object_delete": {
+    "requiredParams": ["modelApiNameOrId", "dataObjectNameOrId"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_sdm_calc_dim_delete": {
+    "requiredParams": ["modelApiNameOrId", "calculatedDimensionId"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_sdm_calc_measure_delete": {
+    "requiredParams": ["modelApiNameOrId", "calculatedMeasureId"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_sdm_metric_delete": {
+    "requiredParams": ["modelApiNameOrId", "metricNameOrId"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_sdm_relationship_delete": {
+    "requiredParams": ["modelApiNameOrId", "relationshipId"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_search_index_delete": {
+    "requiredParams": ["searchIndexApiNameOrId"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_retriever_delete": {
+    "requiredParams": ["retrieverIdOrName"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  "d360_retriever_config_delete": {
+    "requiredParams": ["retrieverIdOrName", "configurationIdOrName"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
   }
 }

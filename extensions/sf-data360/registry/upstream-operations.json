@@ -1202,5 +1202,187 @@
     "description": "Create standard DLO-to-DMO mappings using reviewed mapping payloads.",
     "method": "POST",
     "path": "/ssot/data-model-object-mappings"
+  },
+  {
+    "name": "d360_query_sql_cancel",
+    "family": "Query",
+    "description": "Cancel a running SQL query.",
+    "method": "DELETE",
+    "path": "/ssot/query-sql/{queryId}"
+  },
+  {
+    "name": "d360_dmo_delete",
+    "family": "DMO",
+    "description": "Delete a Data Model Object.",
+    "method": "DELETE",
+    "path": "/ssot/data-model-objects/{dmoName}"
+  },
+  {
+    "name": "d360_dlo_delete",
+    "family": "DLO",
+    "description": "Delete a Data Lake Object.",
+    "method": "DELETE",
+    "path": "/ssot/data-lake-objects/{dloName}"
+  },
+  {
+    "name": "d360_dmo_mapping_delete",
+    "family": "Mappings",
+    "description": "Delete a DLO-to-DMO mapping.",
+    "method": "DELETE",
+    "path": "/ssot/data-model-object-mappings/{mappingName}"
+  },
+  {
+    "name": "d360_dmo_field_mapping_delete",
+    "family": "Mappings",
+    "description": "Delete one field mapping from an object mapping.",
+    "method": "DELETE",
+    "path": "/ssot/data-model-object-mappings/{mappingName}/field-mappings/{fieldMappingName}"
+  },
+  {
+    "name": "d360_datastream_delete",
+    "family": "DataStreams",
+    "description": "Delete a data stream.",
+    "method": "DELETE",
+    "path": "/ssot/data-streams/{dataStreamId}"
+  },
+  {
+    "name": "d360_connection_delete",
+    "family": "Connection",
+    "description": "Delete a data connection.",
+    "method": "DELETE",
+    "path": "/ssot/connections/{connectionId}"
+  },
+  {
+    "name": "d360_segment_delete",
+    "family": "Segment",
+    "description": "Delete a segment by API name.",
+    "method": "DELETE",
+    "path": "/ssot/segments/{segmentApiName}"
+  },
+  {
+    "name": "d360_ci_delete",
+    "family": "Calculated Insights",
+    "description": "Delete a calculated insight.",
+    "method": "DELETE",
+    "path": "/ssot/calculated-insights/{ciName}"
+  },
+  {
+    "name": "d360_ir_delete",
+    "family": "Identity Resolution",
+    "description": "Delete an identity resolution ruleset.",
+    "method": "DELETE",
+    "path": "/ssot/identity-resolutions/{identityResolutionId}"
+  },
+  {
+    "name": "d360_activation_delete",
+    "family": "Activation",
+    "description": "Delete an activation.",
+    "method": "DELETE",
+    "path": "/ssot/activations/{activationId}"
+  },
+  {
+    "name": "d360_activation_target_delete",
+    "family": "Activation",
+    "description": "Delete an activation target.",
+    "method": "DELETE",
+    "path": "/ssot/activation-targets/{activationTargetId}"
+  },
+  {
+    "name": "d360_dataspace_delete",
+    "family": "Dataspace",
+    "description": "Delete a data space and its contents.",
+    "method": "DELETE",
+    "path": "/ssot/data-spaces/{dataSpaceName}"
+  },
+  {
+    "name": "d360_dataspace_member_remove",
+    "family": "Dataspace",
+    "description": "Remove a member from a data space.",
+    "method": "DELETE",
+    "path": "/ssot/data-spaces/{dataSpaceName}/members/{memberId}"
+  },
+  {
+    "name": "d360_transform_delete",
+    "family": "DataTransform",
+    "description": "Delete a data transform.",
+    "method": "DELETE",
+    "path": "/ssot/data-transforms/{transformId}"
+  },
+  {
+    "name": "d360_datakit_undeploy",
+    "family": "DataKit",
+    "description": "Undeploy data kit components.",
+    "method": "POST",
+    "path": "/ssot/data-kits/{dataKitId}/undeploy"
+  },
+  {
+    "name": "d360_dataaction_target_delete",
+    "family": "DataAction",
+    "description": "Delete a data action target.",
+    "method": "DELETE",
+    "path": "/ssot/data-action-targets/{dataActionTargetId}"
+  },
+  {
+    "name": "d360_sdm_delete",
+    "family": "Semantic Retrieval",
+    "description": "Delete a semantic data model.",
+    "method": "DELETE",
+    "path": "/ssot/semantic/models/{modelApiNameOrId}"
+  },
+  {
+    "name": "d360_sdm_data_object_delete",
+    "family": "Semantic Retrieval",
+    "description": "Delete a data object from a semantic data model.",
+    "method": "DELETE",
+    "path": "/ssot/semantic/models/{modelApiNameOrId}/data-objects/{dataObjectNameOrId}"
+  },
+  {
+    "name": "d360_sdm_calc_dim_delete",
+    "family": "Semantic Retrieval",
+    "description": "Delete a calculated dimension from a semantic data model.",
+    "method": "DELETE",
+    "path": "/ssot/semantic/models/{modelApiNameOrId}/calculated-dimensions/{calculatedDimensionId}"
+  },
+  {
+    "name": "d360_sdm_calc_measure_delete",
+    "family": "Semantic Retrieval",
+    "description": "Delete a calculated measurement from a semantic data model.",
+    "method": "DELETE",
+    "path": "/ssot/semantic/models/{modelApiNameOrId}/calculated-measurements/{calculatedMeasureId}"
+  },
+  {
+    "name": "d360_sdm_metric_delete",
+    "family": "Semantic Retrieval",
+    "description": "Delete a metric from a semantic data model.",
+    "method": "DELETE",
+    "path": "/ssot/semantic/models/{modelApiNameOrId}/metrics/{metricNameOrId}"
+  },
+  {
+    "name": "d360_sdm_relationship_delete",
+    "family": "Semantic Retrieval",
+    "description": "Delete a relationship from a semantic data model.",
+    "method": "DELETE",
+    "path": "/ssot/semantic/models/{modelApiNameOrId}/relationships/{relationshipId}"
+  },
+  {
+    "name": "d360_search_index_delete",
+    "family": "Semantic Retrieval",
+    "description": "Delete a search index definition.",
+    "method": "DELETE",
+    "path": "/ssot/search-index/{searchIndexApiNameOrId}"
+  },
+  {
+    "name": "d360_retriever_delete",
+    "family": "Semantic Retrieval",
+    "description": "Delete a RAG retriever and all configurations.",
+    "method": "DELETE",
+    "path": "/ssot/machine-learning/retrievers/{retrieverIdOrName}"
+  },
+  {
+    "name": "d360_retriever_config_delete",
+    "family": "Semantic Retrieval",
+    "description": "Delete one retriever configuration.",
+    "method": "DELETE",
+    "path": "/ssot/machine-learning/retrievers/{retrieverIdOrName}/configurations/{configurationIdOrName}"
   }
 ]

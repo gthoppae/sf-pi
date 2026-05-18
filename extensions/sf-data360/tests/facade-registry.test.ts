@@ -227,10 +227,24 @@ describe("d360 facade registry", () => {
     }
   });
 
-  it("keeps destructive operations out of the facade until stricter review UX exists", () => {
-    expect(getD360Operations().filter((operation) => operation.safety === "destructive")).toEqual(
-      [],
+  it("keeps destructive operations reviewable", () => {
+    const examples = getD360Examples();
+    const destructive = getD360Operations().filter(
+      (operation) => operation.safety === "destructive",
     );
+
+    expect(destructive.length).toBeGreaterThan(0);
+    for (const operation of destructive) {
+      expect(
+        operation.requiredParams?.length,
+        `${operation.name} missing required params`,
+      ).toBeGreaterThan(0);
+      expect(operation.tips, `${operation.name} missing safety tips`).toContain("AgentforceSTDM");
+      expect(
+        examples[operation.name],
+        `${operation.name} missing public-safe example`,
+      ).toBeTruthy();
+    }
   });
 
   it("validates registry integrity", () => {

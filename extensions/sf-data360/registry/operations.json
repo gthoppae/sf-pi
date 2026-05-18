@@ -1719,5 +1719,278 @@
     "optionalParams": ["dataspace"],
     "safety": "confirmed",
     "tips": "Review standard mapping preview output or verified DLO/DMO field details first. The REST facade sends the reviewed mapping payload; upstream MCP local bulk lookup is not embedded here. Use dry_run before execution."
+  },
+  {
+    "name": "d360_query_sql_cancel",
+    "family": "Query",
+    "description": "Cancel a running SQL query.",
+    "method": "DELETE",
+    "path": "/ssot/query-sql/{queryId}",
+    "requiredParams": ["queryId"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_dmo_delete",
+    "family": "DMO",
+    "description": "Delete a Data Model Object.",
+    "method": "DELETE",
+    "path": "/ssot/data-model-objects/{dmoName}",
+    "requiredParams": ["dmoName"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_dlo_delete",
+    "family": "DLO",
+    "description": "Delete a Data Lake Object.",
+    "method": "DELETE",
+    "path": "/ssot/data-lake-objects/{dloName}",
+    "requiredParams": ["dloName"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_dmo_mapping_delete",
+    "family": "Mappings",
+    "description": "Delete a DLO-to-DMO mapping.",
+    "method": "DELETE",
+    "path": "/ssot/data-model-object-mappings/{mappingName}",
+    "requiredParams": ["mappingName"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_dmo_field_mapping_delete",
+    "family": "Mappings",
+    "description": "Delete one field mapping from an object mapping.",
+    "method": "DELETE",
+    "path": "/ssot/data-model-object-mappings/{mappingName}/field-mappings/{fieldMappingName}",
+    "requiredParams": ["mappingName", "fieldMappingName"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_datastream_delete",
+    "family": "DataStreams",
+    "description": "Delete a data stream.",
+    "method": "DELETE",
+    "path": "/ssot/data-streams/{dataStreamId}",
+    "requiredParams": ["dataStreamId"],
+    "optionalParams": ["shouldDeleteDataLakeObject", "dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_connection_delete",
+    "family": "Connection",
+    "description": "Delete a data connection.",
+    "method": "DELETE",
+    "path": "/ssot/connections/{connectionId}",
+    "requiredParams": ["connectionId", "connectorType"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_segment_delete",
+    "family": "Segment",
+    "description": "Delete a segment by API name.",
+    "method": "DELETE",
+    "path": "/ssot/segments/{segmentApiName}",
+    "requiredParams": ["segmentApiName"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_ci_delete",
+    "family": "Calculated Insights",
+    "description": "Delete a calculated insight.",
+    "method": "DELETE",
+    "path": "/ssot/calculated-insights/{ciName}",
+    "requiredParams": ["ciName"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_ir_delete",
+    "family": "Identity Resolution",
+    "description": "Delete an identity resolution ruleset.",
+    "method": "DELETE",
+    "path": "/ssot/identity-resolutions/{identityResolutionId}",
+    "requiredParams": ["identityResolutionId"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_activation_delete",
+    "family": "Activation",
+    "description": "Delete an activation.",
+    "method": "DELETE",
+    "path": "/ssot/activations/{activationId}",
+    "requiredParams": ["activationId"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_activation_target_delete",
+    "family": "Activation",
+    "description": "Delete an activation target.",
+    "method": "DELETE",
+    "path": "/ssot/activation-targets/{activationTargetId}",
+    "requiredParams": ["activationTargetId"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_dataspace_delete",
+    "family": "Dataspace",
+    "description": "Delete a data space and its contents.",
+    "method": "DELETE",
+    "path": "/ssot/data-spaces/{dataSpaceName}",
+    "requiredParams": ["dataSpaceName"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_dataspace_member_remove",
+    "family": "Dataspace",
+    "description": "Remove a member from a data space.",
+    "method": "DELETE",
+    "path": "/ssot/data-spaces/{dataSpaceName}/members/{memberId}",
+    "requiredParams": ["dataSpaceName", "memberId"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_transform_delete",
+    "family": "DataTransform",
+    "description": "Delete a data transform.",
+    "method": "DELETE",
+    "path": "/ssot/data-transforms/{transformId}",
+    "requiredParams": ["transformId"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_datakit_undeploy",
+    "family": "DataKit",
+    "description": "Undeploy data kit components.",
+    "method": "POST",
+    "path": "/ssot/data-kits/{dataKitId}/undeploy",
+    "requiredParams": ["dataKitId", "body"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_dataaction_target_delete",
+    "family": "DataAction",
+    "description": "Delete a data action target.",
+    "method": "DELETE",
+    "path": "/ssot/data-action-targets/{dataActionTargetId}",
+    "requiredParams": ["dataActionTargetId"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_sdm_delete",
+    "family": "Semantic Retrieval",
+    "description": "Delete a semantic data model.",
+    "method": "DELETE",
+    "path": "/ssot/semantic/models/{modelApiNameOrId}",
+    "requiredParams": ["modelApiNameOrId"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_sdm_data_object_delete",
+    "family": "Semantic Retrieval",
+    "description": "Delete a data object from a semantic data model.",
+    "method": "DELETE",
+    "path": "/ssot/semantic/models/{modelApiNameOrId}/data-objects/{dataObjectNameOrId}",
+    "requiredParams": ["modelApiNameOrId", "dataObjectNameOrId"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_sdm_calc_dim_delete",
+    "family": "Semantic Retrieval",
+    "description": "Delete a calculated dimension from a semantic data model.",
+    "method": "DELETE",
+    "path": "/ssot/semantic/models/{modelApiNameOrId}/calculated-dimensions/{calculatedDimensionId}",
+    "requiredParams": ["modelApiNameOrId", "calculatedDimensionId"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_sdm_calc_measure_delete",
+    "family": "Semantic Retrieval",
+    "description": "Delete a calculated measurement from a semantic data model.",
+    "method": "DELETE",
+    "path": "/ssot/semantic/models/{modelApiNameOrId}/calculated-measurements/{calculatedMeasureId}",
+    "requiredParams": ["modelApiNameOrId", "calculatedMeasureId"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_sdm_metric_delete",
+    "family": "Semantic Retrieval",
+    "description": "Delete a metric from a semantic data model.",
+    "method": "DELETE",
+    "path": "/ssot/semantic/models/{modelApiNameOrId}/metrics/{metricNameOrId}",
+    "requiredParams": ["modelApiNameOrId", "metricNameOrId"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_sdm_relationship_delete",
+    "family": "Semantic Retrieval",
+    "description": "Delete a relationship from a semantic data model.",
+    "method": "DELETE",
+    "path": "/ssot/semantic/models/{modelApiNameOrId}/relationships/{relationshipId}",
+    "requiredParams": ["modelApiNameOrId", "relationshipId"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_search_index_delete",
+    "family": "Semantic Retrieval",
+    "description": "Delete a search index definition.",
+    "method": "DELETE",
+    "path": "/ssot/search-index/{searchIndexApiNameOrId}",
+    "requiredParams": ["searchIndexApiNameOrId"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_retriever_delete",
+    "family": "Semantic Retrieval",
+    "description": "Delete a RAG retriever and all configurations.",
+    "method": "DELETE",
+    "path": "/ssot/machine-learning/retrievers/{retrieverIdOrName}",
+    "requiredParams": ["retrieverIdOrName"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
+    "name": "d360_retriever_config_delete",
+    "family": "Semantic Retrieval",
+    "description": "Delete one retriever configuration.",
+    "method": "DELETE",
+    "path": "/ssot/machine-learning/retrievers/{retrieverIdOrName}/configurations/{configurationIdOrName}",
+    "requiredParams": ["retrieverIdOrName", "configurationIdOrName"],
+    "safety": "destructive",
+    "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
   }
 ]
