@@ -9,6 +9,7 @@ import {
   buildMappingLifecyclePlan,
   buildSemanticCalculatedFieldsLifecyclePlan,
   buildSemanticDataObjectLifecyclePlan,
+  buildSemanticMetricLifecyclePlan,
   buildSemanticModelLifecyclePlan,
   canRunMutationLifecycle,
   classifySweepResult,
@@ -471,6 +472,60 @@ describe("d360 capability sweep planning", () => {
         label: "Pi Sweep Calc Dimension 20260519010101",
         expression: "IF 'x' = 'x' THEN 'High' ELSE 'Low' END",
         dataType: "Text",
+      },
+    });
+  });
+
+  it("builds a sweep-owned semantic metric lifecycle plan", () => {
+    const lifecycle = buildSemanticMetricLifecyclePlan("20260519010101");
+
+    expect(lifecycle.resourceName).toBe("PiSweepSdmMetric_20260519010101");
+    expect(lifecycle.dloName).toBe("PiSweepMetricDlo_20260519010101__dll");
+    expect(lifecycle.modelApiNameOrId).toBe("PiSweepSdmMetric_20260519010101");
+    expect(lifecycle.steps.map((step) => step.capability)).toEqual([
+      "d360_dlo_create",
+      "d360_dlo_get",
+      "d360_sdm_create",
+      "d360_sdm_get",
+      "d360_sdm_data_object_create",
+      "d360_sdm_data_objects_list",
+      "d360_sdm_metric_create",
+      "d360_sdm_metrics_list",
+      "d360_sdm_metric_delete",
+      "d360_sdm_metric_get",
+      "d360_sdm_validate",
+      "d360_sdm_delete",
+      "d360_sdm_get",
+      "d360_dlo_delete",
+      "d360_dlo_get",
+    ]);
+    expect(lifecycle.steps[6].params).toEqual({
+      modelApiNameOrId: "PiSweepSdmMetric_20260519010101",
+      body: {
+        apiName: "PiSweepMetric_20260519010101",
+        label: "Pi Sweep Metric 20260519010101",
+        measurementReference: {
+          tableFieldReference: {
+            fieldApiName: "Amount",
+            tableApiName: "PiSweepMetricDataObject_20260519010101",
+          },
+        },
+        timeDimensionReference: {
+          tableFieldReference: {
+            fieldApiName: "EventTime",
+            tableApiName: "PiSweepMetricDataObject_20260519010101",
+          },
+        },
+        aggregationType: "Sum",
+        timeGrains: ["Day", "Month"],
+        additionalDimensions: [
+          {
+            tableFieldReference: {
+              fieldApiName: "Name",
+              tableApiName: "PiSweepMetricDataObject_20260519010101",
+            },
+          },
+        ],
       },
     });
   });

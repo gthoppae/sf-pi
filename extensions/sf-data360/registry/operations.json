@@ -1611,7 +1611,7 @@
     "name": "d360_sdm_metric_update",
     "family": "Semantic Retrieval",
     "description": "Update a metric in a semantic data model.",
-    "method": "PATCH",
+    "method": "PUT",
     "path": "/ssot/semantic/models/{modelApiNameOrId}/metrics/{metricNameOrId}",
     "requiredParams": ["modelApiNameOrId", "metricNameOrId", "body"],
     "optionalParams": ["dataspace"],

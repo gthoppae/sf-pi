@@ -203,6 +203,14 @@ describe("d360 facade registry", () => {
     ]);
   });
 
+  it("uses the live semantic metric update method", () => {
+    expect(findCapability("d360_sdm_metric_update")?.operation).toMatchObject({
+      method: "PUT",
+      safety: "confirmed",
+      path: "/ssot/semantic/models/{modelApiNameOrId}/metrics/{metricNameOrId}",
+    });
+  });
+
   it("uses the live semantic model validation method", () => {
     expect(findCapability("d360_sdm_validate")?.operation).toMatchObject({
       method: "GET",

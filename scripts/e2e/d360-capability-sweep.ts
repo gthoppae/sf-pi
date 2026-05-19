@@ -264,6 +264,140 @@ export function buildSemanticModelLifecyclePlan(runId: string): DmoLifecyclePlan
   };
 }
 
+export function buildSemanticMetricLifecyclePlan(runId: string): DmoLifecyclePlan {
+  const resourceName = `PiSweepSdmMetric_${runId}`;
+  const dloName = `PiSweepMetricDlo_${runId}__dll`;
+  const dataObjectApiName = `PiSweepMetricDataObject_${runId}`;
+  const metricApiName = `PiSweepMetric_${runId}`;
+  return {
+    resourceName,
+    dloName,
+    modelApiNameOrId: resourceName,
+    steps: [
+      {
+        stage: "mutate",
+        capability: "d360_dlo_create",
+        family: "DLO",
+        safety: "confirmed",
+        params: { body: buildMetricDloCreateBody(dloName, runId) },
+      },
+      {
+        stage: "live",
+        capability: "d360_dlo_get",
+        family: "DLO",
+        safety: "read",
+        params: { dloName },
+        sourceCapability: "sdm_metric_dlo_create_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_sdm_create",
+        family: "Semantic Retrieval",
+        safety: "confirmed",
+        params: { body: buildSemanticModelCreateBody(resourceName, runId) },
+      },
+      {
+        stage: "live",
+        capability: "d360_sdm_get",
+        family: "Semantic Retrieval",
+        safety: "read",
+        params: { modelApiNameOrId: resourceName },
+        sourceCapability: "sdm_metric_model_create_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_sdm_data_object_create",
+        family: "Semantic Retrieval",
+        safety: "confirmed",
+        params: {
+          modelApiNameOrId: resourceName,
+          body: buildMetricSemanticDataObjectCreateBody(dataObjectApiName, dloName, runId),
+        },
+      },
+      {
+        stage: "live",
+        capability: "d360_sdm_data_objects_list",
+        family: "Semantic Retrieval",
+        safety: "read",
+        params: { modelApiNameOrId: resourceName },
+        sourceCapability: "sdm_metric_data_object_create_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_sdm_metric_create",
+        family: "Semantic Retrieval",
+        safety: "confirmed",
+        params: {
+          modelApiNameOrId: resourceName,
+          body: buildSemanticMetricCreateBody(metricApiName, dataObjectApiName, runId),
+        },
+      },
+      {
+        stage: "live",
+        capability: "d360_sdm_metrics_list",
+        family: "Semantic Retrieval",
+        safety: "read",
+        params: { modelApiNameOrId: resourceName },
+        sourceCapability: "sdm_metric_create_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_sdm_metric_delete",
+        family: "Semantic Retrieval",
+        safety: "destructive",
+        params: { modelApiNameOrId: resourceName, metricNameOrId: metricApiName },
+      },
+      {
+        stage: "live",
+        capability: "d360_sdm_metric_get",
+        family: "Semantic Retrieval",
+        safety: "read",
+        params: { modelApiNameOrId: resourceName, metricNameOrId: metricApiName },
+        sourceCapability: "sdm_metric_delete_verify",
+      },
+      {
+        stage: "live",
+        capability: "d360_sdm_validate",
+        family: "Semantic Retrieval",
+        safety: "read",
+        params: { modelApiNameOrId: resourceName },
+        sourceCapability: "sdm_metric_validate",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_sdm_delete",
+        family: "Semantic Retrieval",
+        safety: "destructive",
+        params: { modelApiNameOrId: resourceName },
+      },
+      {
+        stage: "live",
+        capability: "d360_sdm_get",
+        family: "Semantic Retrieval",
+        safety: "read",
+        params: { modelApiNameOrId: resourceName },
+        sourceCapability: "sdm_metric_model_delete_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_dlo_delete",
+        family: "DLO",
+        safety: "destructive",
+        params: { dloName },
+        sourceCapability: "sdm_metric_cleanup_dlo",
+      },
+      {
+        stage: "live",
+        capability: "d360_dlo_get",
+        family: "DLO",
+        safety: "read",
+        params: { dloName },
+        sourceCapability: "sdm_metric_dlo_delete_verify",
+      },
+    ],
+  };
+}
+
 export function buildSemanticCalculatedFieldsLifecyclePlan(runId: string): DmoLifecyclePlan {
   const resourceName = `PiSweepSdmCalc_${runId}`;
   return {
@@ -830,6 +964,7 @@ async function main(): Promise<void> {
       buildSemanticModelLifecyclePlan(runId),
       buildSemanticDataObjectLifecyclePlan(runId),
       buildSemanticCalculatedFieldsLifecyclePlan(runId),
+      buildSemanticMetricLifecyclePlan(runId),
     ]) {
       for (const check of lifecycle.steps) {
         const key = checkKey(check);
@@ -1242,6 +1377,21 @@ function buildDloFields(): Array<Record<string, unknown>> {
   ];
 }
 
+function buildMetricDloCreateBody(dloName: string, runId: string): Record<string, unknown> {
+  return {
+    name: dloName,
+    label: `Pi Sweep Metric DLO ${runId}`,
+    category: "Other",
+    dataspaceInfo: [{ name: "default" }],
+    dataLakeFieldInputRepresentations: [
+      { name: "Id__c", label: "Id", dataType: "Text", isPrimaryKey: true },
+      { name: "Name__c", label: "Name", dataType: "Text", isPrimaryKey: false },
+      { name: "EventTime__c", label: "Event Time", dataType: "DateTime", isPrimaryKey: false },
+      { name: "Amount__c", label: "Amount", dataType: "Number", isPrimaryKey: false },
+    ],
+  };
+}
+
 function buildMappingCreateBody(dloName: string, dmoName: string): Record<string, unknown> {
   return {
     sourceEntityDeveloperName: dloName,
@@ -1249,6 +1399,60 @@ function buildMappingCreateBody(dloName: string, dmoName: string): Record<string
     fieldMapping: [
       { sourceFieldDeveloperName: "Id__c", targetFieldDeveloperName: "Id__c" },
       { sourceFieldDeveloperName: "Name__c", targetFieldDeveloperName: "Name__c" },
+    ],
+  };
+}
+
+function buildMetricSemanticDataObjectCreateBody(
+  apiName: string,
+  dloName: string,
+  runId: string,
+): Record<string, unknown> {
+  return {
+    apiName,
+    label: `Pi Sweep Metric Data Object ${runId}`,
+    dataObjectType: "Dlo",
+    dataObjectName: dloName,
+    shouldIncludeAllFields: false,
+    semanticDimensions: [
+      { apiName: "Name", label: "Name", dataType: "Text", dataObjectFieldName: "Name__c" },
+      {
+        apiName: "EventTime",
+        label: "Event Time",
+        dataType: "DateTime",
+        dataObjectFieldName: "EventTime__c",
+      },
+    ],
+    semanticMeasurements: [
+      {
+        apiName: "Amount",
+        label: "Amount",
+        dataType: "Number",
+        dataObjectFieldName: "Amount__c",
+        aggregationType: "Sum",
+      },
+    ],
+  };
+}
+
+function buildSemanticMetricCreateBody(
+  apiName: string,
+  dataObjectApiName: string,
+  runId: string,
+): Record<string, unknown> {
+  return {
+    apiName,
+    label: `Pi Sweep Metric ${runId}`,
+    measurementReference: {
+      tableFieldReference: { fieldApiName: "Amount", tableApiName: dataObjectApiName },
+    },
+    timeDimensionReference: {
+      tableFieldReference: { fieldApiName: "EventTime", tableApiName: dataObjectApiName },
+    },
+    aggregationType: "Sum",
+    timeGrains: ["Day", "Month"],
+    additionalDimensions: [
+      { tableFieldReference: { fieldApiName: "Name", tableApiName: dataObjectApiName } },
     ],
   };
 }

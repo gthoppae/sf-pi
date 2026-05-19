@@ -801,6 +801,7 @@
     "tips": "Verify the metric definition JSON and dry-run before execution."
   },
   "d360_sdm_metric_update": {
+    "method": "PUT",
     "requiredParams": ["modelApiNameOrId", "metricNameOrId", "body"],
     "optionalParams": ["dataspace"],
     "safety": "confirmed",

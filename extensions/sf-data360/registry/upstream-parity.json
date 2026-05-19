@@ -2335,7 +2335,7 @@
       "upstreamPath": "/ssot/semantic/models/{id}/metrics/{mid}",
       "facadeOperation": "d360_sdm_metric_update",
       "facadeFamily": "Semantic Retrieval",
-      "facadeMethod": "PATCH",
+      "facadeMethod": "PUT",
       "facadePath": "/ssot/semantic/models/{modelApiNameOrId}/metrics/{metricNameOrId}",
       "safety": "confirmed",
       "kind": "rest_adjusted",
