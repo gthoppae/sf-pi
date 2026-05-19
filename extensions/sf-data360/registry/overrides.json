@@ -946,6 +946,12 @@
     "safety": "destructive",
     "tips": "Destructive operation. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
   },
+  "d360_dataaction_delete": {
+    "requiredParams": ["dataActionId"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Delete the data action before deleting its data action target. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
   "d360_dataaction_target_delete": {
     "requiredParams": ["dataActionTargetId"],
     "optionalParams": ["dataspace"],

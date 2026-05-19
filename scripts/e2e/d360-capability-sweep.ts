@@ -42,12 +42,39 @@ export type SweepOutcome =
   | "mutation_ok"
   | "failed";
 
+export type MutationLifecycleName =
+  | "dmo"
+  | "dlo"
+  | "mapping"
+  | "sdm"
+  | "sdm-data-object"
+  | "sdm-calculated-fields"
+  | "sdm-metric"
+  | "sdm-relationship"
+  | "transform"
+  | "data-action";
+
 export interface SweepPlanOptions {
   targetOrg: string;
   live?: boolean;
   families?: string[];
   capabilities?: string[];
   maxLive?: number;
+}
+
+export interface SweepThresholdOptions {
+  minReachable?: number;
+  minMutationOk?: number;
+  maxSkipped?: number;
+  requiredOutcomes?: Record<string, SweepOutcome>;
+}
+
+export interface FamilySummaryRow extends Record<
+  SweepOutcome | "family" | "total",
+  string | number
+> {
+  family: string;
+  total: number;
 }
 
 export interface SweepCheck {
@@ -70,12 +97,14 @@ export interface SweepRecord extends SweepCheck {
   durationMs?: number;
 }
 
-interface CliOptions extends SweepPlanOptions {
+interface CliOptions extends SweepPlanOptions, SweepThresholdOptions {
   outputDir?: string;
   timeoutMs?: number;
   dryRunOnly?: boolean;
   mutate?: boolean;
   runId?: string;
+  lifecycles?: MutationLifecycleName[];
+  cleanupRunId?: string;
 }
 
 interface MutationGateOptions {
@@ -92,6 +121,8 @@ interface DmoLifecyclePlan {
   modelApiNameOrId?: string;
   secondaryDloName?: string;
   transformName?: string;
+  dataActionTargetName?: string;
+  dataActionName?: string;
   steps: SweepCheck[];
 }
 
@@ -261,6 +292,78 @@ export function buildSemanticModelLifecyclePlan(runId: string): DmoLifecyclePlan
         safety: "read",
         params: { modelApiNameOrId: resourceName },
         sourceCapability: "sdm_delete_verify",
+      },
+    ],
+  };
+}
+
+export function buildDataActionLifecyclePlan(runId: string): DmoLifecyclePlan {
+  const dataActionTargetName = `PiSweepTarget_${runId}`;
+  const dataActionName = `PiSweepAction_${runId}`;
+  return {
+    resourceName: `PiSweepDataAction_${runId}`,
+    dataActionTargetName,
+    dataActionName,
+    steps: [
+      {
+        stage: "mutate",
+        capability: "d360_dataaction_target_create",
+        family: "DataAction",
+        safety: "confirmed",
+        params: { body: buildDataActionTargetCreateBody(dataActionTargetName, runId) },
+      },
+      {
+        stage: "live",
+        capability: "d360_dataaction_target_get",
+        family: "DataAction",
+        safety: "read",
+        params: { dataActionTargetId: dataActionTargetName },
+        sourceCapability: "dataaction_target_create_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_dataaction_create",
+        family: "DataAction",
+        safety: "confirmed",
+        params: { body: buildDataActionCreateBody(dataActionName, dataActionTargetName, runId) },
+      },
+      {
+        stage: "live",
+        capability: "d360_dataaction_get",
+        family: "DataAction",
+        safety: "read",
+        params: { dataActionId: dataActionName },
+        sourceCapability: "dataaction_create_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_dataaction_delete",
+        family: "DataAction",
+        safety: "destructive",
+        params: { dataActionId: dataActionName },
+      },
+      {
+        stage: "live",
+        capability: "d360_dataaction_get",
+        family: "DataAction",
+        safety: "read",
+        params: { dataActionId: dataActionName },
+        sourceCapability: "dataaction_delete_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_dataaction_target_delete",
+        family: "DataAction",
+        safety: "destructive",
+        params: { dataActionTargetId: dataActionTargetName },
+      },
+      {
+        stage: "live",
+        capability: "d360_dataaction_target_get",
+        family: "DataAction",
+        safety: "read",
+        params: { dataActionTargetId: dataActionTargetName },
+        sourceCapability: "dataaction_target_delete_verify",
       },
     ],
   };
@@ -994,6 +1097,120 @@ export function buildMappingLifecyclePlan(runId: string): DmoLifecyclePlan {
   };
 }
 
+export function buildCleanupLifecyclePlan(runId: string): DmoLifecyclePlan {
+  const dmoNames = [
+    `PiSweepDmo_${runId}__dlm`,
+    `PiSweepMapDmo_${runId}__dlm`,
+    `PiSweepSdmDmo_${runId}__dlm`,
+  ];
+  const dloNames = [
+    `PiSweepDlo_${runId}__dll`,
+    `PiSweepMapDlo_${runId}__dll`,
+    `PiSwRelL_${runId}__dll`,
+    `PiSwRelR_${runId}__dll`,
+    `PiSweepMetricDlo_${runId}__dll`,
+    `PiSwTxTgt_${runId}__dll`,
+  ];
+  const modelNames = [
+    `PiSweepSdm_${runId}`,
+    `PiSweepSdmDo_${runId}`,
+    `PiSweepSdmCalc_${runId}`,
+    `PiSweepSdmMetric_${runId}`,
+    `PiSweepSdmRel_${runId}`,
+  ];
+  const transformNames = [`PiSwTx_${runId}`];
+  const dataActionNames = [`PiSweepAction_${runId}`];
+  const dataActionTargetNames = [`PiSweepTarget_${runId}`];
+  return {
+    resourceName: `PiSweepCleanup_${runId}`,
+    steps: [
+      ...dataActionNames.map(
+        (dataActionId): SweepCheck => ({
+          stage: "mutate",
+          capability: "d360_dataaction_delete",
+          family: "DataAction",
+          safety: "destructive",
+          params: { dataActionId },
+          sourceCapability: "cleanup_dataaction",
+        }),
+      ),
+      ...dataActionTargetNames.map(
+        (dataActionTargetId): SweepCheck => ({
+          stage: "mutate",
+          capability: "d360_dataaction_target_delete",
+          family: "DataAction",
+          safety: "destructive",
+          params: { dataActionTargetId },
+          sourceCapability: "cleanup_dataaction_target",
+        }),
+      ),
+      ...transformNames.map(
+        (transformId): SweepCheck => ({
+          stage: "mutate",
+          capability: "d360_transform_delete",
+          family: "DataTransform",
+          safety: "destructive",
+          params: { transformId },
+          sourceCapability: "cleanup_transform",
+        }),
+      ),
+      ...modelNames.map(
+        (modelApiNameOrId): SweepCheck => ({
+          stage: "mutate",
+          capability: "d360_sdm_delete",
+          family: "Semantic Retrieval",
+          safety: "destructive",
+          params: { modelApiNameOrId },
+          sourceCapability: "cleanup_sdm",
+        }),
+      ),
+      ...dmoNames.map(
+        (dmoName): SweepCheck => ({
+          stage: "mutate",
+          capability: "d360_dmo_delete",
+          family: "DMO",
+          safety: "destructive",
+          params: { dmoName },
+          sourceCapability: "cleanup_dmo",
+        }),
+      ),
+      ...dloNames.map(
+        (dloName): SweepCheck => ({
+          stage: "mutate",
+          capability: "d360_dlo_delete",
+          family: "DLO",
+          safety: "destructive",
+          params: { dloName },
+          sourceCapability: "cleanup_dlo",
+        }),
+      ),
+    ],
+  };
+}
+
+const lifecycleBuilders: Record<MutationLifecycleName, (runId: string) => DmoLifecyclePlan> = {
+  dmo: buildDmoLifecyclePlan,
+  dlo: buildDloLifecyclePlan,
+  mapping: buildMappingLifecyclePlan,
+  sdm: buildSemanticModelLifecyclePlan,
+  "sdm-data-object": buildSemanticDataObjectLifecyclePlan,
+  "sdm-calculated-fields": buildSemanticCalculatedFieldsLifecyclePlan,
+  "sdm-metric": buildSemanticMetricLifecyclePlan,
+  "sdm-relationship": buildSemanticRelationshipLifecyclePlan,
+  transform: buildTransformLifecyclePlan,
+  "data-action": buildDataActionLifecyclePlan,
+};
+
+export function buildMutationLifecyclePlans(
+  runId: string,
+  lifecycles?: MutationLifecycleName[],
+): DmoLifecyclePlan[] {
+  const selected = lifecycles?.length
+    ? lifecycles
+    : (Object.keys(lifecycleBuilders) as MutationLifecycleName[]);
+  return selected.map((name) => lifecycleBuilders[name](runId));
+}
+
 export function buildDmoLifecyclePlan(runId: string): DmoLifecyclePlan {
   const resourceName = `PiSweepDmo_${runId}`;
   const dmoName = `${resourceName}__dlm`;
@@ -1161,6 +1378,10 @@ export function shouldRetrySweepResult(
   check?: SweepCheck,
 ): boolean {
   if (check?.sourceCapability?.endsWith("_delete_verify") && result.ok === true) return true;
+  if (check?.sourceCapability === "dataaction_target_create_verify" && result.ok === true) {
+    const status = String((result.response as Record<string, unknown> | undefined)?.status ?? "");
+    return status.toUpperCase() === "PROCESSING";
+  }
 
   const message = [
     stringValue(result.summary),
@@ -1215,12 +1436,17 @@ export function classifySweepResult(
   }
 
   const message = [summary, error, JSON.stringify(result.response ?? "")].join(" ").toLowerCase();
+  if (check.sourceCapability?.startsWith("cleanup_") && !result.ok) {
+    return { outcome: "not_found_optional", fail: false, summary, status, error };
+  }
+
   if (
     status === 404 ||
     message.includes("not_found") ||
     message.includes("does not exist") ||
     message.includes("no stdm interaction found") ||
     message.includes("no stdm session found") ||
+    message.includes("id can not be null or empty") ||
     message.includes("semantic object not found") ||
     (message.includes("semantic definition") &&
       message.includes("doesn") &&
@@ -1282,30 +1508,24 @@ async function main(): Promise<void> {
   mkdirSync(outputDir, { recursive: true });
 
   const capabilities = getD360Capabilities();
-  const plan = buildCapabilitySweepPlan(capabilities, {
-    ...options,
-    live: !options.dryRunOnly,
-  });
+  const plan = options.cleanupRunId
+    ? []
+    : buildCapabilitySweepPlan(capabilities, {
+        ...options,
+        live: !options.dryRunOnly,
+      });
   const seenChecks = new Set(plan.map(checkKey));
-  if (options.mutate) {
+  if (options.mutate || options.cleanupRunId) {
     const gate = canRunMutationLifecycle({
-      mutate: options.mutate,
+      mutate: true,
       targetOrg: options.targetOrg,
-      runId,
+      runId: options.cleanupRunId ?? runId,
       destructiveEnvValue: process.env.D360_SWEEP_ALLOW_DESTRUCTIVE,
     });
     if (gate.ok !== true) throw new Error(gate.reason);
-    for (const lifecycle of [
-      buildDmoLifecyclePlan(runId),
-      buildDloLifecyclePlan(runId),
-      buildMappingLifecyclePlan(runId),
-      buildSemanticModelLifecyclePlan(runId),
-      buildSemanticDataObjectLifecyclePlan(runId),
-      buildSemanticCalculatedFieldsLifecyclePlan(runId),
-      buildSemanticMetricLifecyclePlan(runId),
-      buildSemanticRelationshipLifecyclePlan(runId),
-      buildTransformLifecyclePlan(runId),
-    ]) {
+    for (const lifecycle of options.cleanupRunId
+      ? [buildCleanupLifecyclePlan(options.cleanupRunId)]
+      : buildMutationLifecyclePlans(runId, options.lifecycles)) {
       for (const check of lifecycle.steps) {
         const key = checkKey(check);
         if (!seenChecks.has(key)) {
@@ -1377,11 +1597,15 @@ async function main(): Promise<void> {
   }
 
   const summary = summarize(records);
+  const familySummary = buildFamilySummary(records);
+  const thresholdErrors = evaluateSweepThresholds(records, options);
   const result = {
-    ok: summary.failed === 0,
+    ok: summary.failed === 0 && thresholdErrors.length === 0,
     targetOrg: options.targetOrg,
     runId,
     summary,
+    familySummary,
+    thresholdErrors,
     records,
   };
   const jsonPath = path.join(outputDir, "d360-capability-sweep.json");
@@ -1390,9 +1614,10 @@ async function main(): Promise<void> {
   writeFileSync(mdPath, renderMarkdown(result));
 
   console.log(`\nSummary: ${summary.failed} failed / ${records.length} checks`);
+  for (const error of thresholdErrors) console.log(`Threshold: ${error}`);
   console.log(`JSON: ${jsonPath}`);
   console.log(`Markdown: ${mdPath}`);
-  process.exit(summary.failed === 0 ? 0 : 1);
+  process.exit(result.ok ? 0 : 1);
 }
 
 async function runFacadeWithRetry(
@@ -1715,6 +1940,53 @@ function buildDloFields(): Array<Record<string, unknown>> {
     { name: "Id__c", label: "Id", dataType: "Text", isPrimaryKey: true },
     { name: "Name__c", label: "Name", dataType: "Text", isPrimaryKey: false },
   ];
+}
+
+function buildDataActionTargetCreateBody(
+  dataActionTargetName: string,
+  runId: string,
+): Record<string, unknown> {
+  return {
+    apiName: dataActionTargetName,
+    label: `Pi Target ${runId}`,
+    type: "WebHook",
+    config: { targetEndpoint: "https://example.invalid/data-action" },
+  };
+}
+
+function buildDataActionCreateBody(
+  dataActionName: string,
+  dataActionTargetName: string,
+  runId: string,
+): Record<string, unknown> {
+  return {
+    dataActionName: `Pi Action ${runId}`,
+    developerName: dataActionName,
+    dataspace: "default",
+    masterLabel: `Pi Action ${runId}`,
+    description: `Sweep-owned data action created by run ${runId}.`,
+    actionConditionExpression: "(1)",
+    shouldTriggerEventOnlyFirstTime: true,
+    dataActionSources: [
+      {
+        sourceName: "ssot__AiAgentInteraction__dlm",
+        sourceType: "DataModelEntity",
+        sourceCdcSubscriptions: ["CREATE", "UPDATE", "DELETE"],
+      },
+    ],
+    actionConditions: [
+      {
+        fieldName: "ssot__AiAgentInteractionType__c",
+        objectName: "ssot__AiAgentInteraction__dlm",
+        operator: "Equal",
+        order: "1",
+        value: "SESSION_END",
+      },
+    ],
+    dataActionTargetNames: [dataActionTargetName],
+    dataActionProjectedFields: [],
+    dataActionEnrichmentProperties: [],
+  };
 }
 
 function buildTransformBody(
@@ -2142,11 +2414,74 @@ function summarize(records: SweepRecord[]): Record<string, number> {
   return summary;
 }
 
+export function buildFamilySummary(records: SweepRecord[]): FamilySummaryRow[] {
+  const byFamily = new Map<string, FamilySummaryRow>();
+  for (const record of records) {
+    const family = record.family ?? "Unspecified";
+    const row = byFamily.get(family) ?? emptyFamilySummaryRow(family);
+    row.total++;
+    row[record.outcome] = Number(row[record.outcome] ?? 0) + 1;
+    byFamily.set(family, row);
+  }
+  return [...byFamily.values()].sort(
+    (a, b) => b.total - a.total || a.family.localeCompare(b.family),
+  );
+}
+
+export function evaluateSweepThresholds(
+  records: SweepRecord[],
+  options: SweepThresholdOptions,
+): string[] {
+  const summary = summarize(records);
+  const errors: string[] = [];
+  const reachable = summary.reachable ?? 0;
+  const mutationOk = summary.mutation_ok ?? 0;
+  const skipped = summary.skipped_needs_payload ?? 0;
+  if (options.minReachable !== undefined && reachable < options.minReachable) {
+    errors.push(`reachable count ${reachable} is below --min-reachable ${options.minReachable}`);
+  }
+  if (options.minMutationOk !== undefined && mutationOk < options.minMutationOk) {
+    errors.push(
+      `mutation_ok count ${mutationOk} is below --min-mutation-ok ${options.minMutationOk}`,
+    );
+  }
+  if (options.maxSkipped !== undefined && skipped > options.maxSkipped) {
+    errors.push(
+      `skipped_needs_payload count ${skipped} is above --max-skipped ${options.maxSkipped}`,
+    );
+  }
+  for (const [capability, outcome] of Object.entries(options.requiredOutcomes ?? {})) {
+    if (!records.some((record) => record.capability === capability && record.outcome === outcome)) {
+      errors.push(`${capability} did not produce required outcome ${outcome}`);
+    }
+  }
+  return errors;
+}
+
+function emptyFamilySummaryRow(family: string): FamilySummaryRow {
+  return {
+    family,
+    total: 0,
+    contract_ok: 0,
+    dry_run_ok: 0,
+    reachable: 0,
+    empty: 0,
+    feature_gated: 0,
+    not_found_optional: 0,
+    dependency_missing: 0,
+    skipped_needs_payload: 0,
+    mutation_ok: 0,
+    failed: 0,
+  };
+}
+
 function renderMarkdown(result: {
   ok: boolean;
   targetOrg: string;
   runId: string;
   summary: Record<string, number>;
+  familySummary: FamilySummaryRow[];
+  thresholdErrors: string[];
   records: SweepRecord[];
 }): string {
   const lines = [
@@ -2163,6 +2498,22 @@ function renderMarkdown(result: {
   ];
   for (const [key, value] of Object.entries(result.summary).filter(([key]) => key !== "total")) {
     lines.push(`| ${key} | ${value} |`);
+  }
+  if (result.thresholdErrors.length) {
+    lines.push("", "## Threshold failures", "");
+    for (const error of result.thresholdErrors) lines.push(`- ${error}`);
+  }
+  lines.push(
+    "",
+    "## Family summary",
+    "",
+    "| Family | Total | Reachable | Mutation OK | Skipped | Dependency missing | Empty | Not found | Failed |",
+    "| --- | ---: | ---: | ---: | ---: | ---: | ---: | ---: | ---: |",
+  );
+  for (const row of result.familySummary) {
+    lines.push(
+      `| ${escapeCell(row.family)} | ${row.total} | ${row.reachable} | ${row.mutation_ok} | ${row.skipped_needs_payload} | ${row.dependency_missing} | ${row.empty} | ${row.not_found_optional} | ${row.failed} |`,
+    );
   }
   lines.push(
     "",
@@ -2217,6 +2568,34 @@ function parseArgs(args: string[]): CliOptions {
       case "--run-id":
         options.runId = requiredArg(args, ++i, arg);
         break;
+      case "--lifecycle":
+        options.lifecycles = [
+          ...(options.lifecycles ?? []),
+          parseLifecycleName(requiredArg(args, ++i, arg)),
+        ];
+        break;
+      case "--cleanup-run-id":
+        options.cleanupRunId = requiredArg(args, ++i, arg);
+        break;
+      case "--min-reachable":
+        options.minReachable = Number(requiredArg(args, ++i, arg));
+        break;
+      case "--min-mutation-ok":
+        options.minMutationOk = Number(requiredArg(args, ++i, arg));
+        break;
+      case "--max-skipped":
+        options.maxSkipped = Number(requiredArg(args, ++i, arg));
+        break;
+      case "--require-outcome": {
+        const [capability, outcome] = requiredArg(args, ++i, arg).split("=");
+        if (!capability || !outcome)
+          throw new Error("--require-outcome expects capability=outcome.");
+        options.requiredOutcomes = {
+          ...(options.requiredOutcomes ?? {}),
+          [capability]: parseSweepOutcome(outcome),
+        };
+        break;
+      }
       default:
         if (arg.startsWith("--")) throw new Error(`Unknown option ${arg}`);
         if (!options.targetOrg) options.targetOrg = arg;
@@ -2224,6 +2603,30 @@ function parseArgs(args: string[]): CliOptions {
     }
   }
   return options;
+}
+
+function parseLifecycleName(value: string): MutationLifecycleName {
+  if (value in lifecycleBuilders) return value as MutationLifecycleName;
+  throw new Error(
+    `Unknown lifecycle '${value}'. Expected one of: ${Object.keys(lifecycleBuilders).join(", ")}`,
+  );
+}
+
+function parseSweepOutcome(value: string): SweepOutcome {
+  const outcomes: SweepOutcome[] = [
+    "contract_ok",
+    "dry_run_ok",
+    "reachable",
+    "empty",
+    "feature_gated",
+    "not_found_optional",
+    "dependency_missing",
+    "skipped_needs_payload",
+    "mutation_ok",
+    "failed",
+  ];
+  if (outcomes.includes(value as SweepOutcome)) return value as SweepOutcome;
+  throw new Error(`Unknown outcome '${value}'. Expected one of: ${outcomes.join(", ")}`);
 }
 
 function requiredArg(args: string[], index: number, flag: string): string {

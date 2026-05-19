@@ -322,6 +322,13 @@
     "path": "/ssot/data-actions/{dataActionId}"
   },
   {
+    "name": "d360_dataaction_delete",
+    "family": "DataAction",
+    "description": "Delete a data action.",
+    "method": "DELETE",
+    "path": "/ssot/data-actions/{dataActionId}"
+  },
+  {
     "name": "d360_dataaction_target_list",
     "family": "DataAction",
     "description": "List data action targets.",

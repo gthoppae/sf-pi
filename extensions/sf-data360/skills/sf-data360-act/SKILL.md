@@ -30,8 +30,8 @@ Data 360 Act phase. Use when managing activations, activation targets, downstrea
 - **DataAction** — Inspect data actions and action targets.
 - **Transforms and Actions** — Inspect SQL transforms and real-time data actions.
 
-- Capabilities: 20 (0 runbook-backed)
-- Safety mix: read=10, safe_post=0, confirmed=7, destructive=3
+- Capabilities: 21 (0 runbook-backed)
+- Safety mix: read=10, safe_post=0, confirmed=7, destructive=4
 
 ## D360 capabilities
 

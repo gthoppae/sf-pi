@@ -268,13 +268,36 @@ npm run e2e:d360-sweep -- --target-org AgentforceSTDM --dry-run-only
 npm run e2e:d360-sweep -- --target-org AgentforceSTDM --max-live 20
 ```
 
-Run the sweep-owned DMO, DLO, DLO-to-DMO mapping, semantic model shell, semantic data-object, semantic calculated-field, semantic metric, semantic relationship, and data transform mutation lifecycles only against the disposable sweep org:
+Run the sweep-owned DMO, DLO, DLO-to-DMO mapping, semantic model shell, semantic data-object, semantic calculated-field, semantic metric, semantic relationship, data transform, and data action mutation lifecycles only against the disposable sweep org:
 
 ```bash
 D360_SWEEP_ALLOW_DESTRUCTIVE=AgentforceSTDM npm run e2e:d360-sweep -- \
   --target-org AgentforceSTDM \
   --dry-run-only \
   --mutate
+```
+
+Useful sweep controls:
+
+```bash
+# Run only one or more mutation lifecycles.
+D360_SWEEP_ALLOW_DESTRUCTIVE=AgentforceSTDM npm run e2e:d360-sweep -- \
+  --target-org AgentforceSTDM \
+  --dry-run-only \
+  --mutate \
+  --lifecycle transform \
+  --lifecycle data-action
+
+# Enforce coverage expectations.
+npm run e2e:d360-sweep -- \
+  --target-org AgentforceSTDM \
+  --require-outcome d360_transform_create=mutation_ok \
+  --min-mutation-ok 10
+
+# Cleanup known sweep-owned resources for a previous run id.
+D360_SWEEP_ALLOW_DESTRUCTIVE=AgentforceSTDM npm run e2e:d360-sweep -- \
+  --target-org AgentforceSTDM \
+  --cleanup-run-id 20260519170330
 ```
 
 The sweep writes JSON and Markdown artifacts to a temp directory and reports expected org-state limitations as structured non-failing outcomes.
@@ -289,7 +312,7 @@ Covered by unit tests:
 - HTTP errors from `Connection.request` surface as `{ status, body }` and are classified by `responseLooksLikeError`; the tool emits an error envelope instead of throwing.
 - Salesforce REST error arrays embedded in 2xx responses are still classified as failed calls.
 - Generated phase skills are committed, reproducible from `registry/phases.json`, and checked in the normal lint path.
-- The capability sweep plans dry-run coverage for every facade capability, runs bounded read/safe-post live checks, dynamically follows list responses into detail reads when public-safe identifiers are available, and can run sweep-owned DMO, DLO, DLO-to-DMO mapping, semantic model shell, semantic data-object, semantic calculated-field, semantic metric, semantic relationship, and data transform lifecycles behind an explicit destructive gate.
+- The capability sweep plans dry-run coverage for every facade capability, runs bounded read/safe-post live checks, dynamically follows list responses into detail reads when public-safe identifiers are available, can run focused sweep-owned mutation lifecycles behind an explicit destructive gate, writes a family summary table, supports coverage thresholds, and includes run-id cleanup helpers.
 
 ## Troubleshooting
 

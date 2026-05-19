@@ -432,6 +432,17 @@
     "safety": "read"
   },
   {
+    "name": "d360_dataaction_delete",
+    "family": "DataAction",
+    "description": "Delete a data action.",
+    "method": "DELETE",
+    "path": "/ssot/data-actions/{dataActionId}",
+    "requiredParams": ["dataActionId"],
+    "optionalParams": ["dataspace"],
+    "safety": "destructive",
+    "tips": "Delete the data action before deleting its data action target. Actual execution is allowed only with target_org='AgentforceSTDM', allow_confirmed=true, and interactive Pi confirmation after reviewing dry_run output."
+  },
+  {
     "name": "d360_dataaction_target_list",
     "family": "DataAction",
     "description": "List data action targets.",

@@ -3,10 +3,14 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildCapabilitySweepPlan,
+  buildCleanupLifecyclePlan,
+  buildDataActionLifecyclePlan,
   buildDloLifecyclePlan,
   buildDmoLifecyclePlan,
   buildDynamicFollowUpChecks,
+  buildFamilySummary,
   buildMappingLifecyclePlan,
+  buildMutationLifecyclePlans,
   buildSemanticCalculatedFieldsLifecyclePlan,
   buildSemanticDataObjectLifecyclePlan,
   buildSemanticMetricLifecyclePlan,
@@ -15,6 +19,7 @@ import {
   buildTransformLifecyclePlan,
   canRunMutationLifecycle,
   classifySweepResult,
+  evaluateSweepThresholds,
   containsPlaceholderValue,
   insertFollowUpChecks,
   paramsForDryRun,
@@ -278,6 +283,105 @@ describe("d360 capability sweep planning", () => {
       "d360_dmo_mapping_list",
       "d360_dmo_mapping_get",
       "d360_dmo_delete",
+    ]);
+  });
+
+  it("selects specific mutation lifecycles", () => {
+    const selected = buildMutationLifecyclePlans("20260519010101", ["dmo", "transform"]);
+
+    expect(selected.map((lifecycle) => lifecycle.resourceName)).toEqual([
+      "PiSweepDmo_20260519010101",
+      "PiSwTx_20260519010101",
+    ]);
+  });
+
+  it("builds cleanup checks for a run id", () => {
+    const cleanup = buildCleanupLifecyclePlan("20260519010101");
+
+    expect(cleanup.steps.map((step) => step.capability)).toEqual(
+      expect.arrayContaining([
+        "d360_dmo_delete",
+        "d360_dlo_delete",
+        "d360_sdm_delete",
+        "d360_transform_delete",
+      ]),
+    );
+    expect(
+      cleanup.steps.some((step) => step.params?.dmoName === "PiSweepDmo_20260519010101__dlm"),
+    ).toBe(true);
+    expect(cleanup.steps.some((step) => step.params?.transformId === "PiSwTx_20260519010101")).toBe(
+      true,
+    );
+  });
+
+  it("evaluates coverage thresholds and required outcomes", () => {
+    const records = [
+      {
+        stage: "live" as const,
+        capability: "a",
+        family: "A",
+        outcome: "reachable" as const,
+        fail: false,
+        summary: "ok",
+      },
+      {
+        stage: "mutate" as const,
+        capability: "b",
+        family: "B",
+        outcome: "mutation_ok" as const,
+        fail: false,
+        summary: "ok",
+      },
+      {
+        stage: "live_skip" as const,
+        capability: "c",
+        family: "C",
+        outcome: "skipped_needs_payload" as const,
+        fail: false,
+        summary: "skip",
+      },
+    ];
+
+    expect(
+      evaluateSweepThresholds(records, {
+        minReachable: 1,
+        minMutationOk: 1,
+        maxSkipped: 1,
+        requiredOutcomes: { b: "mutation_ok" },
+      }),
+    ).toEqual([]);
+    expect(
+      evaluateSweepThresholds(records, { minReachable: 2, requiredOutcomes: { b: "reachable" } }),
+    ).toEqual(
+      expect.arrayContaining([
+        "reachable count 1 is below --min-reachable 2",
+        "b did not produce required outcome reachable",
+      ]),
+    );
+  });
+
+  it("builds a family summary table model", () => {
+    const rows = buildFamilySummary([
+      {
+        stage: "live" as const,
+        capability: "a",
+        family: "A",
+        outcome: "reachable" as const,
+        fail: false,
+        summary: "ok",
+      },
+      {
+        stage: "mutate" as const,
+        capability: "b",
+        family: "A",
+        outcome: "mutation_ok" as const,
+        fail: false,
+        summary: "ok",
+      },
+    ]);
+
+    expect(rows).toEqual([
+      expect.objectContaining({ family: "A", reachable: 1, mutation_ok: 1, total: 2 }),
     ]);
   });
 
@@ -600,6 +704,35 @@ describe("d360 capability sweep planning", () => {
     });
   });
 
+  it("builds a sweep-owned data action lifecycle plan", () => {
+    const lifecycle = buildDataActionLifecyclePlan("20260519010101");
+
+    expect(lifecycle.resourceName).toBe("PiSweepDataAction_20260519010101");
+    expect(lifecycle.dataActionTargetName).toBe("PiSweepTarget_20260519010101");
+    expect(lifecycle.dataActionName).toBe("PiSweepAction_20260519010101");
+    expect(lifecycle.steps.map((step) => step.capability)).toEqual([
+      "d360_dataaction_target_create",
+      "d360_dataaction_target_get",
+      "d360_dataaction_create",
+      "d360_dataaction_get",
+      "d360_dataaction_delete",
+      "d360_dataaction_get",
+      "d360_dataaction_target_delete",
+      "d360_dataaction_target_get",
+    ]);
+    expect(lifecycle.steps[2].params?.body).toMatchObject({
+      developerName: "PiSweepAction_20260519010101",
+      dataActionTargetNames: ["PiSweepTarget_20260519010101"],
+      dataActionSources: [
+        {
+          sourceName: "ssot__AiAgentInteraction__dlm",
+          sourceType: "DataModelEntity",
+          sourceCdcSubscriptions: ["CREATE", "UPDATE", "DELETE"],
+        },
+      ],
+    });
+  });
+
   it("builds a sweep-owned data transform lifecycle plan", () => {
     const lifecycle = buildTransformLifecyclePlan("20260519010101");
 
@@ -727,6 +860,17 @@ describe("d360 capability sweep planning", () => {
         },
       ),
     ).toMatchObject({ outcome: "dependency_missing", fail: false });
+
+    expect(
+      classifySweepResult(
+        {
+          stage: "mutate",
+          capability: "d360_dataaction_delete",
+          sourceCapability: "cleanup_dataaction",
+        },
+        { ok: false, status: 500, error: "An unexpected error occurred" },
+      ),
+    ).toMatchObject({ outcome: "not_found_optional", fail: false });
 
     expect(
       classifySweepResult(

@@ -1528,6 +1528,10 @@
     },
     "capability": "d360_datakit_undeploy"
   },
+  "d360_dataaction_delete": {
+    "params": { "dataActionId": "ExampleDataActionId" },
+    "capability": "d360_dataaction_delete"
+  },
   "d360_dataaction_target_delete": {
     "params": { "dataActionTargetId": "ExampleDataActionTargetId" },
     "capability": "d360_dataaction_target_delete"
