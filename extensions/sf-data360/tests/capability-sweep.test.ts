@@ -589,6 +589,10 @@ describe("d360 capability sweep planning", () => {
       "d360_transform_validate",
       "d360_transform_create",
       "d360_transform_get",
+      "d360_transform_update",
+      "d360_transform_get",
+      "d360_transform_schedule_set",
+      "d360_transform_schedule_get",
       "d360_transform_delete",
       "d360_transform_get",
       "d360_dlo_delete",
@@ -687,6 +691,17 @@ describe("d360 capability sweep planning", () => {
         { ok: false, status: 281, error: "Can not deserialize: unexpected array" },
       ),
     ).toMatchObject({ outcome: "skipped_needs_payload", fail: false });
+
+    expect(
+      classifySweepResult(
+        { stage: "mutate", capability: "d360_transform_update" },
+        {
+          ok: false,
+          status: 500,
+          error: "MktDataTransform can only be updated when it is not a draft",
+        },
+      ),
+    ).toMatchObject({ outcome: "dependency_missing", fail: false });
 
     expect(
       classifySweepResult(

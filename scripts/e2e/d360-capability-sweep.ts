@@ -271,6 +271,7 @@ export function buildTransformLifecyclePlan(runId: string): DmoLifecyclePlan {
   const sourceDloName = "AIRetrieverRequest__dll";
   const targetDloName = `PiSwTxTgt_${runId}__dll`;
   const body = buildTransformBody(resourceName, sourceDloName, targetDloName, runId);
+  const updateBody = { ...body, label: `Pi Sweep Transform ${runId} Updated` };
   return {
     resourceName,
     dloName: targetDloName,
@@ -333,7 +334,42 @@ export function buildTransformLifecyclePlan(runId: string): DmoLifecyclePlan {
         params: { transformId: resourceName },
         sourceCapability: "transform_create_verify",
       },
-
+      {
+        stage: "mutate",
+        capability: "d360_transform_update",
+        family: "DataTransform",
+        safety: "confirmed",
+        params: { transformId: resourceName, body: updateBody },
+      },
+      {
+        stage: "live",
+        capability: "d360_transform_get",
+        family: "DataTransform",
+        safety: "read",
+        params: { transformId: resourceName },
+        sourceCapability: "transform_update_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_transform_schedule_set",
+        family: "DataTransform",
+        safety: "confirmed",
+        params: {
+          transformId: resourceName,
+          body: {
+            frequency: "None",
+            time: { hour: 3, minute: 0, timeZone: "America/Los_Angeles" },
+          },
+        },
+      },
+      {
+        stage: "live",
+        capability: "d360_transform_schedule_get",
+        family: "DataTransform",
+        safety: "read",
+        params: { transformId: resourceName },
+        sourceCapability: "transform_schedule_verify",
+      },
       {
         stage: "mutate",
         capability: "d360_transform_delete",
@@ -1207,6 +1243,7 @@ export function classifySweepResult(
     message.includes("provide a valid recordid") ||
     message.includes("developer name is missing") ||
     message.includes("field ids should not be empty") ||
+    message.includes("mktdatatransform can only be updated") ||
     message.includes("not enabled") ||
     message.includes("feature")
   ) {
