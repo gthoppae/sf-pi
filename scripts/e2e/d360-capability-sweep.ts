@@ -28,7 +28,7 @@ import {
   type D360OperationSafety,
 } from "../../extensions/sf-data360/lib/facade/registry.ts";
 
-export type SweepStage = "contract" | "dry_run" | "live" | "live_skip";
+export type SweepStage = "contract" | "dry_run" | "live" | "live_skip" | "mutate";
 
 export type SweepOutcome =
   | "contract_ok"
@@ -39,6 +39,7 @@ export type SweepOutcome =
   | "not_found_optional"
   | "dependency_missing"
   | "skipped_needs_payload"
+  | "mutation_ok"
   | "failed";
 
 export interface SweepPlanOptions {
@@ -73,6 +74,21 @@ interface CliOptions extends SweepPlanOptions {
   outputDir?: string;
   timeoutMs?: number;
   dryRunOnly?: boolean;
+  mutate?: boolean;
+  runId?: string;
+}
+
+interface MutationGateOptions {
+  mutate?: boolean;
+  targetOrg: string;
+  runId: string;
+  destructiveEnvValue?: string;
+}
+
+interface DmoLifecyclePlan {
+  resourceName: string;
+  dmoName: string;
+  steps: SweepCheck[];
 }
 
 export function buildCapabilitySweepPlan(
@@ -113,6 +129,90 @@ export function buildCapabilitySweepPlan(
   }
 
   return checks;
+}
+
+export function canRunMutationLifecycle(
+  options: MutationGateOptions,
+): { ok: true } | { ok: false; reason: string } {
+  if (!options.mutate) return { ok: false, reason: "Pass --mutate to run lifecycle checks." };
+  if (options.targetOrg !== SWEEP_MUTATION_TARGET_ORG) {
+    return {
+      ok: false,
+      reason: `Mutation lifecycle requires --target-org ${SWEEP_MUTATION_TARGET_ORG}.`,
+    };
+  }
+  if (options.destructiveEnvValue !== options.targetOrg) {
+    return {
+      ok: false,
+      reason: `Set D360_SWEEP_ALLOW_DESTRUCTIVE=${options.targetOrg} to run destructive cleanup.`,
+    };
+  }
+  if (!/^[A-Za-z0-9]{8,32}$/.test(options.runId)) {
+    return { ok: false, reason: "Mutation lifecycle requires a stable alphanumeric run id." };
+  }
+  return { ok: true };
+}
+
+export function buildDmoLifecyclePlan(runId: string): DmoLifecyclePlan {
+  const resourceName = `PiSweepDmo_${runId}`;
+  const dmoName = `${resourceName}__dlm`;
+  return {
+    resourceName,
+    dmoName,
+    steps: [
+      {
+        stage: "mutate",
+        capability: "d360_dmo_create",
+        family: "DMO",
+        safety: "confirmed",
+        params: { body: buildDmoCreateBody(resourceName, runId) },
+      },
+      {
+        stage: "live",
+        capability: "d360_dmo_get",
+        family: "DMO",
+        safety: "read",
+        params: { dmoName },
+        sourceCapability: "dmo_create_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_dmo_update",
+        family: "DMO",
+        safety: "confirmed",
+        params: {
+          dmoName,
+          body: {
+            label: `Pi Sweep DMO ${runId} Updated`,
+            description: `Sweep-owned DMO updated by run ${runId}.`,
+          },
+        },
+      },
+      {
+        stage: "live",
+        capability: "d360_dmo_get",
+        family: "DMO",
+        safety: "read",
+        params: { dmoName },
+        sourceCapability: "dmo_update_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_dmo_delete",
+        family: "DMO",
+        safety: "destructive",
+        params: { dmoName },
+      },
+      {
+        stage: "live",
+        capability: "d360_dmo_get",
+        family: "DMO",
+        safety: "read",
+        params: { dmoName },
+        sourceCapability: "dmo_delete_verify",
+      },
+    ],
+  };
 }
 
 export function buildDynamicFollowUpChecks(
@@ -221,6 +321,9 @@ export function classifySweepResult(
   if (ok && check.stage === "dry_run") {
     return { outcome: "dry_run_ok", fail: false, summary, status, error };
   }
+  if (ok && check.stage === "mutate") {
+    return { outcome: "mutation_ok", fail: false, summary, status, error };
+  }
   if (ok) {
     return {
       outcome: looksEmpty(result.response) ? "empty" : "reachable",
@@ -275,10 +378,12 @@ async function main(): Promise<void> {
   }
 
   const env = await loadEnvironment();
-  const runId = new Date()
-    .toISOString()
-    .replace(/[-:.TZ]/g, "")
-    .slice(0, 14);
+  const runId =
+    options.runId ??
+    new Date()
+      .toISOString()
+      .replace(/[-:.TZ]/g, "")
+      .slice(0, 14);
   const outputDir = path.resolve(
     options.outputDir ?? path.join(os.tmpdir(), "pi-d360-capability-sweeps", runId),
   );
@@ -290,7 +395,24 @@ async function main(): Promise<void> {
     live: !options.dryRunOnly,
   });
   const seenChecks = new Set(plan.map(checkKey));
+  if (options.mutate) {
+    const gate = canRunMutationLifecycle({
+      mutate: options.mutate,
+      targetOrg: options.targetOrg,
+      runId,
+      destructiveEnvValue: process.env.D360_SWEEP_ALLOW_DESTRUCTIVE,
+    });
+    if (gate.ok !== true) throw new Error(gate.reason);
+    for (const check of buildDmoLifecyclePlan(runId).steps) {
+      const key = checkKey(check);
+      if (!seenChecks.has(key)) {
+        seenChecks.add(key);
+        plan.push(check);
+      }
+    }
+  }
   const ctx = createHeadlessContext();
+  const mutationCtx = createSweepMutationContext();
   const records: SweepRecord[] = [];
 
   console.log(`D360 capability sweep`);
@@ -312,10 +434,12 @@ async function main(): Promise<void> {
           target_org: options.targetOrg,
           params: check.params,
           dry_run: check.stage === "dry_run",
+          allow_confirmed: check.stage === "mutate",
           timeout_ms: options.timeoutMs,
           output_mode: "summary",
         };
-        const result = await runFacade(input, env, ctx, ctx.signal);
+        const activeCtx = check.stage === "mutate" ? mutationCtx : ctx;
+        const result = await runFacade(input, env, activeCtx, activeCtx.signal);
         classified = classifySweepResult(check, result);
         for (const followUp of buildDynamicFollowUpChecks(check, result, capabilities)) {
           const key = checkKey(followUp);
@@ -341,7 +465,9 @@ async function main(): Promise<void> {
     records.push(record);
     const marker = record.fail
       ? "✗"
-      : record.outcome === "reachable" || record.outcome === "dry_run_ok"
+      : record.outcome === "reachable" ||
+          record.outcome === "dry_run_ok" ||
+          record.outcome === "mutation_ok"
         ? "✓"
         : "•";
     console.log(`  ${marker} ${record.stage.padEnd(8)} ${record.capability} — ${record.outcome}`);
@@ -367,7 +493,12 @@ async function main(): Promise<void> {
 }
 
 function checkKey(check: SweepCheck): string {
-  return [check.stage, check.capability, JSON.stringify(check.params ?? {})].join(":");
+  return [
+    check.stage,
+    check.capability,
+    check.sourceCapability ?? "",
+    JSON.stringify(check.params ?? {}),
+  ].join(":");
 }
 
 function baseCheck(capability: D360Capability, stage: SweepStage): SweepCheck {
@@ -400,6 +531,8 @@ interface DynamicFollowUp {
   inheritParams?: string[];
   constantParams?: Record<string, unknown>;
 }
+
+const SWEEP_MUTATION_TARGET_ORG = "AgentforceSTDM";
 
 const idOrNameCandidates = [
   "id",
@@ -634,6 +767,30 @@ const dynamicDetailCapabilities = new Set(
     followUps.map((followUp) => followUp.capability),
   ),
 );
+
+function buildDmoCreateBody(resourceName: string, runId: string): Record<string, unknown> {
+  return {
+    name: resourceName,
+    label: `Pi Sweep DMO ${runId}`,
+    category: "PROFILE",
+    dataSpaceName: "default",
+    description: `Sweep-owned DMO created by run ${runId}.`,
+    fields: [
+      {
+        name: "Id__c",
+        label: "Id",
+        dataType: "Text",
+        isPrimaryKey: true,
+      },
+      {
+        name: "Name__c",
+        label: "Name",
+        dataType: "Text",
+        isPrimaryKey: false,
+      },
+    ],
+  };
+}
 
 function dryRunValue(paramName: string): unknown {
   if (paramName === "body") return {};
@@ -898,6 +1055,12 @@ function parseArgs(args: string[]): CliOptions {
       case "--dry-run-only":
         options.dryRunOnly = true;
         break;
+      case "--mutate":
+        options.mutate = true;
+        break;
+      case "--run-id":
+        options.runId = requiredArg(args, ++i, arg);
+        break;
       default:
         if (arg.startsWith("--")) throw new Error(`Unknown option ${arg}`);
         if (!options.targetOrg) options.targetOrg = arg;
@@ -933,6 +1096,17 @@ function createHeadlessContext(): ExtensionContext {
     signal: controller.signal,
     ui: {
       select: async () => "Block",
+    },
+  } as unknown as ExtensionContext;
+}
+
+function createSweepMutationContext(): ExtensionContext {
+  const controller = new AbortController();
+  return {
+    hasUI: true,
+    signal: controller.signal,
+    ui: {
+      select: async () => "Allow once",
     },
   } as unknown as ExtensionContext;
 }

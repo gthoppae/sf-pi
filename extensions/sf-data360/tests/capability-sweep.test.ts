@@ -3,7 +3,9 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildCapabilitySweepPlan,
+  buildDmoLifecyclePlan,
   buildDynamicFollowUpChecks,
+  canRunMutationLifecycle,
   classifySweepResult,
   containsPlaceholderValue,
   paramsForDryRun,
@@ -261,6 +263,61 @@ describe("d360 capability sweep planning", () => {
       true,
     );
     expect(containsPlaceholderValue({ limit: 5, query: "AI Agent Interaction" })).toBe(false);
+  });
+
+  it("builds a sweep-owned DMO lifecycle plan", () => {
+    const lifecycle = buildDmoLifecyclePlan("20260519010101");
+
+    expect(lifecycle.resourceName).toBe("PiSweepDmo_20260519010101");
+    expect(lifecycle.dmoName).toBe("PiSweepDmo_20260519010101__dlm");
+    expect(lifecycle.steps.map((step) => step.capability)).toEqual([
+      "d360_dmo_create",
+      "d360_dmo_get",
+      "d360_dmo_update",
+      "d360_dmo_get",
+      "d360_dmo_delete",
+      "d360_dmo_get",
+    ]);
+    expect(lifecycle.steps[0].params?.body).toMatchObject({
+      name: "PiSweepDmo_20260519010101",
+      label: "Pi Sweep DMO 20260519010101",
+      category: "PROFILE",
+    });
+    expect(JSON.stringify(lifecycle.steps[0].params?.body)).not.toContain("creationType");
+    expect(lifecycle.steps[4].params).toEqual({ dmoName: "PiSweepDmo_20260519010101__dlm" });
+  });
+
+  it("requires explicit mutation gate for sweep-owned destructive lifecycle checks", () => {
+    expect(
+      canRunMutationLifecycle({
+        mutate: true,
+        targetOrg: "AgentforceSTDM",
+        runId: "20260519010101",
+        destructiveEnvValue: "AgentforceSTDM",
+      }),
+    ).toEqual({ ok: true });
+
+    expect(
+      canRunMutationLifecycle({
+        mutate: true,
+        targetOrg: "OtherOrg",
+        runId: "20260519010101",
+        destructiveEnvValue: "AgentforceSTDM",
+      }).ok,
+    ).toBe(false);
+    expect(
+      canRunMutationLifecycle({
+        mutate: true,
+        targetOrg: "AgentforceSTDM",
+        runId: "20260519010101",
+      }).ok,
+    ).toBe(false);
+  });
+
+  it("classifies mutation outcomes separately from read reachability", () => {
+    expect(
+      classifySweepResult({ stage: "mutate", capability: "d360_dmo_create" }, { ok: true }),
+    ).toMatchObject({ outcome: "mutation_ok", fail: false });
   });
 
   it("classifies live outcomes without failing on expected org-state limitations", () => {
