@@ -230,6 +230,7 @@ function runbookCard(
   opts: FacadeCardBuildOptions,
 ): D360ResultCard {
   const runbook = stringValue(result.runbook) ?? "runbook";
+  const capability = stringValue(result.capability) ?? runbook;
   const ok = result.ok !== false;
   const runbookResult = objectValue(result.result);
   const markdown = stringValue(runbookResult.markdown);
@@ -265,10 +266,10 @@ function runbookCard(
         path: "/services/data/v*/ssot/query-sql",
         targetOrg: stringValue(result.targetOrg),
         apiVersion: stringValue(result.apiVersion),
-        operation: runbook,
+        capability,
         payload: null,
       },
-      lineage: runbookLineage(runbook, opts.fullOutputPath),
+      lineage: runbookLineage(capability, runbook, opts.fullOutputPath),
       facts,
       sections: lines.length
         ? [{ title: "Preview", icon: "💬", lines }]
@@ -370,16 +371,18 @@ function localOperationLineage(
 }
 
 function runbookLineage(
+  capability: string,
   runbook: string,
   fullOutputPath: string | undefined,
 ): D360ResultCard["lineage"] {
   return {
     lines: [
-      "Runbook",
-      `  ↳ ${runbook}`,
-      "     ↳ Data 360 SQL / observability workflow",
-      ...runbookObjects(runbook).map((name) => `        ↳ Object: ${name}`),
-      ...(fullOutputPath ? [`           ↳ Artifact: ${fullOutputPath}`] : []),
+      "Capability",
+      `  ↳ ${capability}`,
+      "     ↳ Runbook-backed workflow",
+      "        ↳ Data 360 SQL / observability workflow",
+      ...runbookObjects(runbook).map((name) => `           ↳ Object: ${name}`),
+      ...(fullOutputPath ? [`              ↳ Artifact: ${fullOutputPath}`] : []),
     ],
   };
 }

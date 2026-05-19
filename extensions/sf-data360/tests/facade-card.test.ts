@@ -198,6 +198,11 @@ describe("d360 facade result cards", () => {
 
     expect(text).toContain("💬 STDM session timeline ✅");
     expect(text).toContain("Stage 5/5: Summarize");
+    expect(text).toContain("Capability: agent_observability.stdm_session_timeline");
+    expect(text).toContain("Capability");
+    expect(text).toContain("Runbook-backed workflow");
+    expect(text).not.toContain("Operation: agent_observability.stdm_session_timeline");
+    expect(text).not.toContain("Lineage\n  Runbook");
     expect(text).toContain("ssot__AiAgentInteraction__dlm");
     expect(text).toContain("Rows: 8");
     expect(text).toContain("1. 👤 User");

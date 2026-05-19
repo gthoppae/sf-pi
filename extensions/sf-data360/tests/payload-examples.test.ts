@@ -8,8 +8,30 @@ const upstreamExamples = JSON.parse(
 const localExamples = JSON.parse(
   readFileSync("extensions/sf-data360/registry/examples.json", "utf8"),
 ) as Record<string, unknown>;
+const packageJson = JSON.parse(readFileSync("package.json", "utf8")) as {
+  scripts?: Record<string, string>;
+};
 
 describe("d360 payload example parity", () => {
+  it("keeps top-level examples capability-shaped", () => {
+    const legacy = Object.entries(localExamples).filter(([, example]) => {
+      if (!example || typeof example !== "object" || Array.isArray(example)) return false;
+      return "operation" in example || "runbook" in example;
+    });
+
+    expect(legacy).toEqual([]);
+  });
+
+  it("keeps upstream payload example checks in the normal lint path", () => {
+    expect(packageJson.scripts?.["generate-d360-payload-examples"]).toBe(
+      "node scripts/generate-d360-payload-examples.mjs",
+    );
+    expect(packageJson.scripts?.["generate-d360-payload-examples:check"]).toBe(
+      "node scripts/generate-d360-payload-examples.mjs --check",
+    );
+    expect(packageJson.scripts?.lint).toContain("generate-d360-payload-examples:check");
+  });
+
   it("represents every upstream payload example as a capability example or variant", () => {
     const uncovered = Object.keys(upstreamExamples).filter(
       (upstreamKey) => !localExamples[upstreamKey] && !findVariantBySourceExample(upstreamKey),

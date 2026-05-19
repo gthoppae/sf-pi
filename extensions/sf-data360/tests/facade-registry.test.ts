@@ -3,8 +3,6 @@ import { describe, expect, it } from "vitest";
 
 import {
   findCapability,
-  findOperation,
-  findRunbook,
   getD360Capabilities,
   getD360Examples,
   getD360Families,
@@ -205,13 +203,11 @@ describe("d360 facade registry", () => {
     ]);
   });
 
-  it("returns operation and runbook examples that point at registered names", () => {
+  it("returns capability-shaped examples that point at registered names", () => {
     for (const example of Object.values(getD360Examples()) as Array<Record<string, unknown>>) {
-      const operation = typeof example.operation === "string" ? example.operation : undefined;
-      const runbook = typeof example.runbook === "string" ? example.runbook : undefined;
-      if (operation) expect(findOperation(operation)).toBeTruthy();
-      if (runbook) expect(findRunbook(runbook)).toBeTruthy();
-      expect(operation || runbook).toBeTruthy();
+      const capability = typeof example.capability === "string" ? example.capability : undefined;
+      expect(capability).toBeTruthy();
+      expect(findCapability(capability ?? "")).toBeTruthy();
     }
   });
 

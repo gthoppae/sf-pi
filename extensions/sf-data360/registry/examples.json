@@ -1,77 +1,47 @@
 {
   "d360_query_sql": {
-    "operation": "d360_query_sql",
     "params": {
       "dataspaceName": "default",
       "sql": "SELECT COUNT(*) AS n FROM \"ssot__TelemetryTraceSpan__dlm\""
-    }
+    },
+    "capability": "d360_query_sql"
   },
   "d360_dlo_describe": {
-    "operation": "d360_dlo_describe",
-    "params": {
-      "dloName": "ObservabilitySpans__dll"
-    }
+    "params": { "dloName": "ObservabilitySpans__dll" },
+    "capability": "d360_dlo_describe"
   },
-  "d360_data_streams_list": {
-    "operation": "d360_data_streams_list",
-    "params": {
-      "limit": 10
-    }
-  },
+  "d360_data_streams_list": { "params": { "limit": 10 }, "capability": "d360_data_streams_list" },
   "d360_semantic_models_list": {
-    "operation": "d360_semantic_models_list",
-    "params": {
-      "limit": 10
-    }
+    "params": { "limit": 10 },
+    "capability": "d360_semantic_models_list"
   },
   "agent_observability.platform_trace_tree": {
-    "runbook": "agent_observability.platform_trace_tree",
-    "params": {
-      "trace_id": "d18ba385fe932069deeb078f48d158d1"
-    }
+    "params": { "trace_id": "d18ba385fe932069deeb078f48d158d1" },
+    "capability": "agent_observability.platform_trace_tree"
   },
   "agent_observability.join_interaction_trace": {
-    "runbook": "agent_observability.join_interaction_trace",
-    "params": {
-      "interaction_id": "64a3c2001eb45a35aebc575b743506c1"
-    }
+    "params": { "interaction_id": "64a3c2001eb45a35aebc575b743506c1" },
+    "capability": "agent_observability.join_interaction_trace"
   },
   "agent_observability.stdm_session_timeline": {
-    "runbook": "agent_observability.stdm_session_timeline",
-    "params": {
-      "session_id": "019e2218-ca4c-7ba4-b9ed-b3419bb1b34b",
-      "limit": 100
-    }
+    "params": { "session_id": "019e2218-ca4c-7ba4-b9ed-b3419bb1b34b", "limit": 100 },
+    "capability": "agent_observability.stdm_session_timeline"
   },
   "d360_metadata_search": {
-    "operation": "d360_metadata_search",
     "params": {
       "body": {
         "query": "AI Agent Interaction",
-        "pagination": {
-          "limit": 5
-        },
-        "filters": [
-          {
-            "field": "metadataType",
-            "values": ["DataModelObject"]
-          }
-        ]
+        "pagination": { "limit": 5 },
+        "filters": [{ "field": "metadataType", "values": ["DataModelObject"] }]
       }
-    }
+    },
+    "capability": "d360_metadata_search"
   },
   "d360_semantic_query": {
-    "operation": "d360_semantic_query",
-    "params": {
-      "body": {
-        "semanticQuery": {
-          "fields": []
-        }
-      }
-    }
+    "params": { "body": { "semanticQuery": { "fields": [] } } },
+    "capability": "d360_semantic_query"
   },
   "d360_ci_create": {
-    "operation": "d360_ci_create",
     "params": {
       "body": {
         "apiName": "Example_Score__cio",
@@ -81,16 +51,11 @@
         "publishScheduleInterval": "SYSTEM_MANAGED",
         "expression": "SELECT SomeDmo__dlm.Id__c AS id__c, COUNT(*) AS count__c FROM SomeDmo__dlm GROUP BY SomeDmo__dlm.Id__c"
       }
-    }
+    },
+    "capability": "d360_ci_create"
   },
-  "d360_ci_run": {
-    "operation": "d360_ci_run",
-    "params": {
-      "ciName": "Example_Score__cio"
-    }
-  },
+  "d360_ci_run": { "params": { "ciName": "Example_Score__cio" }, "capability": "d360_ci_run" },
   "d360_segment_create": {
-    "operation": "d360_segment_create",
     "params": {
       "body": {
         "displayName": "Example Segment",
@@ -102,16 +67,14 @@
           "expression": "/* replace with verified segment criteria */"
         }
       }
-    }
+    },
+    "capability": "d360_segment_create"
   },
   "d360_segment_publish": {
-    "operation": "d360_segment_publish",
-    "params": {
-      "segmentId": "ExampleSegmentId"
-    }
+    "params": { "segmentId": "ExampleSegmentId" },
+    "capability": "d360_segment_publish"
   },
   "d360_activation_create": {
-    "operation": "d360_activation_create",
     "params": {
       "body": {
         "displayName": "Example Activation",
@@ -120,10 +83,10 @@
         "dataSpaceName": "default",
         "description": "Example activation payload placeholder. Replace ids and target config with verified values before execution."
       }
-    }
+    },
+    "capability": "d360_activation_create"
   },
   "d360_activation_target_create": {
-    "operation": "d360_activation_target_create",
     "params": {
       "body": {
         "displayName": "Example Activation Target",
@@ -132,10 +95,10 @@
         "dataSpaceName": "default",
         "description": "Example activation target payload placeholder. Replace destination fields with values from the selected connector."
       }
-    }
+    },
+    "capability": "d360_activation_target_create"
   },
   "d360_transform_create": {
-    "operation": "d360_transform_create",
     "params": {
       "body": {
         "label": "Example Transform",
@@ -152,24 +115,20 @@
           "targetDlo": "ExampleTarget__dll"
         }
       }
-    }
+    },
+    "capability": "d360_transform_create"
   },
   "d360_transform_schedule_set": {
-    "operation": "d360_transform_schedule_set",
     "params": {
       "transformId": "ExampleTransformId",
       "body": {
         "frequency": "Daily",
-        "time": {
-          "hour": 2,
-          "minute": 0,
-          "timeZone": "America/Los_Angeles"
-        }
+        "time": { "hour": 2, "minute": 0, "timeZone": "America/Los_Angeles" }
       }
-    }
+    },
+    "capability": "d360_transform_schedule_set"
   },
   "d360_dataaction_target_create": {
-    "operation": "d360_dataaction_target_create",
     "params": {
       "body": {
         "apiName": "Example_Data_Action_Target",
@@ -182,10 +141,10 @@
           "apiContract": "ExampleContract"
         }
       }
-    }
+    },
+    "capability": "d360_dataaction_target_create"
   },
   "d360_dataaction_create": {
-    "operation": "d360_dataaction_create",
     "params": {
       "body": {
         "dataActionName": "Example Data Action",
@@ -200,20 +159,16 @@
         "isRealTimeAction": true,
         "shouldProcessDayZero": false,
         "shouldTriggerEventOnlyFirstTime": true,
-        "dataActionSources": [
-          {
-            "sourceName": "ExampleSource__dlm"
-          }
-        ],
+        "dataActionSources": [{ "sourceName": "ExampleSource__dlm" }],
         "actionConditions": [],
         "dataActionTargetNames": ["Example_Data_Action_Target"],
         "dataActionProjectedFields": [],
         "dataActionEnrichmentProperties": []
       }
-    }
+    },
+    "capability": "d360_dataaction_create"
   },
   "d360_search_index_create": {
-    "operation": "d360_search_index_create",
     "params": {
       "body": {
         "label": "Example Search Index",
@@ -231,33 +186,22 @@
               "sourceDmoDeveloperName": "ExampleSource__dlm",
               "sourceDmoFieldDeveloperName": "ExampleText__c",
               "decorators": [],
-              "config": {
-                "id": "passage_extraction",
-                "userValues": []
-              }
+              "config": { "id": "passage_extraction", "userValues": [] }
             }
           ]
         },
-        "vectorEmbedding": {
-          "vectorEmbeddingRelatedFields": []
-        },
+        "vectorEmbedding": { "vectorEmbeddingRelatedFields": [] },
         "vectorEmbeddingConfiguration": {
-          "embeddingModel": {
-            "id": "example_embedding_model",
-            "userValues": []
-          },
-          "index": {
-            "id": "HNSW",
-            "userValues": []
-          },
+          "embeddingModel": { "id": "example_embedding_model", "userValues": [] },
+          "index": { "id": "HNSW", "userValues": [] },
           "similarityMetric": "COSINE"
         },
         "transformConfigurations": []
       }
-    }
+    },
+    "capability": "d360_search_index_create"
   },
   "d360_retriever_create": {
-    "operation": "d360_retriever_create",
     "params": {
       "body": {
         "label": "Example Retriever",
@@ -266,9 +210,7 @@
         "dataSpaces": ["default"],
         "configuration": {
           "queryType": "NoCode",
-          "input": {
-            "id": "ExampleSearchIndexId"
-          },
+          "input": { "id": "ExampleSearchIndexId" },
           "numberOfResults": 5,
           "isActive": true,
           "isCitationEnabled": false,
@@ -282,17 +224,15 @@
           ]
         }
       }
-    }
+    },
+    "capability": "d360_retriever_create"
   },
   "d360_retriever_config_create": {
-    "operation": "d360_retriever_config_create",
     "params": {
       "retrieverIdOrName": "ExampleRetriever",
       "body": {
         "queryType": "NoCode",
-        "input": {
-          "id": "ExampleSearchIndexId"
-        },
+        "input": { "id": "ExampleSearchIndexId" },
         "numberOfResults": 5,
         "isActive": true,
         "isCitationEnabled": false,
@@ -305,10 +245,10 @@
           }
         ]
       }
-    }
+    },
+    "capability": "d360_retriever_config_create"
   },
   "d360_datastream_create": {
-    "operation": "d360_datastream_create",
     "params": {
       "body": {
         "name": "Example_Data_Stream",
@@ -316,57 +256,27 @@
         "datastreamType": "EXTERNAL",
         "connectorInfo": {
           "connectorType": "DataConnector",
-          "connectorDetails": {
-            "name": "ExampleConnection"
-          }
+          "connectorDetails": { "name": "ExampleConnection" }
         },
         "dataLakeObjectInfo": {
           "name": "Example_Data_Stream__dll",
           "label": "Example Data Stream",
           "category": "Profile",
-          "dataspaceInfo": [
-            {
-              "name": "default"
-            }
-          ],
+          "dataspaceInfo": [{ "name": "default" }],
           "dataLakeFieldInputRepresentations": [
-            {
-              "name": "Id__c",
-              "label": "Id",
-              "dataType": "Text",
-              "isPrimaryKey": true
-            },
-            {
-              "name": "Name__c",
-              "label": "Name",
-              "dataType": "Text",
-              "isPrimaryKey": false
-            }
+            { "name": "Id__c", "label": "Id", "dataType": "Text", "isPrimaryKey": true },
+            { "name": "Name__c", "label": "Name", "dataType": "Text", "isPrimaryKey": false }
           ]
         },
         "sourceFields": [
-          {
-            "name": "Id",
-            "dataType": "Text"
-          },
-          {
-            "name": "Name",
-            "dataType": "Text"
-          }
+          { "name": "Id", "dataType": "Text" },
+          { "name": "Name", "dataType": "Text" }
         ],
         "mappings": [
-          {
-            "sourceFieldLabel": "Id",
-            "targetFieldName": "Id__c"
-          },
-          {
-            "sourceFieldLabel": "Name",
-            "targetFieldName": "Name__c"
-          }
+          { "sourceFieldLabel": "Id", "targetFieldName": "Id__c" },
+          { "sourceFieldLabel": "Name", "targetFieldName": "Name__c" }
         ],
-        "refreshConfig": {
-          "refreshMode": "TOTAL_REPLACE"
-        }
+        "refreshConfig": { "refreshMode": "TOTAL_REPLACE" }
       }
     },
     "variants": {
@@ -383,9 +293,7 @@
             },
             "connectorInfo": {
               "connectorType": "UploadedFiles",
-              "connectorDetails": {
-                "name": "UploadedFiles"
-              }
+              "connectorDetails": { "name": "UploadedFiles" }
             },
             "dataAccessMode": "INGEST",
             "dataLakeObjectInfo": {
@@ -409,18 +317,8 @@
                   "label": "Last Name",
                   "isPrimaryKey": false
                 },
-                {
-                  "name": "Email",
-                  "dataType": "Text",
-                  "label": "Email",
-                  "isPrimaryKey": false
-                },
-                {
-                  "name": "City",
-                  "dataType": "Text",
-                  "label": "City",
-                  "isPrimaryKey": false
-                },
+                { "name": "Email", "dataType": "Text", "label": "Email", "isPrimaryKey": false },
+                { "name": "City", "dataType": "Text", "label": "City", "isPrimaryKey": false },
                 {
                   "name": "Country",
                   "dataType": "Text",
@@ -437,10 +335,7 @@
             },
             "label": "Customer CSV Upload",
             "refreshConfig": {
-              "frequency": {
-                "hours": [],
-                "refreshDayOfMonth": []
-              },
+              "frequency": { "hours": [], "refreshDayOfMonth": [] },
               "hasHeaders": false,
               "isAccelerationEnabled": false,
               "refreshMode": "TOTAL_REPLACE",
@@ -451,10 +346,10 @@
           }
         }
       }
-    }
+    },
+    "capability": "d360_datastream_create"
   },
   "d360_datastream_create_sfdc": {
-    "operation": "d360_datastream_create_sfdc",
     "params": {
       "body": {
         "name": "Account_Home",
@@ -462,20 +357,13 @@
         "datastreamType": "SFDC",
         "connectorInfo": {
           "connectorType": "SalesforceDotCom",
-          "connectorDetails": {
-            "name": "SalesforceDotCom_Home",
-            "sourceObject": "Account"
-          }
+          "connectorDetails": { "name": "SalesforceDotCom_Home", "sourceObject": "Account" }
         },
         "dataLakeObjectInfo": {
           "name": "Account_Home",
           "label": "Account Home",
           "category": "Profile",
-          "dataspaceInfo": [
-            {
-              "name": "default"
-            }
-          ]
+          "dataspaceInfo": [{ "name": "default" }]
         }
       }
     },
@@ -497,12 +385,7 @@
             "dataLakeObjectInfo": {
               "category": "Other",
               "dataLakeFieldInfoRepresentation": [
-                {
-                  "name": "Id",
-                  "dataType": "Text",
-                  "label": "Product ID",
-                  "isPrimaryKey": true
-                },
+                { "name": "Id", "dataType": "Text", "label": "Product ID", "isPrimaryKey": true },
                 {
                   "name": "Name",
                   "dataType": "Text",
@@ -515,12 +398,7 @@
                   "label": "Product Code",
                   "isPrimaryKey": false
                 },
-                {
-                  "name": "Family",
-                  "dataType": "Text",
-                  "label": "Family",
-                  "isPrimaryKey": false
-                },
+                { "name": "Family", "dataType": "Text", "label": "Family", "isPrimaryKey": false },
                 {
                   "name": "IsActive",
                   "dataType": "Text",
@@ -537,11 +415,7 @@
             },
             "label": "Product Catalog Stream",
             "refreshConfig": {
-              "frequency": {
-                "hours": [],
-                "refreshDayOfMonth": [],
-                "frequencyType": "BATCH"
-              },
+              "frequency": { "hours": [], "refreshDayOfMonth": [], "frequencyType": "BATCH" },
               "hasHeaders": false,
               "isAccelerationEnabled": false,
               "refreshMode": "UPSERT",
@@ -570,30 +444,15 @@
               "category": "Engagement",
               "eventDateColumn": "CreatedDate",
               "dataLakeFieldInfoRepresentation": [
-                {
-                  "name": "Id",
-                  "dataType": "Text",
-                  "label": "Task ID",
-                  "isPrimaryKey": true
-                },
-                {
-                  "name": "WhoId",
-                  "dataType": "Text",
-                  "label": "Who ID",
-                  "isPrimaryKey": false
-                },
+                { "name": "Id", "dataType": "Text", "label": "Task ID", "isPrimaryKey": true },
+                { "name": "WhoId", "dataType": "Text", "label": "Who ID", "isPrimaryKey": false },
                 {
                   "name": "Subject",
                   "dataType": "Text",
                   "label": "Subject",
                   "isPrimaryKey": false
                 },
-                {
-                  "name": "Status",
-                  "dataType": "Text",
-                  "label": "Status",
-                  "isPrimaryKey": false
-                },
+                { "name": "Status", "dataType": "Text", "label": "Status", "isPrimaryKey": false },
                 {
                   "name": "CreatedDate",
                   "dataType": "DateTime",
@@ -616,11 +475,7 @@
             },
             "label": "Task Engagement Stream",
             "refreshConfig": {
-              "frequency": {
-                "hours": [],
-                "refreshDayOfMonth": [],
-                "frequencyType": "BATCH"
-              },
+              "frequency": { "hours": [], "refreshDayOfMonth": [], "frequencyType": "BATCH" },
               "hasHeaders": false,
               "isAccelerationEnabled": false,
               "refreshMode": "UPSERT",
@@ -648,12 +503,7 @@
             "dataLakeObjectInfo": {
               "category": "Profile",
               "dataLakeFieldInfoRepresentation": [
-                {
-                  "name": "Id",
-                  "dataType": "Text",
-                  "label": "Account ID",
-                  "isPrimaryKey": true
-                },
+                { "name": "Id", "dataType": "Text", "label": "Account ID", "isPrimaryKey": true },
                 {
                   "name": "Name",
                   "dataType": "Text",
@@ -694,11 +544,7 @@
             },
             "label": "Account Data Stream",
             "refreshConfig": {
-              "frequency": {
-                "hours": [],
-                "refreshDayOfMonth": [],
-                "frequencyType": "BATCH"
-              },
+              "frequency": { "hours": [], "refreshDayOfMonth": [], "frequencyType": "BATCH" },
               "hasHeaders": false,
               "isAccelerationEnabled": false,
               "refreshMode": "UPSERT",
@@ -709,10 +555,10 @@
           }
         }
       }
-    }
+    },
+    "capability": "d360_datastream_create_sfdc"
   },
   "d360_datastream_create_snowflake": {
-    "operation": "d360_datastream_create_snowflake",
     "params": {
       "body": {
         "name": "Example_Snowflake_Stream",
@@ -720,57 +566,27 @@
         "datastreamType": "EXTERNAL",
         "connectorInfo": {
           "connectorType": "DataConnector",
-          "connectorDetails": {
-            "name": "ExampleSnowflakeConnection"
-          }
+          "connectorDetails": { "name": "ExampleSnowflakeConnection" }
         },
         "dataLakeObjectInfo": {
           "name": "Example_Snowflake_Stream__dll",
           "label": "Example Snowflake Stream",
           "category": "Profile",
-          "dataspaceInfo": [
-            {
-              "name": "default"
-            }
-          ],
+          "dataspaceInfo": [{ "name": "default" }],
           "dataLakeFieldInputRepresentations": [
-            {
-              "name": "Id__c",
-              "label": "Id",
-              "dataType": "Text",
-              "isPrimaryKey": true
-            },
-            {
-              "name": "Name__c",
-              "label": "Name",
-              "dataType": "Text",
-              "isPrimaryKey": false
-            }
+            { "name": "Id__c", "label": "Id", "dataType": "Text", "isPrimaryKey": true },
+            { "name": "Name__c", "label": "Name", "dataType": "Text", "isPrimaryKey": false }
           ]
         },
         "mappings": [
-          {
-            "sourceFieldLabel": "ID",
-            "targetFieldName": "Id__c"
-          },
-          {
-            "sourceFieldLabel": "NAME",
-            "targetFieldName": "Name__c"
-          }
+          { "sourceFieldLabel": "ID", "targetFieldName": "Id__c" },
+          { "sourceFieldLabel": "NAME", "targetFieldName": "Name__c" }
         ],
         "sourceFields": [
-          {
-            "name": "ID",
-            "dataType": "Text"
-          },
-          {
-            "name": "NAME",
-            "dataType": "Text"
-          }
+          { "name": "ID", "dataType": "Text" },
+          { "name": "NAME", "dataType": "Text" }
         ],
-        "refreshConfig": {
-          "refreshMode": "TOTAL_REPLACE"
-        },
+        "refreshConfig": { "refreshMode": "TOTAL_REPLACE" },
         "advancedAttributes": {
           "database": "EXAMPLE_DB",
           "schema": "PUBLIC",
@@ -778,16 +594,14 @@
         },
         "dataAccessMode": "Direct_Access"
       }
-    }
+    },
+    "capability": "d360_datastream_create_snowflake"
   },
   "d360_datastream_run": {
-    "operation": "d360_datastream_run",
-    "params": {
-      "dataStreamId": "ExampleDataStreamId"
-    }
+    "params": { "dataStreamId": "ExampleDataStreamId" },
+    "capability": "d360_datastream_run"
   },
   "d360_datastream_create_aws_s3": {
-    "operation": "d360_datastream_create_aws_s3",
     "params": {
       "body": {
         "name": "Example_Aws_S3_Stream",
@@ -795,57 +609,27 @@
         "datastreamType": "CONNECTORSFRAMEWORK",
         "connectorInfo": {
           "connectorType": "DataConnector",
-          "connectorDetails": {
-            "name": "ExampleAwsS3Connection"
-          }
+          "connectorDetails": { "name": "ExampleAwsS3Connection" }
         },
         "dataLakeObjectInfo": {
           "name": "Example_Aws_S3_Stream__dll",
           "label": "Example AWS S3 Stream",
           "category": "Profile",
-          "dataspaceInfo": [
-            {
-              "name": "default"
-            }
-          ],
+          "dataspaceInfo": [{ "name": "default" }],
           "dataLakeFieldInputRepresentations": [
-            {
-              "name": "Id__c",
-              "label": "Id",
-              "dataType": "Text",
-              "isPrimaryKey": true
-            },
-            {
-              "name": "Name__c",
-              "label": "Name",
-              "dataType": "Text",
-              "isPrimaryKey": false
-            }
+            { "name": "Id__c", "label": "Id", "dataType": "Text", "isPrimaryKey": true },
+            { "name": "Name__c", "label": "Name", "dataType": "Text", "isPrimaryKey": false }
           ]
         },
         "sourceFields": [
-          {
-            "name": "Id",
-            "dataType": "Text"
-          },
-          {
-            "name": "Name",
-            "dataType": "Text"
-          }
+          { "name": "Id", "dataType": "Text" },
+          { "name": "Name", "dataType": "Text" }
         ],
         "mappings": [
-          {
-            "sourceFieldLabel": "Id",
-            "targetFieldName": "Id__c"
-          },
-          {
-            "sourceFieldLabel": "Name",
-            "targetFieldName": "Name__c"
-          }
+          { "sourceFieldLabel": "Id", "targetFieldName": "Id__c" },
+          { "sourceFieldLabel": "Name", "targetFieldName": "Name__c" }
         ],
-        "refreshConfig": {
-          "refreshMode": "TOTAL_REPLACE"
-        },
+        "refreshConfig": { "refreshMode": "TOTAL_REPLACE" },
         "advancedAttributes": {
           "fileType": "CSV",
           "importDirectory": "/example/",
@@ -854,10 +638,10 @@
           "headerlessRetrievalEnabled": false
         }
       }
-    }
+    },
+    "capability": "d360_datastream_create_aws_s3"
   },
   "d360_dmo_create": {
-    "operation": "d360_dmo_create",
     "params": {
       "body": {
         "name": "Example_Profile",
@@ -908,21 +692,9 @@
                 "dataType": "Text",
                 "isRequired": true
               },
-              {
-                "label": "Page URL",
-                "name": "PageUrl__c",
-                "dataType": "Text"
-              },
-              {
-                "label": "Event Type",
-                "name": "EventType__c",
-                "dataType": "Text"
-              },
-              {
-                "label": "Created Date",
-                "name": "CreatedDate__c",
-                "dataType": "DateTime"
-              },
+              { "label": "Page URL", "name": "PageUrl__c", "dataType": "Text" },
+              { "label": "Event Type", "name": "EventType__c", "dataType": "Text" },
+              { "label": "Created Date", "name": "CreatedDate__c", "dataType": "DateTime" },
               {
                 "precision": 10,
                 "name": "Duration__c",
@@ -959,11 +731,7 @@
                 "dataType": "Text",
                 "isRequired": true
               },
-              {
-                "label": "Category",
-                "name": "Category__c",
-                "dataType": "Text"
-              },
+              { "label": "Category", "name": "Category__c", "dataType": "Text" },
               {
                 "precision": 18,
                 "name": "Price__c",
@@ -971,11 +739,7 @@
                 "label": "Price",
                 "dataType": "Number"
               },
-              {
-                "label": "Is Active",
-                "name": "IsActive__c",
-                "dataType": "Text"
-              }
+              { "label": "Is Active", "name": "IsActive__c", "dataType": "Text" }
             ]
           }
         }
@@ -1011,29 +775,22 @@
                 "label": "Metric Value",
                 "dataType": "Number"
               },
-              {
-                "label": "Calculation Date",
-                "name": "CalculationDate__c",
-                "dataType": "DateTime"
-              }
+              { "label": "Calculation Date", "name": "CalculationDate__c", "dataType": "DateTime" }
             ]
           }
         }
       }
-    }
+    },
+    "capability": "d360_dmo_create"
   },
   "d360_dmo_update": {
-    "operation": "d360_dmo_update",
     "params": {
       "dmoName": "Example_Profile__dlm",
-      "body": {
-        "label": "Example Profile Updated",
-        "description": "Dry-run placeholder only"
-      }
-    }
+      "body": { "label": "Example Profile Updated", "description": "Dry-run placeholder only" }
+    },
+    "capability": "d360_dmo_update"
   },
   "d360_dlo_create": {
-    "operation": "d360_dlo_create",
     "params": {
       "body": {
         "name": "Example_Profile__dll",
@@ -1041,66 +798,36 @@
         "category": "Profile",
         "dataSpaceName": "default",
         "description": "Example DLO payload placeholder. Verify fields, category, and dataspace before execution.",
-        "dataspaceInfo": [
-          {
-            "name": "default"
-          }
-        ],
+        "dataspaceInfo": [{ "name": "default" }],
         "dataLakeFieldInputRepresentations": [
-          {
-            "name": "Id__c",
-            "label": "Id",
-            "dataType": "Text",
-            "isPrimaryKey": true
-          },
-          {
-            "name": "Name__c",
-            "label": "Name",
-            "dataType": "Text",
-            "isPrimaryKey": false
-          }
+          { "name": "Id__c", "label": "Id", "dataType": "Text", "isPrimaryKey": true },
+          { "name": "Name__c", "label": "Name", "dataType": "Text", "isPrimaryKey": false }
         ]
       }
-    }
+    },
+    "capability": "d360_dlo_create"
   },
   "d360_dlo_update": {
-    "operation": "d360_dlo_update",
     "params": {
       "dloName": "Example_Profile__dll",
       "body": {
         "label": "Example Profile Updated",
         "dataLakeFieldInputRepresentations": [
-          {
-            "name": "Id__c",
-            "label": "Id",
-            "dataType": "Text",
-            "isPrimaryKey": true
-          },
-          {
-            "name": "Name__c",
-            "label": "Name",
-            "dataType": "Text",
-            "isPrimaryKey": false
-          }
+          { "name": "Id__c", "label": "Id", "dataType": "Text", "isPrimaryKey": true },
+          { "name": "Name__c", "label": "Name", "dataType": "Text", "isPrimaryKey": false }
         ]
       }
-    }
+    },
+    "capability": "d360_dlo_update"
   },
   "d360_dmo_mapping_create": {
-    "operation": "d360_dmo_mapping_create",
     "params": {
       "body": {
         "sourceEntityDeveloperName": "Example_Profile__dll",
         "targetEntityDeveloperName": "Example_Profile__dlm",
         "fieldMapping": [
-          {
-            "sourceFieldDeveloperName": "Id__c",
-            "targetFieldDeveloperName": "Id__c"
-          },
-          {
-            "sourceFieldDeveloperName": "Name__c",
-            "targetFieldDeveloperName": "Name__c"
-          }
+          { "sourceFieldDeveloperName": "Id__c", "targetFieldDeveloperName": "Id__c" },
+          { "sourceFieldDeveloperName": "Name__c", "targetFieldDeveloperName": "Name__c" }
         ]
       }
     },
@@ -1114,10 +841,7 @@
             "sourceEntityDeveloperName": "Contact_Home__dll",
             "targetEntityDeveloperName": "ssot__Individual__dlm",
             "fieldMapping": [
-              {
-                "sourceFieldDeveloperName": "Id__c",
-                "targetFieldDeveloperName": "ssot__Id__c"
-              },
+              { "sourceFieldDeveloperName": "Id__c", "targetFieldDeveloperName": "ssot__Id__c" },
               {
                 "sourceFieldDeveloperName": "FirstName__c",
                 "targetFieldDeveloperName": "ssot__FirstName__c"
@@ -1151,10 +875,7 @@
             "sourceEntityDeveloperName": "Contact_Home__dll",
             "targetEntityDeveloperName": "ssot__ContactPointEmail__dlm",
             "fieldMapping": [
-              {
-                "sourceFieldDeveloperName": "Id__c",
-                "targetFieldDeveloperName": "ssot__Id__c"
-              },
+              { "sourceFieldDeveloperName": "Id__c", "targetFieldDeveloperName": "ssot__Id__c" },
               {
                 "sourceFieldDeveloperName": "Email__c",
                 "targetFieldDeveloperName": "ssot__EmailAddress__c"
@@ -1168,43 +889,34 @@
           }
         }
       }
-    }
+    },
+    "capability": "d360_dmo_mapping_create"
   },
   "d360_dmo_mapping_update": {
-    "operation": "d360_dmo_mapping_update",
     "params": {
       "mappingName": "Example_Profile_mapping",
       "body": {
         "label": "Example Profile Mapping Updated",
         "fieldMapping": [
-          {
-            "sourceFieldDeveloperName": "Id__c",
-            "targetFieldDeveloperName": "Id__c"
-          },
-          {
-            "sourceFieldDeveloperName": "Name__c",
-            "targetFieldDeveloperName": "Name__c"
-          }
+          { "sourceFieldDeveloperName": "Id__c", "targetFieldDeveloperName": "Id__c" },
+          { "sourceFieldDeveloperName": "Name__c", "targetFieldDeveloperName": "Name__c" }
         ]
       }
-    }
+    },
+    "capability": "d360_dmo_mapping_update"
   },
   "d360_dmo_field_mapping_add": {
-    "operation": "d360_dmo_field_mapping_add",
     "params": {
       "mappingName": "Example_Profile_mapping",
       "body": {
         "fieldMappings": [
-          {
-            "sourceFieldDeveloperName": "Name__c",
-            "targetFieldDeveloperName": "Name__c"
-          }
+          { "sourceFieldDeveloperName": "Name__c", "targetFieldDeveloperName": "Name__c" }
         ]
       }
-    }
+    },
+    "capability": "d360_dmo_field_mapping_add"
   },
   "d360_connection_create": {
-    "operation": "d360_connection_create",
     "params": {
       "connectorType": "ExampleConnector",
       "body": {
@@ -1212,39 +924,24 @@
         "label": "Example Connection",
         "name": "Example_Connection",
         "method": "Ingress",
-        "parameters": [
-          {
-            "paramName": "exampleHost",
-            "value": "example.invalid"
-          }
-        ],
-        "credentials": [
-          {
-            "paramName": "exampleUser",
-            "value": "example-user"
-          }
-        ]
+        "parameters": [{ "paramName": "exampleHost", "value": "example.invalid" }],
+        "credentials": [{ "paramName": "exampleUser", "value": "example-user" }]
       }
-    }
+    },
+    "capability": "d360_connection_create"
   },
   "d360_connection_update": {
-    "operation": "d360_connection_update",
     "params": {
       "connectionId": "ExampleConnectionId",
       "connectorType": "ExampleConnector",
       "body": {
         "label": "Example Connection Updated",
-        "parameters": [
-          {
-            "paramName": "exampleHost",
-            "value": "example.invalid"
-          }
-        ]
+        "parameters": [{ "paramName": "exampleHost", "value": "example.invalid" }]
       }
-    }
+    },
+    "capability": "d360_connection_update"
   },
   "d360_connection_create_snowflake": {
-    "operation": "d360_connection_create_snowflake",
     "params": {
       "body": {
         "connectorType": "SNOWFLAKE",
@@ -1252,49 +949,25 @@
         "name": "example_snowflake_connection",
         "method": "Ingress",
         "credentials": [
-          {
-            "paramName": "authenticationOption",
-            "value": "KeyPair"
-          },
-          {
-            "paramName": "user",
-            "value": "EXAMPLE_USER"
-          },
-          {
-            "paramName": "privateKey",
-            "value": "PLACEHOLDER_PRIVATE_KEY_CONTENT"
-          }
+          { "paramName": "authenticationOption", "value": "KeyPair" },
+          { "paramName": "user", "value": "EXAMPLE_USER" },
+          { "paramName": "privateKey", "value": "PLACEHOLDER_PRIVATE_KEY_CONTENT" }
         ],
         "parameters": [
-          {
-            "paramName": "hasPrivateNetworkRoute",
-            "value": "false"
-          },
-          {
-            "paramName": "accountUrl",
-            "value": "https://example.snowflakecomputing.com"
-          },
-          {
-            "paramName": "region",
-            "value": "us-west-2"
-          },
-          {
-            "paramName": "warehouse",
-            "value": "EXAMPLE_WAREHOUSE"
-          }
+          { "paramName": "hasPrivateNetworkRoute", "value": "false" },
+          { "paramName": "accountUrl", "value": "https://example.snowflakecomputing.com" },
+          { "paramName": "region", "value": "us-west-2" },
+          { "paramName": "warehouse", "value": "EXAMPLE_WAREHOUSE" }
         ]
       }
-    }
+    },
+    "capability": "d360_connection_create_snowflake"
   },
   "d360_snowflake_connection_list": {
-    "operation": "d360_snowflake_connection_list",
-    "params": {
-      "connectorType": "SNOWFLAKE",
-      "limit": 10
-    }
+    "params": { "connectorType": "SNOWFLAKE", "limit": 10 },
+    "capability": "d360_snowflake_connection_list"
   },
   "d360_ci_update": {
-    "operation": "d360_ci_update",
     "params": {
       "ciName": "Example_Score__cio",
       "body": {
@@ -1302,74 +975,63 @@
         "description": "Dry-run placeholder only. Reuse validated SQL before execution.",
         "expression": "SELECT SomeDmo__dlm.Id__c AS id__c, COUNT(*) AS count__c FROM SomeDmo__dlm GROUP BY SomeDmo__dlm.Id__c"
       }
-    }
+    },
+    "capability": "d360_ci_update"
   },
   "d360_ci_enable": {
-    "operation": "d360_ci_enable",
-    "params": {
-      "ciName": "Example_Score__cio"
-    }
+    "params": { "ciName": "Example_Score__cio" },
+    "capability": "d360_ci_enable"
   },
   "d360_ci_disable": {
-    "operation": "d360_ci_disable",
-    "params": {
-      "ciName": "Example_Score__cio"
-    }
+    "params": { "ciName": "Example_Score__cio" },
+    "capability": "d360_ci_disable"
   },
   "d360_segment_update": {
-    "operation": "d360_segment_update",
     "params": {
       "segmentId": "ExampleSegmentId",
       "body": {
         "displayName": "Example Segment Updated",
         "description": "Dry-run placeholder only."
       }
-    }
+    },
+    "capability": "d360_segment_update"
   },
   "d360_segment_deactivate": {
-    "operation": "d360_segment_deactivate",
-    "params": {
-      "segmentApiName": "Example_Segment"
-    }
+    "params": { "segmentApiName": "Example_Segment" },
+    "capability": "d360_segment_deactivate"
   },
   "d360_activation_update": {
-    "operation": "d360_activation_update",
     "params": {
       "activationId": "ExampleActivationId",
       "body": {
         "displayName": "Example Activation Updated",
         "description": "Dry-run placeholder only."
       }
-    }
+    },
+    "capability": "d360_activation_update"
   },
   "d360_activation_target_update": {
-    "operation": "d360_activation_target_update",
     "params": {
       "activationTargetId": "ExampleActivationTargetId",
       "body": {
         "displayName": "Example Activation Target Updated",
         "description": "Dry-run placeholder only."
       }
-    }
+    },
+    "capability": "d360_activation_target_update"
   },
   "d360_transform_update": {
-    "operation": "d360_transform_update",
     "params": {
       "transformId": "ExampleTransformId",
-      "body": {
-        "label": "Example Transform Updated",
-        "description": "Dry-run placeholder only."
-      }
-    }
+      "body": { "label": "Example Transform Updated", "description": "Dry-run placeholder only." }
+    },
+    "capability": "d360_transform_update"
   },
   "d360_transform_run": {
-    "operation": "d360_transform_run",
-    "params": {
-      "transformId": "ExampleTransformId"
-    }
+    "params": { "transformId": "ExampleTransformId" },
+    "capability": "d360_transform_run"
   },
   "d360_dataaction_target_update": {
-    "operation": "d360_dataaction_target_update",
     "params": {
       "dataActionTargetId": "ExampleDataActionTargetId",
       "body": {
@@ -1379,30 +1041,25 @@
           "apiContract": "ExampleContract"
         }
       }
-    }
+    },
+    "capability": "d360_dataaction_target_update"
   },
   "d360_retriever_update": {
-    "operation": "d360_retriever_update",
     "params": {
       "retrieverIdOrName": "ExampleRetriever",
-      "body": {
-        "label": "Example Retriever Updated",
-        "description": "Dry-run placeholder only."
-      }
-    }
+      "body": { "label": "Example Retriever Updated", "description": "Dry-run placeholder only." }
+    },
+    "capability": "d360_retriever_update"
   },
   "d360_retriever_config_update": {
-    "operation": "d360_retriever_config_update",
     "params": {
       "retrieverIdOrName": "ExampleRetriever",
       "configurationIdOrName": "ExampleConfiguration",
-      "body": {
-        "isActive": true
-      }
-    }
+      "body": { "isActive": true }
+    },
+    "capability": "d360_retriever_config_update"
   },
   "d360_search_index_update": {
-    "operation": "d360_search_index_update",
     "params": {
       "searchIndexApiNameOrId": "Example_Search_Index",
       "body": {
@@ -1415,41 +1072,29 @@
         "vectorDmoName": "Example Vector DMO",
         "vectorDmoDeveloperName": "Example_Vector",
         "searchType": "HYBRID",
-        "chunkingConfiguration": {
-          "fieldLevelConfigurations": []
-        },
-        "vectorEmbedding": {
-          "vectorEmbeddingRelatedFields": []
-        },
+        "chunkingConfiguration": { "fieldLevelConfigurations": [] },
+        "vectorEmbedding": { "vectorEmbeddingRelatedFields": [] },
         "vectorEmbeddingConfiguration": {
-          "embeddingModel": {
-            "id": "example_embedding_model",
-            "userValues": []
-          },
-          "index": {
-            "id": "HNSW",
-            "userValues": []
-          },
+          "embeddingModel": { "id": "example_embedding_model", "userValues": [] },
+          "index": { "id": "HNSW", "userValues": [] },
           "similarityMetric": "COSINE"
         },
         "transformConfigurations": []
       }
-    }
+    },
+    "capability": "d360_search_index_update"
   },
   "d360_datastream_update": {
-    "operation": "d360_datastream_update",
     "params": {
       "dataStreamId": "ExampleDataStreamId",
       "body": {
         "label": "Example Data Stream Updated",
-        "refreshConfig": {
-          "refreshMode": "TOTAL_REPLACE"
-        }
+        "refreshConfig": { "refreshMode": "TOTAL_REPLACE" }
       }
-    }
+    },
+    "capability": "d360_datastream_update"
   },
   "d360_ir_create": {
-    "operation": "d360_ir_create",
     "params": {
       "body": {
         "label": "Example Identity Resolution",
@@ -1479,20 +1124,16 @@
                 "fieldName": "Email__c",
                 "ruleType": "MostRecent",
                 "shouldIgnoreEmptyValue": true,
-                "sources": [
-                  {
-                    "name": "ExampleSource"
-                  }
-                ]
+                "sources": [{ "name": "ExampleSource" }]
               }
             ]
           }
         ]
       }
-    }
+    },
+    "capability": "d360_ir_create"
   },
   "d360_ir_update": {
-    "operation": "d360_ir_update",
     "params": {
       "identityResolutionId": "ExampleIdentityResolutionId",
       "body": {
@@ -1500,10 +1141,10 @@
         "description": "Dry-run placeholder only.",
         "doesRunAutomatically": false
       }
-    }
+    },
+    "capability": "d360_ir_update"
   },
   "d360_ir_full_update": {
-    "operation": "d360_ir_full_update",
     "params": {
       "identityResolutionId": "ExampleIdentityResolutionId",
       "body": {
@@ -1534,70 +1175,51 @@
                 "fieldName": "Email__c",
                 "ruleType": "MostRecent",
                 "shouldIgnoreEmptyValue": true,
-                "sources": [
-                  {
-                    "name": "ExampleSource"
-                  }
-                ]
+                "sources": [{ "name": "ExampleSource" }]
               }
             ]
           }
         ]
       }
-    }
+    },
+    "capability": "d360_ir_full_update"
   },
   "d360_ir_publish": {
-    "operation": "d360_ir_publish",
-    "params": {
-      "identityResolutionId": "ExampleIdentityResolutionId"
-    }
+    "params": { "identityResolutionId": "ExampleIdentityResolutionId" },
+    "capability": "d360_ir_publish"
   },
   "d360_ir_run": {
-    "operation": "d360_ir_run",
     "params": {
       "identityResolutionId": "ExampleIdentityResolutionId",
-      "body": {
-        "callingApp": "sf-pi",
-        "callingAppInfo": "Dry-run placeholder only."
-      }
-    }
+      "body": { "callingApp": "sf-pi", "callingAppInfo": "Dry-run placeholder only." }
+    },
+    "capability": "d360_ir_run"
   },
   "d360_dataspace_create": {
-    "operation": "d360_dataspace_create",
     "params": {
       "body": {
         "name": "Example_Data_Space",
         "label": "Example Data Space",
         "description": "Example data space payload placeholder. Verify naming and membership plan before execution."
       }
-    }
+    },
+    "capability": "d360_dataspace_create"
   },
   "d360_dataspace_update": {
-    "operation": "d360_dataspace_update",
     "params": {
       "dataSpaceName": "Example_Data_Space",
-      "body": {
-        "label": "Example Data Space Updated",
-        "description": "Dry-run placeholder only."
-      }
-    }
+      "body": { "label": "Example Data Space Updated", "description": "Dry-run placeholder only." }
+    },
+    "capability": "d360_dataspace_update"
   },
   "d360_dataspace_member_add": {
-    "operation": "d360_dataspace_member_add",
     "params": {
       "dataSpaceName": "Example_Data_Space",
-      "body": {
-        "members": [
-          {
-            "memberName": "ExampleMember",
-            "filter": []
-          }
-        ]
-      }
-    }
+      "body": { "members": [{ "memberName": "ExampleMember", "filter": [] }] }
+    },
+    "capability": "d360_dataspace_member_add"
   },
   "d360_sdm_create": {
-    "operation": "d360_sdm_create",
     "params": {
       "body": {
         "apiName": "ExampleSemanticModel",
@@ -1605,29 +1227,27 @@
         "description": "Example SDM shell placeholder. Add data objects and relationships after creation.",
         "dataspace": "default"
       }
-    }
+    },
+    "capability": "d360_sdm_create"
   },
   "d360_sdm_update": {
-    "operation": "d360_sdm_update",
     "params": {
       "modelApiNameOrId": "ExampleSemanticModel",
       "body": {
         "label": "Example Semantic Model Updated",
         "description": "Dry-run placeholder only."
       }
-    }
+    },
+    "capability": "d360_sdm_update"
   },
   "d360_sdm_clone": {
-    "operation": "d360_sdm_clone",
     "params": {
       "modelApiNameOrId": "ExampleSemanticModel",
-      "body": {
-        "apiName": "ExampleSemanticModelClone"
-      }
-    }
+      "body": { "apiName": "ExampleSemanticModelClone" }
+    },
+    "capability": "d360_sdm_clone"
   },
   "d360_sdm_data_object_create": {
-    "operation": "d360_sdm_data_object_create",
     "params": {
       "modelApiNameOrId": "ExampleSemanticModel",
       "body": {
@@ -1652,21 +1272,18 @@
           }
         }
       }
-    }
+    },
+    "capability": "d360_sdm_data_object_create"
   },
   "d360_sdm_data_object_update": {
-    "operation": "d360_sdm_data_object_update",
     "params": {
       "modelApiNameOrId": "ExampleSemanticModel",
       "dataObjectNameOrId": "ExampleIndividual",
-      "body": {
-        "label": "Example Individual Updated",
-        "shouldIncludeAllFields": true
-      }
-    }
+      "body": { "label": "Example Individual Updated", "shouldIncludeAllFields": true }
+    },
+    "capability": "d360_sdm_data_object_update"
   },
   "d360_sdm_calc_dim_create": {
-    "operation": "d360_sdm_calc_dim_create",
     "params": {
       "modelApiNameOrId": "ExampleSemanticModel",
       "body": {
@@ -1674,10 +1291,10 @@
         "expression": "IF [ExampleIndividual].[Score] > 10 THEN 'High' ELSE 'Low' END",
         "dataType": "Text"
       }
-    }
+    },
+    "capability": "d360_sdm_calc_dim_create"
   },
   "d360_sdm_calc_dim_update": {
-    "operation": "d360_sdm_calc_dim_update",
     "params": {
       "modelApiNameOrId": "ExampleSemanticModel",
       "calculatedDimensionId": "ExampleCalculatedDimensionId",
@@ -1686,10 +1303,10 @@
         "expression": "IF [ExampleIndividual].[Score] > 20 THEN 'High' ELSE 'Low' END",
         "dataType": "Text"
       }
-    }
+    },
+    "capability": "d360_sdm_calc_dim_update"
   },
   "d360_sdm_calc_measure_create": {
-    "operation": "d360_sdm_calc_measure_create",
     "params": {
       "modelApiNameOrId": "ExampleSemanticModel",
       "body": {
@@ -1698,10 +1315,10 @@
         "dataType": "Number",
         "aggregationType": "UserAgg"
       }
-    }
+    },
+    "capability": "d360_sdm_calc_measure_create"
   },
   "d360_sdm_calc_measure_update": {
-    "operation": "d360_sdm_calc_measure_update",
     "params": {
       "modelApiNameOrId": "ExampleSemanticModel",
       "calculatedMeasureId": "ExampleCalculatedMeasureId",
@@ -1711,44 +1328,32 @@
         "dataType": "Number",
         "aggregationType": "UserAgg"
       }
-    }
+    },
+    "capability": "d360_sdm_calc_measure_update"
   },
   "d360_sdm_metric_create": {
-    "operation": "d360_sdm_metric_create",
     "params": {
       "modelApiNameOrId": "ExampleSemanticModel",
       "body": {
         "name": "ExampleMetric",
         "label": "Example Metric",
-        "definition": {
-          "expression": {
-            "semanticField": {
-              "name": "Example_Total_Amount"
-            }
-          }
-        }
+        "definition": { "expression": { "semanticField": { "name": "Example_Total_Amount" } } }
       }
-    }
+    },
+    "capability": "d360_sdm_metric_create"
   },
   "d360_sdm_metric_update": {
-    "operation": "d360_sdm_metric_update",
     "params": {
       "modelApiNameOrId": "ExampleSemanticModel",
       "metricNameOrId": "ExampleMetric",
       "body": {
         "label": "Example Metric Updated",
-        "definition": {
-          "expression": {
-            "semanticField": {
-              "name": "Example_Total_Amount"
-            }
-          }
-        }
+        "definition": { "expression": { "semanticField": { "name": "Example_Total_Amount" } } }
       }
-    }
+    },
+    "capability": "d360_sdm_metric_update"
   },
   "d360_sdm_relationship_create": {
-    "operation": "d360_sdm_relationship_create",
     "params": {
       "modelApiNameOrId": "ExampleSemanticModel",
       "body": {
@@ -1769,10 +1374,10 @@
           ]
         }
       }
-    }
+    },
+    "capability": "d360_sdm_relationship_create"
   },
   "d360_sdm_relationship_update": {
-    "operation": "d360_sdm_relationship_update",
     "params": {
       "modelApiNameOrId": "ExampleSemanticModel",
       "relationshipId": "ExampleRelationshipId",
@@ -1792,35 +1397,27 @@
           ]
         }
       }
-    }
+    },
+    "capability": "d360_sdm_relationship_update"
   },
   "d360_sdm_query": {
-    "operation": "d360_sdm_query",
     "params": {
       "body": {
         "semanticModelId": "ExampleSemanticModel",
         "structuredSemanticQuery": {
           "fields": [
             {
-              "expression": {
-                "semanticField": {
-                  "name": "ExampleMetric"
-                }
-              },
+              "expression": { "semanticField": { "name": "ExampleMetric" } },
               "alias": "exampleMetric"
             }
           ],
-          "options": {
-            "limitOptions": {
-              "limit": 10
-            }
-          }
+          "options": { "limitOptions": { "limit": 10 } }
         }
       }
-    }
+    },
+    "capability": "d360_sdm_query"
   },
   "d360_datakit_deploy": {
-    "operation": "d360_datakit_deploy",
     "params": {
       "body": {
         "components": [
@@ -1834,340 +1431,210 @@
           }
         ]
       }
-    }
+    },
+    "capability": "d360_datakit_deploy"
   },
-  "d360_datakit_list": {
-    "operation": "d360_datakit_list",
-    "params": {
-      "limit": 10
-    }
-  },
+  "d360_datakit_list": { "params": { "limit": 10 }, "capability": "d360_datakit_list" },
   "d360_metadata": {
-    "operation": "d360_metadata",
-    "params": {
-      "entityName": "ssot__Individual__dlm",
-      "entityType": "DataModelObject"
-    }
+    "params": { "entityName": "ssot__Individual__dlm", "entityType": "DataModelObject" },
+    "capability": "d360_metadata"
   },
   "d360_datagraph_lookup": {
-    "operation": "d360_datagraph_lookup",
-    "params": {
-      "entity": "ExampleDataGraph",
-      "lookupKeys": "ExampleLookupKey",
-      "limit": 10
-    }
+    "params": { "entity": "ExampleDataGraph", "lookupKeys": "ExampleLookupKey", "limit": 10 },
+    "capability": "d360_datagraph_lookup"
   },
   "d360_standard_mapping_create": {
-    "operation": "d360_standard_mapping_create",
     "params": {
       "body": {
         "sourceEntityDeveloperName": "Example_Profile__dll",
         "targetEntityDeveloperName": "Example_Profile__dlm",
         "fieldMapping": [
-          {
-            "sourceFieldDeveloperName": "Id__c",
-            "targetFieldDeveloperName": "Id__c"
-          },
-          {
-            "sourceFieldDeveloperName": "Name__c",
-            "targetFieldDeveloperName": "Name__c"
-          }
+          { "sourceFieldDeveloperName": "Id__c", "targetFieldDeveloperName": "Id__c" },
+          { "sourceFieldDeveloperName": "Name__c", "targetFieldDeveloperName": "Name__c" }
         ]
       }
-    }
+    },
+    "capability": "d360_standard_mapping_create"
   },
   "d360_query_sql_cancel": {
-    "operation": "d360_query_sql_cancel",
-    "params": {
-      "queryId": "ExampleQueryId"
-    }
+    "params": { "queryId": "ExampleQueryId" },
+    "capability": "d360_query_sql_cancel"
   },
   "d360_dmo_delete": {
-    "operation": "d360_dmo_delete",
-    "params": {
-      "dmoName": "Example_Profile__dlm"
-    }
+    "params": { "dmoName": "Example_Profile__dlm" },
+    "capability": "d360_dmo_delete"
   },
   "d360_dlo_delete": {
-    "operation": "d360_dlo_delete",
-    "params": {
-      "dloName": "Example_Profile__dll"
-    }
+    "params": { "dloName": "Example_Profile__dll" },
+    "capability": "d360_dlo_delete"
   },
   "d360_dmo_mapping_delete": {
-    "operation": "d360_dmo_mapping_delete",
-    "params": {
-      "mappingName": "Example_Profile_mapping"
-    }
+    "params": { "mappingName": "Example_Profile_mapping" },
+    "capability": "d360_dmo_mapping_delete"
   },
   "d360_dmo_field_mapping_delete": {
-    "operation": "d360_dmo_field_mapping_delete",
     "params": {
       "mappingName": "Example_Profile_mapping",
       "fieldMappingName": "Name__c_fieldmap_Name__c"
-    }
+    },
+    "capability": "d360_dmo_field_mapping_delete"
   },
   "d360_datastream_delete": {
-    "operation": "d360_datastream_delete",
-    "params": {
-      "dataStreamId": "ExampleDataStreamId",
-      "shouldDeleteDataLakeObject": false
-    }
+    "params": { "dataStreamId": "ExampleDataStreamId", "shouldDeleteDataLakeObject": false },
+    "capability": "d360_datastream_delete"
   },
   "d360_connection_delete": {
-    "operation": "d360_connection_delete",
-    "params": {
-      "connectionId": "ExampleConnectionId",
-      "connectorType": "ExampleConnector"
-    }
+    "params": { "connectionId": "ExampleConnectionId", "connectorType": "ExampleConnector" },
+    "capability": "d360_connection_delete"
   },
   "d360_segment_delete": {
-    "operation": "d360_segment_delete",
-    "params": {
-      "segmentApiName": "Example_Segment"
-    }
+    "params": { "segmentApiName": "Example_Segment" },
+    "capability": "d360_segment_delete"
   },
   "d360_ci_delete": {
-    "operation": "d360_ci_delete",
-    "params": {
-      "ciName": "Example_Score__cio"
-    }
+    "params": { "ciName": "Example_Score__cio" },
+    "capability": "d360_ci_delete"
   },
   "d360_ir_delete": {
-    "operation": "d360_ir_delete",
-    "params": {
-      "identityResolutionId": "ExampleIdentityResolutionId"
-    }
+    "params": { "identityResolutionId": "ExampleIdentityResolutionId" },
+    "capability": "d360_ir_delete"
   },
   "d360_activation_delete": {
-    "operation": "d360_activation_delete",
-    "params": {
-      "activationId": "ExampleActivationId"
-    }
+    "params": { "activationId": "ExampleActivationId" },
+    "capability": "d360_activation_delete"
   },
   "d360_activation_target_delete": {
-    "operation": "d360_activation_target_delete",
-    "params": {
-      "activationTargetId": "ExampleActivationTargetId"
-    }
+    "params": { "activationTargetId": "ExampleActivationTargetId" },
+    "capability": "d360_activation_target_delete"
   },
   "d360_dataspace_delete": {
-    "operation": "d360_dataspace_delete",
-    "params": {
-      "dataSpaceName": "Example_Data_Space"
-    }
+    "params": { "dataSpaceName": "Example_Data_Space" },
+    "capability": "d360_dataspace_delete"
   },
   "d360_dataspace_member_remove": {
-    "operation": "d360_dataspace_member_remove",
-    "params": {
-      "dataSpaceName": "Example_Data_Space",
-      "memberId": "ExampleMemberId"
-    }
+    "params": { "dataSpaceName": "Example_Data_Space", "memberId": "ExampleMemberId" },
+    "capability": "d360_dataspace_member_remove"
   },
   "d360_transform_delete": {
-    "operation": "d360_transform_delete",
-    "params": {
-      "transformId": "ExampleTransformId"
-    }
+    "params": { "transformId": "ExampleTransformId" },
+    "capability": "d360_transform_delete"
   },
   "d360_datakit_undeploy": {
-    "operation": "d360_datakit_undeploy",
     "params": {
       "dataKitId": "ExampleDataKitId",
       "body": {
-        "components": [
-          {
-            "type": "SemanticModel",
-            "details": {
-              "name": "ExampleSemanticModel"
-            }
-          }
-        ]
+        "components": [{ "type": "SemanticModel", "details": { "name": "ExampleSemanticModel" } }]
       }
-    }
+    },
+    "capability": "d360_datakit_undeploy"
   },
   "d360_dataaction_target_delete": {
-    "operation": "d360_dataaction_target_delete",
-    "params": {
-      "dataActionTargetId": "ExampleDataActionTargetId"
-    }
+    "params": { "dataActionTargetId": "ExampleDataActionTargetId" },
+    "capability": "d360_dataaction_target_delete"
   },
   "d360_sdm_delete": {
-    "operation": "d360_sdm_delete",
-    "params": {
-      "modelApiNameOrId": "ExampleSemanticModel"
-    }
+    "params": { "modelApiNameOrId": "ExampleSemanticModel" },
+    "capability": "d360_sdm_delete"
   },
   "d360_sdm_data_object_delete": {
-    "operation": "d360_sdm_data_object_delete",
     "params": {
       "modelApiNameOrId": "ExampleSemanticModel",
       "dataObjectNameOrId": "ExampleIndividual"
-    }
+    },
+    "capability": "d360_sdm_data_object_delete"
   },
   "d360_sdm_calc_dim_delete": {
-    "operation": "d360_sdm_calc_dim_delete",
     "params": {
       "modelApiNameOrId": "ExampleSemanticModel",
       "calculatedDimensionId": "ExampleCalculatedDimensionId"
-    }
+    },
+    "capability": "d360_sdm_calc_dim_delete"
   },
   "d360_sdm_calc_measure_delete": {
-    "operation": "d360_sdm_calc_measure_delete",
     "params": {
       "modelApiNameOrId": "ExampleSemanticModel",
       "calculatedMeasureId": "ExampleCalculatedMeasureId"
-    }
+    },
+    "capability": "d360_sdm_calc_measure_delete"
   },
   "d360_sdm_metric_delete": {
-    "operation": "d360_sdm_metric_delete",
-    "params": {
-      "modelApiNameOrId": "ExampleSemanticModel",
-      "metricNameOrId": "ExampleMetric"
-    }
+    "params": { "modelApiNameOrId": "ExampleSemanticModel", "metricNameOrId": "ExampleMetric" },
+    "capability": "d360_sdm_metric_delete"
   },
   "d360_sdm_relationship_delete": {
-    "operation": "d360_sdm_relationship_delete",
     "params": {
       "modelApiNameOrId": "ExampleSemanticModel",
       "relationshipId": "ExampleRelationshipId"
-    }
+    },
+    "capability": "d360_sdm_relationship_delete"
   },
   "d360_search_index_delete": {
-    "operation": "d360_search_index_delete",
-    "params": {
-      "searchIndexApiNameOrId": "Example_Search_Index"
-    }
+    "params": { "searchIndexApiNameOrId": "Example_Search_Index" },
+    "capability": "d360_search_index_delete"
   },
   "d360_retriever_delete": {
-    "operation": "d360_retriever_delete",
-    "params": {
-      "retrieverIdOrName": "ExampleRetriever"
-    }
+    "params": { "retrieverIdOrName": "ExampleRetriever" },
+    "capability": "d360_retriever_delete"
   },
   "d360_retriever_config_delete": {
-    "operation": "d360_retriever_config_delete",
     "params": {
       "retrieverIdOrName": "ExampleRetriever",
       "configurationIdOrName": "ExampleConfiguration"
-    }
+    },
+    "capability": "d360_retriever_config_delete"
   },
   "d360_standard_mapping_preview": {
-    "operation": "d360_standard_mapping_preview",
-    "params": {
-      "sourceObjectName": "Account",
-      "targetDmoName": "AccountDmo"
-    }
+    "params": { "sourceObjectName": "Account", "targetDmoName": "AccountDmo" },
+    "capability": "d360_standard_mapping_preview"
   },
   "d360_preview_field_matches": {
-    "operation": "d360_preview_field_matches",
     "params": {
       "sourceFields": [
-        {
-          "name": "Id__c",
-          "label": "Id",
-          "dataType": "Text"
-        },
-        {
-          "name": "Name__c",
-          "label": "Name",
-          "dataType": "Text"
-        },
-        {
-          "name": "CreatedDate__c",
-          "label": "Created Date",
-          "dataType": "DateTime"
-        }
+        { "name": "Id__c", "label": "Id", "dataType": "Text" },
+        { "name": "Name__c", "label": "Name", "dataType": "Text" },
+        { "name": "CreatedDate__c", "label": "Created Date", "dataType": "DateTime" }
       ],
       "targetFields": [
-        {
-          "name": "Id__c",
-          "label": "Id",
-          "dataType": "Text"
-        },
-        {
-          "name": "Name__c",
-          "label": "Name",
-          "dataType": "Text"
-        },
-        {
-          "name": "CreatedDate__c",
-          "label": "Created Date",
-          "dataType": "DateTime"
-        }
+        { "name": "Id__c", "label": "Id", "dataType": "Text" },
+        { "name": "Name__c", "label": "Name", "dataType": "Text" },
+        { "name": "CreatedDate__c", "label": "Created Date", "dataType": "DateTime" }
       ],
       "sourceDloName": "Example_Profile__dll",
       "targetDmoName": "Example_Profile__dlm",
       "threshold": 0.45
-    }
+    },
+    "capability": "d360_preview_field_matches"
   },
   "d360_smart_mapping_suggest": {
-    "operation": "d360_smart_mapping_suggest",
     "params": {
       "sourceFields": [
-        {
-          "name": "Id__c",
-          "label": "Id",
-          "dataType": "Text"
-        },
-        {
-          "name": "Name__c",
-          "label": "Name",
-          "dataType": "Text"
-        },
-        {
-          "name": "CreatedDate__c",
-          "label": "Created Date",
-          "dataType": "DateTime"
-        }
+        { "name": "Id__c", "label": "Id", "dataType": "Text" },
+        { "name": "Name__c", "label": "Name", "dataType": "Text" },
+        { "name": "CreatedDate__c", "label": "Created Date", "dataType": "DateTime" }
       ],
       "targetFields": [
-        {
-          "name": "Id__c",
-          "label": "Id",
-          "dataType": "Text"
-        },
-        {
-          "name": "Name__c",
-          "label": "Name",
-          "dataType": "Text"
-        },
-        {
-          "name": "CreatedDate__c",
-          "label": "Created Date",
-          "dataType": "DateTime"
-        }
+        { "name": "Id__c", "label": "Id", "dataType": "Text" },
+        { "name": "Name__c", "label": "Name", "dataType": "Text" },
+        { "name": "CreatedDate__c", "label": "Created Date", "dataType": "DateTime" }
       ],
       "sourceDloName": "Example_Profile__dll",
       "targetDmoName": "Example_Profile__dlm",
       "threshold": 0.45
-    }
+    },
+    "capability": "d360_smart_mapping_suggest"
   },
   "d360_event_date_recommend": {
-    "operation": "d360_event_date_recommend",
     "params": {
       "category": "Engagement",
       "fields": [
-        {
-          "name": "Id__c",
-          "label": "Id",
-          "dataType": "Text"
-        },
-        {
-          "name": "Name__c",
-          "label": "Name",
-          "dataType": "Text"
-        },
-        {
-          "name": "CreatedDate__c",
-          "label": "Created Date",
-          "dataType": "DateTime"
-        }
+        { "name": "Id__c", "label": "Id", "dataType": "Text" },
+        { "name": "Name__c", "label": "Name", "dataType": "Text" },
+        { "name": "CreatedDate__c", "label": "Created Date", "dataType": "DateTime" }
       ]
-    }
+    },
+    "capability": "d360_event_date_recommend"
   },
   "d360_smart_datastream_create": {
-    "operation": "d360_smart_datastream_create",
     "params": {
       "body": {
         "name": "Example_Engagement_Stream",
@@ -2179,21 +1646,9 @@
           "category": "Engagement"
         },
         "sourceFields": [
-          {
-            "name": "Id__c",
-            "label": "Id",
-            "dataType": "Text"
-          },
-          {
-            "name": "Name__c",
-            "label": "Name",
-            "dataType": "Text"
-          },
-          {
-            "name": "CreatedDate__c",
-            "label": "Created Date",
-            "dataType": "DateTime"
-          }
+          { "name": "Id__c", "label": "Id", "dataType": "Text" },
+          { "name": "Name__c", "label": "Name", "dataType": "Text" },
+          { "name": "CreatedDate__c", "label": "Created Date", "dataType": "DateTime" }
         ]
       },
       "autoSelectEventDate": true
@@ -2216,26 +1671,10 @@
             "dataLakeObjectInfo": {
               "category": "Engagement",
               "dataLakeFieldInfoRepresentation": [
-                {
-                  "dataType": "Text",
-                  "name": "Id",
-                  "isPrimaryKey": true
-                },
-                {
-                  "dataType": "DateTime",
-                  "name": "CreatedDate",
-                  "isPrimaryKey": false
-                },
-                {
-                  "dataType": "DateTime",
-                  "name": "ActivityDate",
-                  "isPrimaryKey": false
-                },
-                {
-                  "dataType": "DateTime",
-                  "name": "LastModifiedDate",
-                  "isPrimaryKey": false
-                }
+                { "dataType": "Text", "name": "Id", "isPrimaryKey": true },
+                { "dataType": "DateTime", "name": "CreatedDate", "isPrimaryKey": false },
+                { "dataType": "DateTime", "name": "ActivityDate", "isPrimaryKey": false },
+                { "dataType": "DateTime", "name": "LastModifiedDate", "isPrimaryKey": false }
               ]
             },
             "dataAccessMode": "INGEST"
@@ -2244,6 +1683,7 @@
           "_note": "Pass an Engagement data stream body and the tool will analyze date fields, rank them, and inject the best eventDateColumn (e.g., CreatedDate over LastModifiedDate)."
         }
       }
-    }
+    },
+    "capability": "d360_smart_datastream_create"
   }
 }

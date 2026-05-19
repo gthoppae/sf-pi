@@ -48,6 +48,7 @@ export interface D360CardRequest {
   apiVersion?: string;
   orgType?: string;
   safety?: string;
+  capability?: string;
   operation?: string;
   /** JSON payload/body. Use null for an explicit empty body. */
   payload?: unknown;
@@ -277,7 +278,11 @@ function buildHeaderLines(card: D360ResultCard): string[] {
     request?.targetOrg ? `Target: ${request.targetOrg}` : undefined,
     request?.apiVersion ? `API v${request.apiVersion}` : undefined,
     request?.orgType,
-    request?.operation ? `Operation: ${request.operation}` : undefined,
+    request?.capability
+      ? `Capability: ${request.capability}`
+      : request?.operation
+        ? `Operation: ${request.operation}`
+        : undefined,
     request?.safety ? `Safety: ${request.safety}` : undefined,
   ].filter((value): value is string => Boolean(value));
   if (details.length) lines.push(details.join(" · "));

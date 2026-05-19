@@ -66,7 +66,9 @@ describe("d360 capability execution", () => {
         name: "agent_observability.stdm_session_timeline",
         kind: "runbook",
       }),
-      example: expect.objectContaining({ runbook: "agent_observability.stdm_session_timeline" }),
+      example: expect.objectContaining({
+        capability: "agent_observability.stdm_session_timeline",
+      }),
     });
   });
 

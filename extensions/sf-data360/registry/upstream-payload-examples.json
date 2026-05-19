@@ -74,39 +74,21 @@
   "d360_sdm_query": {
     "semanticModelId": "0163L000000TMKDQA4",
     "structuredSemanticQuery": {
-      "options": {
-        "limitOptions": {
-          "limit": 100
-        }
-      },
+      "options": { "limitOptions": { "limit": 100 } },
       "fields": [
         {
           "rowGrouping": true,
-          "expression": {
-            "tableField": {
-              "name": "Region",
-              "tableName": "Account"
-            }
-          },
+          "expression": { "tableField": { "name": "Region", "tableName": "Account" } },
           "alias": "Region"
         },
         {
           "semanticAggregationMethod": "SEMANTIC_AGGREGATION_METHOD_SUM",
-          "expression": {
-            "tableField": {
-              "name": "AnnualRevenue",
-              "tableName": "Account"
-            }
-          },
+          "expression": { "tableField": { "name": "AnnualRevenue", "tableName": "Account" } },
           "alias": "TotalRevenue"
         },
         {
           "rowGrouping": true,
-          "expression": {
-            "semanticField": {
-              "name": "Revenue_Tier"
-            }
-          },
+          "expression": { "semanticField": { "name": "Revenue_Tier" } },
           "alias": "RevenueSegment"
         }
       ]
@@ -155,40 +137,19 @@
           {
             "fieldName": "ssot__Id__c",
             "ruleType": "sourcesequence",
-            "sources": [
-              {
-                "name": "Contact_Home__dll"
-              },
-              {
-                "name": "CustomerStream__dll"
-              }
-            ],
+            "sources": [{ "name": "Contact_Home__dll" }, { "name": "CustomerStream__dll" }],
             "shouldIgnoreEmptyValue": true
           }
         ],
         "entityName": "ssot__Individual__dlm",
         "ruleType": "sourcesequence",
-        "sources": [
-          {
-            "name": "Contact_Home__dll"
-          },
-          {
-            "name": "CustomerStream__dll"
-          }
-        ],
+        "sources": [{ "name": "Contact_Home__dll" }, { "name": "CustomerStream__dll" }],
         "shouldIgnoreEmptyValue": true
       },
       {
         "entityName": "ssot__ContactPointEmail__dlm",
         "ruleType": "sourcesequence",
-        "sources": [
-          {
-            "name": "Contact_Home__dll"
-          },
-          {
-            "name": "CustomerStream__dll"
-          }
-        ],
+        "sources": [{ "name": "Contact_Home__dll" }, { "name": "CustomerStream__dll" }],
         "shouldIgnoreEmptyValue": true
       }
     ],
@@ -196,7 +157,7 @@
     "configurationType": "individual",
     "rulesetId": "sufx",
     "doesRunAutomatically": false,
-    "_note": "configurationType REQUIRED: 'individual' or 'account'. matchMethodType values: exact, exactnormalized, fuzzy, fuzzyhigh, fuzzylow. reconciliationRules ruleType values: lastupdated (requires LastModifiedDate mapped), mostfrequent, sourcesequence. IMPORTANT: every reconciliationRule MUST include ruleType \u2014 omitting it causes a server 500. For lastupdated, the DMO must have ssot__LastModifiedDate__c mapped; use sourcesequence if not.",
+    "_note": "configurationType REQUIRED: 'individual' or 'account'. matchMethodType values: exact, exactnormalized, fuzzy, fuzzyhigh, fuzzylow. reconciliationRules ruleType values: lastupdated (requires LastModifiedDate mapped), mostfrequent, sourcesequence. IMPORTANT: every reconciliationRule MUST include ruleType — omitting it causes a server 500. For lastupdated, the DMO must have ssot__LastModifiedDate__c mapped; use sourcesequence if not.",
     "label": "Email and Name Matching"
   },
   "d360_transform_create": {
@@ -209,23 +170,11 @@
     "name": "Send High Value Customers to Salesforce",
     "segmentId": "seg_000000000001",
     "targetId": "target_000000000001",
-    "schedule": {
-      "frequency": "DAILY",
-      "time": "02:00"
-    },
+    "schedule": { "frequency": "DAILY", "time": "02:00" },
     "mappings": [
-      {
-        "segment_field": "individual_id",
-        "target_field": "Individual_ID__c"
-      },
-      {
-        "segment_field": "AnnualRevenue__c",
-        "target_field": "Customer_Revenue__c"
-      },
-      {
-        "segment_field": "Tier",
-        "target_field": "Segment_Tier__c"
-      }
+      { "segment_field": "individual_id", "target_field": "Individual_ID__c" },
+      { "segment_field": "AnnualRevenue__c", "target_field": "Customer_Revenue__c" },
+      { "segment_field": "Tier", "target_field": "Segment_Tier__c" }
     ]
   },
   "d360_dmo_create_profile": {
@@ -241,12 +190,7 @@
         "label": "ID",
         "dataType": "Text"
       },
-      {
-        "name": "MetricName__c",
-        "label": "Metric Name",
-        "dataType": "Text",
-        "isRequired": true
-      },
+      { "name": "MetricName__c", "label": "Metric Name", "dataType": "Text", "isRequired": true },
       {
         "precision": 18,
         "name": "MetricValue__c",
@@ -254,11 +198,7 @@
         "label": "Metric Value",
         "dataType": "Number"
       },
-      {
-        "label": "Calculation Date",
-        "name": "CalculationDate__c",
-        "dataType": "DateTime"
-      }
+      { "label": "Calculation Date", "name": "CalculationDate__c", "dataType": "DateTime" }
     ]
   },
   "d360_dmo_create_engagement": {
@@ -274,27 +214,10 @@
         "isPrimaryKey": true,
         "isRequired": true
       },
-      {
-        "name": "ContactId__c",
-        "label": "Contact ID",
-        "dataType": "Text",
-        "isRequired": true
-      },
-      {
-        "label": "Page URL",
-        "name": "PageUrl__c",
-        "dataType": "Text"
-      },
-      {
-        "label": "Event Type",
-        "name": "EventType__c",
-        "dataType": "Text"
-      },
-      {
-        "label": "Created Date",
-        "name": "CreatedDate__c",
-        "dataType": "DateTime"
-      },
+      { "name": "ContactId__c", "label": "Contact ID", "dataType": "Text", "isRequired": true },
+      { "label": "Page URL", "name": "PageUrl__c", "dataType": "Text" },
+      { "label": "Event Type", "name": "EventType__c", "dataType": "Text" },
+      { "label": "Created Date", "name": "CreatedDate__c", "dataType": "DateTime" },
       {
         "precision": 10,
         "name": "Duration__c",
@@ -318,43 +241,18 @@
         "isPrimaryKey": true,
         "isRequired": true
       },
-      {
-        "name": "ProductName__c",
-        "label": "Product Name",
-        "dataType": "Text",
-        "isRequired": true
-      },
-      {
-        "label": "Category",
-        "name": "Category__c",
-        "dataType": "Text"
-      },
-      {
-        "precision": 18,
-        "name": "Price__c",
-        "scale": 2,
-        "label": "Price",
-        "dataType": "Number"
-      },
-      {
-        "label": "Is Active",
-        "name": "IsActive__c",
-        "dataType": "Text"
-      }
+      { "name": "ProductName__c", "label": "Product Name", "dataType": "Text", "isRequired": true },
+      { "label": "Category", "name": "Category__c", "dataType": "Text" },
+      { "precision": 18, "name": "Price__c", "scale": 2, "label": "Price", "dataType": "Number" },
+      { "label": "Is Active", "name": "IsActive__c", "dataType": "Text" }
     ]
   },
   "d360_dmo_mapping_create": {
     "sourceEntityDeveloperName": "Account_00D000000000000__dll",
     "targetEntityDeveloperName": "ssot__Account__dlm",
     "fieldMapping": [
-      {
-        "sourceFieldDeveloperName": "Id__c",
-        "targetFieldDeveloperName": "ssot__Id__c"
-      },
-      {
-        "sourceFieldDeveloperName": "Name__c",
-        "targetFieldDeveloperName": "ssot__Name__c"
-      },
+      { "sourceFieldDeveloperName": "Id__c", "targetFieldDeveloperName": "ssot__Id__c" },
+      { "sourceFieldDeveloperName": "Name__c", "targetFieldDeveloperName": "ssot__Name__c" },
       {
         "sourceFieldDeveloperName": "Industry__c",
         "targetFieldDeveloperName": "ssot__Industry__c"
@@ -375,25 +273,16 @@
         "sourceFieldDeveloperName": "BillingState__c",
         "targetFieldDeveloperName": "ssot__BillingState__c"
       },
-      {
-        "sourceFieldDeveloperName": "Phone__c",
-        "targetFieldDeveloperName": "ssot__Phone__c"
-      },
-      {
-        "sourceFieldDeveloperName": "Website__c",
-        "targetFieldDeveloperName": "ssot__Website__c"
-      }
+      { "sourceFieldDeveloperName": "Phone__c", "targetFieldDeveloperName": "ssot__Phone__c" },
+      { "sourceFieldDeveloperName": "Website__c", "targetFieldDeveloperName": "ssot__Website__c" }
     ],
-    "_note": "IMPORTANT: dataspace query param is REQUIRED (pass via 'dataspace' tool parameter). DLO field names include __c suffix (e.g., Id__c not Id). Use d360_dlo_get to get exact field names. For custom DMOs, you must create the DMO with explicit dataSpaceName first \u2014 otherwise the mapping API returns 'DMO not found'. System fields (DataSource__c, DataSourceObject__c, KQ_*) are auto-added."
+    "_note": "IMPORTANT: dataspace query param is REQUIRED (pass via 'dataspace' tool parameter). DLO field names include __c suffix (e.g., Id__c not Id). Use d360_dlo_get to get exact field names. For custom DMOs, you must create the DMO with explicit dataSpaceName first — otherwise the mapping API returns 'DMO not found'. System fields (DataSource__c, DataSourceObject__c, KQ_*) are auto-added."
   },
   "d360_dmo_mapping_create_contact": {
     "sourceEntityDeveloperName": "Contact_Home__dll",
     "targetEntityDeveloperName": "ssot__Individual__dlm",
     "fieldMapping": [
-      {
-        "sourceFieldDeveloperName": "Id__c",
-        "targetFieldDeveloperName": "ssot__Id__c"
-      },
+      { "sourceFieldDeveloperName": "Id__c", "targetFieldDeveloperName": "ssot__Id__c" },
       {
         "sourceFieldDeveloperName": "FirstName__c",
         "targetFieldDeveloperName": "ssot__FirstName__c"
@@ -410,61 +299,34 @@
         "sourceFieldDeveloperName": "Birthdate__c",
         "targetFieldDeveloperName": "ssot__BirthDate__c"
       },
-      {
-        "sourceFieldDeveloperName": "Title__c",
-        "targetFieldDeveloperName": "ssot__TitleName__c"
-      }
+      { "sourceFieldDeveloperName": "Title__c", "targetFieldDeveloperName": "ssot__TitleName__c" }
     ]
   },
   "d360_dmo_mapping_create_contact_point_email": {
     "sourceEntityDeveloperName": "Contact_Home__dll",
     "targetEntityDeveloperName": "ssot__ContactPointEmail__dlm",
     "fieldMapping": [
-      {
-        "sourceFieldDeveloperName": "Id__c",
-        "targetFieldDeveloperName": "ssot__Id__c"
-      },
+      { "sourceFieldDeveloperName": "Id__c", "targetFieldDeveloperName": "ssot__Id__c" },
       {
         "sourceFieldDeveloperName": "Email__c",
         "targetFieldDeveloperName": "ssot__EmailAddress__c"
       },
-      {
-        "sourceFieldDeveloperName": "Id__c",
-        "targetFieldDeveloperName": "ssot__PartyId__c"
-      }
+      { "sourceFieldDeveloperName": "Id__c", "targetFieldDeveloperName": "ssot__PartyId__c" }
     ],
     "_note": "For ContactPointEmail, map the source person ID to both ssot__Id__c and ssot__PartyId__c. The PartyId links the email to the Individual for identity resolution. KQ_PartyId__c is auto-added."
   },
   "d360_datastream_create_sfdc_profile": {
     "connectorInfo": {
       "connectorType": "SalesforceDotCom",
-      "connectorDetails": {
-        "sourceObject": "Account",
-        "name": "SalesforceDotCom_00D000000000000"
-      }
+      "connectorDetails": { "sourceObject": "Account", "name": "SalesforceDotCom_00D000000000000" }
     },
     "dataAccessMode": "INGEST",
     "dataLakeObjectInfo": {
       "category": "Profile",
       "dataLakeFieldInfoRepresentation": [
-        {
-          "name": "Id",
-          "dataType": "Text",
-          "label": "Account ID",
-          "isPrimaryKey": true
-        },
-        {
-          "name": "Name",
-          "dataType": "Text",
-          "label": "Account Name",
-          "isPrimaryKey": false
-        },
-        {
-          "name": "Industry",
-          "dataType": "Text",
-          "label": "Industry",
-          "isPrimaryKey": false
-        },
+        { "name": "Id", "dataType": "Text", "label": "Account ID", "isPrimaryKey": true },
+        { "name": "Name", "dataType": "Text", "label": "Account Name", "isPrimaryKey": false },
+        { "name": "Industry", "dataType": "Text", "label": "Industry", "isPrimaryKey": false },
         {
           "name": "AnnualRevenue",
           "dataType": "Number",
@@ -493,11 +355,7 @@
     },
     "label": "Account Data Stream",
     "refreshConfig": {
-      "frequency": {
-        "hours": [],
-        "refreshDayOfMonth": [],
-        "frequencyType": "BATCH"
-      },
+      "frequency": { "hours": [], "refreshDayOfMonth": [], "frequencyType": "BATCH" },
       "hasHeaders": false,
       "isAccelerationEnabled": false,
       "refreshMode": "UPSERT",
@@ -509,40 +367,17 @@
   "d360_datastream_create_sfdc_engagement": {
     "connectorInfo": {
       "connectorType": "SalesforceDotCom",
-      "connectorDetails": {
-        "sourceObject": "Task",
-        "name": "SalesforceDotCom_00D000000000000"
-      }
+      "connectorDetails": { "sourceObject": "Task", "name": "SalesforceDotCom_00D000000000000" }
     },
     "dataAccessMode": "INGEST",
     "dataLakeObjectInfo": {
       "category": "Engagement",
       "eventDateColumn": "CreatedDate",
       "dataLakeFieldInfoRepresentation": [
-        {
-          "name": "Id",
-          "dataType": "Text",
-          "label": "Task ID",
-          "isPrimaryKey": true
-        },
-        {
-          "name": "WhoId",
-          "dataType": "Text",
-          "label": "Who ID",
-          "isPrimaryKey": false
-        },
-        {
-          "name": "Subject",
-          "dataType": "Text",
-          "label": "Subject",
-          "isPrimaryKey": false
-        },
-        {
-          "name": "Status",
-          "dataType": "Text",
-          "label": "Status",
-          "isPrimaryKey": false
-        },
+        { "name": "Id", "dataType": "Text", "label": "Task ID", "isPrimaryKey": true },
+        { "name": "WhoId", "dataType": "Text", "label": "Who ID", "isPrimaryKey": false },
+        { "name": "Subject", "dataType": "Text", "label": "Subject", "isPrimaryKey": false },
+        { "name": "Status", "dataType": "Text", "label": "Status", "isPrimaryKey": false },
         {
           "name": "CreatedDate",
           "dataType": "DateTime",
@@ -565,71 +400,31 @@
     },
     "label": "Task Engagement Stream",
     "refreshConfig": {
-      "frequency": {
-        "hours": [],
-        "refreshDayOfMonth": [],
-        "frequencyType": "BATCH"
-      },
+      "frequency": { "hours": [], "refreshDayOfMonth": [], "frequencyType": "BATCH" },
       "hasHeaders": false,
       "isAccelerationEnabled": false,
       "refreshMode": "UPSERT",
       "shouldFetchImmediately": false,
       "shouldTreatMissingFilesAsFailures": false
     },
-    "_note": "CRITICAL: Engagement streams MUST set eventDateColumn to an immutable date field (like CreatedDate). Do NOT use LastModifiedDate \u2014 it changes on updates and breaks time-series partitioning. Use d360_smart_datastream to auto-select the best field."
+    "_note": "CRITICAL: Engagement streams MUST set eventDateColumn to an immutable date field (like CreatedDate). Do NOT use LastModifiedDate — it changes on updates and breaks time-series partitioning. Use d360_smart_datastream to auto-select the best field."
   },
   "d360_datastream_create_csv": {
-    "advancedAttributes": {
-      "fileType": "CSV",
-      "delimiter": ",",
-      "fileName": "customers-100.csv"
-    },
+    "advancedAttributes": { "fileType": "CSV", "delimiter": ",", "fileName": "customers-100.csv" },
     "connectorInfo": {
       "connectorType": "UploadedFiles",
-      "connectorDetails": {
-        "name": "UploadedFiles"
-      }
+      "connectorDetails": { "name": "UploadedFiles" }
     },
     "dataAccessMode": "INGEST",
     "dataLakeObjectInfo": {
       "category": "Profile",
       "dataLakeFieldInfoRepresentation": [
-        {
-          "name": "Customer_Id",
-          "dataType": "Text",
-          "label": "Customer Id",
-          "isPrimaryKey": true
-        },
-        {
-          "name": "First_Name",
-          "dataType": "Text",
-          "label": "First Name",
-          "isPrimaryKey": false
-        },
-        {
-          "name": "Last_Name",
-          "dataType": "Text",
-          "label": "Last Name",
-          "isPrimaryKey": false
-        },
-        {
-          "name": "Email",
-          "dataType": "Text",
-          "label": "Email",
-          "isPrimaryKey": false
-        },
-        {
-          "name": "City",
-          "dataType": "Text",
-          "label": "City",
-          "isPrimaryKey": false
-        },
-        {
-          "name": "Country",
-          "dataType": "Text",
-          "label": "Country",
-          "isPrimaryKey": false
-        },
+        { "name": "Customer_Id", "dataType": "Text", "label": "Customer Id", "isPrimaryKey": true },
+        { "name": "First_Name", "dataType": "Text", "label": "First Name", "isPrimaryKey": false },
+        { "name": "Last_Name", "dataType": "Text", "label": "Last Name", "isPrimaryKey": false },
+        { "name": "Email", "dataType": "Text", "label": "Email", "isPrimaryKey": false },
+        { "name": "City", "dataType": "Text", "label": "City", "isPrimaryKey": false },
+        { "name": "Country", "dataType": "Text", "label": "Country", "isPrimaryKey": false },
         {
           "name": "Subscription_Date",
           "dataType": "Date",
@@ -640,10 +435,7 @@
     },
     "label": "Customer CSV Upload",
     "refreshConfig": {
-      "frequency": {
-        "hours": [],
-        "refreshDayOfMonth": []
-      },
+      "frequency": { "hours": [], "refreshDayOfMonth": [] },
       "hasHeaders": false,
       "isAccelerationEnabled": false,
       "refreshMode": "TOTAL_REPLACE",
@@ -655,45 +447,22 @@
   "d360_datastream_create_other": {
     "connectorInfo": {
       "connectorType": "SalesforceDotCom",
-      "connectorDetails": {
-        "sourceObject": "Product2",
-        "name": "SalesforceDotCom_00D000000000000"
-      }
+      "connectorDetails": { "sourceObject": "Product2", "name": "SalesforceDotCom_00D000000000000" }
     },
     "dataAccessMode": "INGEST",
     "dataLakeObjectInfo": {
       "category": "Other",
       "dataLakeFieldInfoRepresentation": [
-        {
-          "name": "Id",
-          "dataType": "Text",
-          "label": "Product ID",
-          "isPrimaryKey": true
-        },
-        {
-          "name": "Name",
-          "dataType": "Text",
-          "label": "Product Name",
-          "isPrimaryKey": false
-        },
+        { "name": "Id", "dataType": "Text", "label": "Product ID", "isPrimaryKey": true },
+        { "name": "Name", "dataType": "Text", "label": "Product Name", "isPrimaryKey": false },
         {
           "name": "ProductCode",
           "dataType": "Text",
           "label": "Product Code",
           "isPrimaryKey": false
         },
-        {
-          "name": "Family",
-          "dataType": "Text",
-          "label": "Family",
-          "isPrimaryKey": false
-        },
-        {
-          "name": "IsActive",
-          "dataType": "Text",
-          "label": "Is Active",
-          "isPrimaryKey": false
-        },
+        { "name": "Family", "dataType": "Text", "label": "Family", "isPrimaryKey": false },
+        { "name": "IsActive", "dataType": "Text", "label": "Is Active", "isPrimaryKey": false },
         {
           "name": "CreatedDate",
           "dataType": "DateTime",
@@ -704,11 +473,7 @@
     },
     "label": "Product Catalog Stream",
     "refreshConfig": {
-      "frequency": {
-        "hours": [],
-        "refreshDayOfMonth": [],
-        "frequencyType": "BATCH"
-      },
+      "frequency": { "hours": [], "refreshDayOfMonth": [], "frequencyType": "BATCH" },
       "hasHeaders": false,
       "isAccelerationEnabled": false,
       "refreshMode": "UPSERT",
@@ -723,12 +488,7 @@
     "dataAccessMode": "INGEST",
     "datasource": "AwsS3",
     "datastreamType": "CONNECTORSFRAMEWORK",
-    "connectorInfo": {
-      "connectorType": "DataConnector",
-      "connectorDetails": {
-        "name": "test"
-      }
-    },
+    "connectorInfo": { "connectorType": "DataConnector", "connectorDetails": { "name": "test" } },
     "advancedAttributes": {
       "fileName": "bookings.csv",
       "importDirectory": "/",
@@ -740,18 +500,9 @@
       "name": "AirlineBookings_S3__dll",
       "label": "Airline Bookings",
       "category": "Other",
-      "dataspaceInfo": [
-        {
-          "name": "default"
-        }
-      ],
+      "dataspaceInfo": [{ "name": "default" }],
       "dataLakeFieldInputRepresentations": [
-        {
-          "name": "booking_id",
-          "label": "Booking Id",
-          "dataType": "Text",
-          "isPrimaryKey": true
-        },
+        { "name": "booking_id", "label": "Booking Id", "dataType": "Text", "isPrimaryKey": true },
         {
           "name": "booking_reference",
           "label": "Booking Reference",
@@ -770,12 +521,7 @@
           "dataType": "Text",
           "isPrimaryKey": false
         },
-        {
-          "name": "flight_id",
-          "label": "Flight Id",
-          "dataType": "Text",
-          "isPrimaryKey": false
-        },
+        { "name": "flight_id", "label": "Flight Id", "dataType": "Text", "isPrimaryKey": false },
         {
           "name": "booking_date",
           "label": "Booking Date",
@@ -809,46 +555,16 @@
       ]
     },
     "sourceFields": [
-      {
-        "name": "booking_id",
-        "dataType": "Text"
-      },
-      {
-        "name": "booking_reference",
-        "dataType": "Text"
-      },
-      {
-        "name": "passenger_name",
-        "dataType": "Text"
-      },
-      {
-        "name": "loyalty_tier",
-        "dataType": "Text"
-      },
-      {
-        "name": "flight_id",
-        "dataType": "Text"
-      },
-      {
-        "name": "booking_date",
-        "dataType": "Date"
-      },
-      {
-        "name": "cabin_class",
-        "dataType": "Text"
-      },
-      {
-        "name": "seat_number",
-        "dataType": "Text"
-      },
-      {
-        "name": "ticket_price_usd",
-        "dataType": "Number"
-      },
-      {
-        "name": "booking_status",
-        "dataType": "Text"
-      }
+      { "name": "booking_id", "dataType": "Text" },
+      { "name": "booking_reference", "dataType": "Text" },
+      { "name": "passenger_name", "dataType": "Text" },
+      { "name": "loyalty_tier", "dataType": "Text" },
+      { "name": "flight_id", "dataType": "Text" },
+      { "name": "booking_date", "dataType": "Date" },
+      { "name": "cabin_class", "dataType": "Text" },
+      { "name": "seat_number", "dataType": "Text" },
+      { "name": "ticket_price_usd", "dataType": "Number" },
+      { "name": "booking_status", "dataType": "Text" }
     ],
     "mappings": [
       {
@@ -903,10 +619,7 @@
       }
     ],
     "refreshConfig": {
-      "frequency": {
-        "frequencyType": "Daily",
-        "hours": [12]
-      },
+      "frequency": { "frequencyType": "Daily", "hours": [12] },
       "refreshMode": "UPSERT",
       "isAccelerationEnabled": false
     },
@@ -921,102 +634,37 @@
       "clientId": "REPLACE_WITH_CLIENT_ID",
       "username": "REPLACE_WITH_USERNAME"
     },
-    "config": {
-      "batchSize": 10000,
-      "apiVersion": "v60.0",
-      "pollInterval": 3600
-    }
+    "config": { "batchSize": 10000, "apiVersion": "v60.0", "pollInterval": 3600 }
   },
   "d360_smart_mapping_suggest": {
     "sourceFields": [
-      {
-        "label": "ID",
-        "name": "Id__c",
-        "dataType": "Text"
-      },
-      {
-        "label": "Account Name",
-        "name": "Name__c",
-        "dataType": "Text"
-      },
-      {
-        "label": "Industry",
-        "name": "Industry__c",
-        "dataType": "Text"
-      },
-      {
-        "label": "Annual Revenue",
-        "name": "AnnualRevenue__c",
-        "dataType": "Number"
-      }
+      { "label": "ID", "name": "Id__c", "dataType": "Text" },
+      { "label": "Account Name", "name": "Name__c", "dataType": "Text" },
+      { "label": "Industry", "name": "Industry__c", "dataType": "Text" },
+      { "label": "Annual Revenue", "name": "AnnualRevenue__c", "dataType": "Number" }
     ],
     "targetFields": [
-      {
-        "label": "ID",
-        "name": "ssot__Id__c",
-        "dataType": "Text"
-      },
-      {
-        "label": "Name",
-        "name": "ssot__Name__c",
-        "dataType": "Text"
-      },
-      {
-        "label": "Industry",
-        "name": "ssot__Industry__c",
-        "dataType": "Text"
-      },
-      {
-        "label": "Annual Revenue",
-        "name": "ssot__AnnualRevenue__c",
-        "dataType": "Number"
-      }
+      { "label": "ID", "name": "ssot__Id__c", "dataType": "Text" },
+      { "label": "Name", "name": "ssot__Name__c", "dataType": "Text" },
+      { "label": "Industry", "name": "ssot__Industry__c", "dataType": "Text" },
+      { "label": "Annual Revenue", "name": "ssot__AnnualRevenue__c", "dataType": "Number" }
     ],
     "sourceDloName": "Account_00D000000000000__dll",
     "targetDmoName": "ssot__Account__dlm",
     "threshold": 0.5,
-    "fieldOverrides": [
-      {
-        "source": "KQ_Id",
-        "target": "ssot__ExternalId__c"
-      }
-    ],
+    "fieldOverrides": [{ "source": "KQ_Id", "target": "ssot__ExternalId__c" }],
     "_note": "sourceFields and targetFields are arrays of FieldInput objects. fieldOverrides are FieldOverrideInput objects with source/target field names."
   },
   "d360_preview_field_matches": {
     "sourceFields": [
-      {
-        "label": "Email",
-        "name": "Email__c",
-        "dataType": "Text"
-      },
-      {
-        "label": "First Name",
-        "name": "FirstName__c",
-        "dataType": "Text"
-      },
-      {
-        "label": "Last Name",
-        "name": "LastName__c",
-        "dataType": "Text"
-      }
+      { "label": "Email", "name": "Email__c", "dataType": "Text" },
+      { "label": "First Name", "name": "FirstName__c", "dataType": "Text" },
+      { "label": "Last Name", "name": "LastName__c", "dataType": "Text" }
     ],
     "targetFields": [
-      {
-        "label": "Email Address",
-        "name": "ssot__EmailAddress__c",
-        "dataType": "Text"
-      },
-      {
-        "label": "First Name",
-        "name": "ssot__FirstName__c",
-        "dataType": "Text"
-      },
-      {
-        "label": "Last Name",
-        "name": "ssot__LastName__c",
-        "dataType": "Text"
-      }
+      { "label": "Email Address", "name": "ssot__EmailAddress__c", "dataType": "Text" },
+      { "label": "First Name", "name": "ssot__FirstName__c", "dataType": "Text" },
+      { "label": "Last Name", "name": "ssot__LastName__c", "dataType": "Text" }
     ],
     "sourceDloName": "Contact_Home__dll",
     "targetDmoName": "ssot__Individual__dlm",
@@ -1027,35 +675,16 @@
     "body": {
       "connectorInfo": {
         "connectorType": "SalesforceDotCom",
-        "connectorDetails": {
-          "sourceObject": "Task",
-          "name": "SalesforceDotCom_00D000000000000"
-        }
+        "connectorDetails": { "sourceObject": "Task", "name": "SalesforceDotCom_00D000000000000" }
       },
       "label": "Task Stream",
       "dataLakeObjectInfo": {
         "category": "Engagement",
         "dataLakeFieldInfoRepresentation": [
-          {
-            "dataType": "Text",
-            "name": "Id",
-            "isPrimaryKey": true
-          },
-          {
-            "dataType": "DateTime",
-            "name": "CreatedDate",
-            "isPrimaryKey": false
-          },
-          {
-            "dataType": "DateTime",
-            "name": "ActivityDate",
-            "isPrimaryKey": false
-          },
-          {
-            "dataType": "DateTime",
-            "name": "LastModifiedDate",
-            "isPrimaryKey": false
-          }
+          { "dataType": "Text", "name": "Id", "isPrimaryKey": true },
+          { "dataType": "DateTime", "name": "CreatedDate", "isPrimaryKey": false },
+          { "dataType": "DateTime", "name": "ActivityDate", "isPrimaryKey": false },
+          { "dataType": "DateTime", "name": "LastModifiedDate", "isPrimaryKey": false }
         ]
       },
       "dataAccessMode": "INGEST"
@@ -1101,29 +730,14 @@
       "fromAddress": "noreply@company.com",
       "fromName": "Company Support",
       "replyToAddress": "support@company.com",
-      "trackingConfig": {
-        "trackOpens": true,
-        "trackClicks": true
-      }
+      "trackingConfig": { "trackOpens": true, "trackClicks": true }
     }
   },
   "d360_datakit_deploy": {
     "components": [
-      {
-        "name": "Revenue_By_Region__cio",
-        "action": "CREATE",
-        "type": "CI"
-      },
-      {
-        "name": "Segment_VIP_Customers",
-        "action": "CREATE",
-        "type": "SEGMENT"
-      },
-      {
-        "name": "AccountRevenue",
-        "action": "CREATE",
-        "type": "SDM"
-      }
+      { "name": "Revenue_By_Region__cio", "action": "CREATE", "type": "CI" },
+      { "name": "Segment_VIP_Customers", "action": "CREATE", "type": "SEGMENT" },
+      { "name": "AccountRevenue", "action": "CREATE", "type": "SDM" }
     ]
   }
 }

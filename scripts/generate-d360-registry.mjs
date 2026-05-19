@@ -139,14 +139,16 @@ function validateRegistry({ operations, families, runbooks, examples }) {
     }
   }
 
+  const capabilityNames = new Set([...operationNames, ...runbookNames]);
   for (const [key, example] of Object.entries(examples ?? {})) {
-    const operation = example && typeof example === "object" ? example.operation : undefined;
-    const runbook = example && typeof example === "object" ? example.runbook : undefined;
-    if (operation && !operationNames.has(operation))
-      errors.push(`Example ${key} references unknown operation ${operation}.`);
-    if (runbook && !runbookNames.has(runbook))
-      errors.push(`Example ${key} references unknown runbook ${runbook}.`);
-    if (!operation && !runbook) errors.push(`Example ${key} must reference operation or runbook.`);
+    const capability = example && typeof example === "object" ? example.capability : undefined;
+    if (!capability) {
+      errors.push(`Example ${key} must reference capability.`);
+      continue;
+    }
+    if (!capabilityNames.has(capability)) {
+      errors.push(`Example ${key} references unknown capability ${capability}.`);
+    }
   }
 
   if (errors.length) {
