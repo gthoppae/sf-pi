@@ -1173,6 +1173,7 @@ export function shouldRetrySweepResult(
     message.includes("currently in processing or deleting") ||
     message.includes("currently: processing") ||
     message.includes("being processed") ||
+    message.includes("mktdatatransform can only be updated") ||
     message.includes("try again later")
   );
 }

@@ -367,6 +367,13 @@ describe("d360 capability sweep planning", () => {
       }),
     ).toBe(true);
     expect(
+      shouldRetrySweepResult({
+        ok: false,
+        error:
+          "MktDataTransform can only be updated when it is not a draft with a ACTIVE/ERROR state",
+      }),
+    ).toBe(true);
+    expect(
       shouldRetrySweepResult(
         { ok: true },
         { stage: "live", capability: "d360_dlo_get", sourceCapability: "dlo_delete_verify" },
