@@ -5,8 +5,9 @@ import {
   buildCapabilitySweepPlan,
   buildDloLifecyclePlan,
   buildDmoLifecyclePlan,
-  buildMappingLifecyclePlan,
   buildDynamicFollowUpChecks,
+  buildMappingLifecyclePlan,
+  buildSemanticModelLifecyclePlan,
   canRunMutationLifecycle,
   classifySweepResult,
   containsPlaceholderValue,
@@ -383,6 +384,29 @@ describe("d360 capability sweep planning", () => {
     });
   });
 
+  it("builds a sweep-owned semantic model shell lifecycle plan", () => {
+    const lifecycle = buildSemanticModelLifecyclePlan("20260519010101");
+
+    expect(lifecycle.resourceName).toBe("PiSweepSdm_20260519010101");
+    expect(lifecycle.modelApiNameOrId).toBe("PiSweepSdm_20260519010101");
+    expect(lifecycle.steps.map((step) => step.capability)).toEqual([
+      "d360_sdm_create",
+      "d360_sdm_get",
+      "d360_sdm_validate",
+      "d360_sdm_delete",
+      "d360_sdm_get",
+    ]);
+    expect(lifecycle.steps[0].params?.body).toEqual({
+      apiName: "PiSweepSdm_20260519010101",
+      label: "Pi Sweep SDM 20260519010101",
+      description: "Sweep-owned semantic model shell created by run 20260519010101.",
+      dataspace: "default",
+    });
+    expect(lifecycle.steps[3].params).toEqual({
+      modelApiNameOrId: "PiSweepSdm_20260519010101",
+    });
+  });
+
   it("requires explicit mutation gate for sweep-owned destructive lifecycle checks", () => {
     expect(
       canRunMutationLifecycle({
@@ -469,6 +493,17 @@ describe("d360 capability sweep planning", () => {
           status: 500,
           error:
             "Please provide a valid recordId of type DataLakeObjectInstance or a valid developerName for a Data Lake Object.",
+        },
+      ),
+    ).toMatchObject({ outcome: "not_found_optional", fail: false });
+
+    expect(
+      classifySweepResult(
+        { stage: "live", capability: "d360_sdm_get", sourceCapability: "sdm_delete_verify" },
+        {
+          ok: false,
+          status: 500,
+          error: "SemanticAuthoringError: Semantic object not found",
         },
       ),
     ).toMatchObject({ outcome: "not_found_optional", fail: false });

@@ -89,6 +89,7 @@ interface DmoLifecyclePlan {
   resourceName: string;
   dmoName?: string;
   dloName?: string;
+  modelApiNameOrId?: string;
   steps: SweepCheck[];
 }
 
@@ -210,6 +211,54 @@ export function buildDloLifecyclePlan(runId: string): DmoLifecyclePlan {
         safety: "read",
         params: { dloName },
         sourceCapability: "dlo_delete_verify",
+      },
+    ],
+  };
+}
+
+export function buildSemanticModelLifecyclePlan(runId: string): DmoLifecyclePlan {
+  const resourceName = `PiSweepSdm_${runId}`;
+  return {
+    resourceName,
+    modelApiNameOrId: resourceName,
+    steps: [
+      {
+        stage: "mutate",
+        capability: "d360_sdm_create",
+        family: "Semantic Retrieval",
+        safety: "confirmed",
+        params: { body: buildSemanticModelCreateBody(resourceName, runId) },
+      },
+      {
+        stage: "live",
+        capability: "d360_sdm_get",
+        family: "Semantic Retrieval",
+        safety: "read",
+        params: { modelApiNameOrId: resourceName },
+        sourceCapability: "sdm_create_verify",
+      },
+      {
+        stage: "live",
+        capability: "d360_sdm_validate",
+        family: "Semantic Retrieval",
+        safety: "read",
+        params: { modelApiNameOrId: resourceName },
+        sourceCapability: "sdm_validate",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_sdm_delete",
+        family: "Semantic Retrieval",
+        safety: "destructive",
+        params: { modelApiNameOrId: resourceName },
+      },
+      {
+        stage: "live",
+        capability: "d360_sdm_get",
+        family: "Semantic Retrieval",
+        safety: "read",
+        params: { modelApiNameOrId: resourceName },
+        sourceCapability: "sdm_delete_verify",
       },
     ],
   };
@@ -529,6 +578,8 @@ export function classifySweepResult(
     message.includes("does not exist") ||
     message.includes("no stdm interaction found") ||
     message.includes("no stdm session found") ||
+    message.includes("semantic object not found") ||
+    message.includes("semantic_entity_not_exist") ||
     (check.sourceCapability?.endsWith("_delete_verify") &&
       message.includes("provide a valid recordid"))
   ) {
@@ -597,6 +648,7 @@ async function main(): Promise<void> {
       buildDmoLifecyclePlan(runId),
       buildDloLifecyclePlan(runId),
       buildMappingLifecyclePlan(runId),
+      buildSemanticModelLifecyclePlan(runId),
     ]) {
       for (const check of lifecycle.steps) {
         const key = checkKey(check);
@@ -1017,6 +1069,18 @@ function buildMappingCreateBody(dloName: string, dmoName: string): Record<string
       { sourceFieldDeveloperName: "Id__c", targetFieldDeveloperName: "Id__c" },
       { sourceFieldDeveloperName: "Name__c", targetFieldDeveloperName: "Name__c" },
     ],
+  };
+}
+
+function buildSemanticModelCreateBody(
+  resourceName: string,
+  runId: string,
+): Record<string, unknown> {
+  return {
+    apiName: resourceName,
+    label: `Pi Sweep SDM ${runId}`,
+    description: `Sweep-owned semantic model shell created by run ${runId}.`,
+    dataspace: "default",
   };
 }
 
