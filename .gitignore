@@ -34,6 +34,8 @@ dist/
 
 # Agent / local verification scratch files
 context.md
+!CONTEXT.md
+!**/CONTEXT.md
 progress.md
 research.md
 generated-cat.jpg

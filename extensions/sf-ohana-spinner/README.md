@@ -43,7 +43,9 @@ repaints.
 ### 3. 5s message rotation in Ohana mode only
 
 Keeps Ohana mode entertaining without changing Calm mode's stable text. Too
-fast and users can't read the jokes; too slow and it gets stale.
+fast and users can't read the jokes; too slow and it gets stale. The message
+catalog is intentionally small and curated: short, public-safe,
+product/platform-oriented lines only.
 
 ### 4. One mode setting
 
@@ -73,8 +75,8 @@ extensions/sf-ohana-spinner/
     rainbow.ts              ← implementation module
     settings.ts             ← implementation module
   tests/
+    lifecycle.test.ts       ← unit / smoke test
     settings.test.ts        ← unit / smoke test
-    smoke.test.ts           ← unit / smoke test
   CREDITS.md                ← extension attribution
   index.ts                  ← Pi extension entry point
   manifest.json             ← source-of-truth extension metadata
@@ -85,9 +87,13 @@ extensions/sf-ohana-spinner/
 
 ## Testing Strategy
 
-Tests cover the message catalog, frame builders, mode settings, and module
-export. The live timer lifecycle is tested via manual QA since it depends on
-Pi's runtime context.
+Tests focus on user-visible outcomes at the extension boundary:
+
+- session start installs a visible Ohana or Calm working indicator
+- Ohana frames are colorful and include Salesforce-themed personality text
+- Calm frames stay quiet and avoid rainbow color codes or rotating message text
+- session shutdown restores Pi's default working indicator and message
+- mode settings preserve project-over-global precedence
 
 Run: `npm test`
 
