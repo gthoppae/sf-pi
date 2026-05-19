@@ -43,6 +43,7 @@ export type SweepOutcome =
   | "failed";
 
 export type MutationLifecycleName =
+  | "calculated-insight"
   | "dmo"
   | "dlo"
   | "mapping"
@@ -302,6 +303,60 @@ export function buildSemanticModelLifecyclePlan(runId: string): DmoLifecyclePlan
         safety: "read",
         params: { modelApiNameOrId: resourceName },
         sourceCapability: "sdm_delete_verify",
+      },
+    ],
+  };
+}
+
+export function buildCalculatedInsightLifecyclePlan(runId: string): DmoLifecyclePlan {
+  const ciName = `PiSweepCi_${runId}__cio`;
+  return {
+    resourceName: ciName,
+    steps: [
+      {
+        stage: "live",
+        capability: "d360_ci_validate",
+        family: "Calculated Insights",
+        safety: "safe_post",
+        params: { body: buildCalculatedInsightValidateBody(runId) },
+        sourceCapability: "ci_validate_before_create",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_ci_create",
+        family: "Calculated Insights",
+        safety: "confirmed",
+        params: { body: buildCalculatedInsightCreateBody(runId) },
+      },
+      {
+        stage: "live",
+        capability: "d360_ci_get",
+        family: "Calculated Insights",
+        safety: "read",
+        params: { ciName },
+        sourceCapability: "ci_create_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_ci_run",
+        family: "Calculated Insights",
+        safety: "confirmed",
+        params: { ciName },
+      },
+      {
+        stage: "mutate",
+        capability: "d360_ci_delete",
+        family: "Calculated Insights",
+        safety: "destructive",
+        params: { ciName },
+      },
+      {
+        stage: "live",
+        capability: "d360_ci_get",
+        family: "Calculated Insights",
+        safety: "read",
+        params: { ciName },
+        sourceCapability: "ci_delete_verify",
       },
     ],
   };
@@ -1221,10 +1276,21 @@ export function buildCleanupLifecyclePlan(runId: string): DmoLifecyclePlan {
   ];
   const transformNames = [`PiSwTx_${runId}`];
   const dataActionNames = [`PiSweepAction_${runId}`];
+  const calculatedInsightNames = [`PiSweepCi_${runId}__cio`];
   const dataActionTargetNames = [`PiSweepTarget_${runId}`];
   return {
     resourceName: `PiSweepCleanup_${runId}`,
     steps: [
+      ...calculatedInsightNames.map(
+        (ciName): SweepCheck => ({
+          stage: "mutate",
+          capability: "d360_ci_delete",
+          family: "Calculated Insights",
+          safety: "destructive",
+          params: { ciName },
+          sourceCapability: "cleanup_ci",
+        }),
+      ),
       ...dataActionNames.map(
         (dataActionId): SweepCheck => ({
           stage: "mutate",
@@ -1290,6 +1356,7 @@ export function buildCleanupLifecyclePlan(runId: string): DmoLifecyclePlan {
 }
 
 const lifecycleBuilders: Record<MutationLifecycleName, (runId: string) => DmoLifecyclePlan> = {
+  "calculated-insight": buildCalculatedInsightLifecyclePlan,
   dmo: buildDmoLifecyclePlan,
   dlo: buildDloLifecyclePlan,
   mapping: buildMappingLifecyclePlan,
@@ -1561,12 +1628,16 @@ export function classifySweepResult(
   if (
     status === 401 ||
     status === 403 ||
+    message.includes("api_disabled_for_org") ||
     message.includes("not visible") ||
     message.includes("permission")
   ) {
     return { outcome: "feature_gated", fail: false, summary, status, error };
   }
-  if (message.includes("can not deserialize: unexpected array")) {
+  if (
+    message.includes("can not deserialize: unexpected array") ||
+    message.includes("method_not_allowed")
+  ) {
     return { outcome: "skipped_needs_payload", fail: false, summary, status, error };
   }
 
@@ -2095,6 +2166,30 @@ function buildDloFields(): Array<Record<string, unknown>> {
     { name: "Id__c", label: "Id", dataType: "Text", isPrimaryKey: true },
     { name: "Name__c", label: "Name", dataType: "Text", isPrimaryKey: false },
   ];
+}
+
+function buildCalculatedInsightValidateBody(runId: string): Record<string, unknown> {
+  return { expression: calculatedInsightExpression(runId) };
+}
+
+function buildCalculatedInsightCreateBody(runId: string): Record<string, unknown> {
+  return {
+    apiName: `PiSweepCi_${runId}__cio`,
+    displayName: `Pi Sweep CI ${runId}`,
+    definitionType: "CALCULATED_METRIC",
+    dataSpaceName: "default",
+    publishScheduleInterval: "SYSTEM_MANAGED",
+    expression: calculatedInsightExpression(runId),
+  };
+}
+
+function calculatedInsightExpression(_runId: string): string {
+  return [
+    "SELECT ssot__AiAgentSession__dlm.ssot__Id__c AS session_id__c,",
+    "COUNT(*) AS interaction_count__c",
+    "FROM ssot__AiAgentSession__dlm",
+    "GROUP BY ssot__AiAgentSession__dlm.ssot__Id__c",
+  ].join(" ");
 }
 
 function buildDataActionTargetCreateBody(

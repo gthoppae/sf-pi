@@ -4,6 +4,7 @@ import { describe, expect, it } from "vitest";
 import {
   buildCapabilitySweepPlan,
   applySweepPreset,
+  buildCalculatedInsightLifecyclePlan,
   buildCleanupLifecyclePlan,
   buildDataActionLifecyclePlan,
   buildDiscoveredCleanupLifecyclePlan,
@@ -732,6 +733,27 @@ describe("d360 capability sweep planning", () => {
     });
   });
 
+  it("builds a sweep-owned calculated insight lifecycle plan", () => {
+    const lifecycle = buildCalculatedInsightLifecyclePlan("20260519010101");
+
+    expect(lifecycle.resourceName).toBe("PiSweepCi_20260519010101__cio");
+    expect(lifecycle.steps.map((step) => step.capability)).toEqual([
+      "d360_ci_validate",
+      "d360_ci_create",
+      "d360_ci_get",
+      "d360_ci_run",
+      "d360_ci_delete",
+      "d360_ci_get",
+    ]);
+    expect(lifecycle.steps[1].params?.body).toMatchObject({
+      apiName: "PiSweepCi_20260519010101__cio",
+      displayName: "Pi Sweep CI 20260519010101",
+      definitionType: "CALCULATED_METRIC",
+      dataSpaceName: "default",
+      publishScheduleInterval: "SYSTEM_MANAGED",
+    });
+  });
+
   it("builds a sweep-owned data action lifecycle plan", () => {
     const lifecycle = buildDataActionLifecyclePlan("20260519010101");
 
@@ -888,6 +910,20 @@ describe("d360 capability sweep planning", () => {
         },
       ),
     ).toMatchObject({ outcome: "dependency_missing", fail: false });
+
+    expect(
+      classifySweepResult(
+        { stage: "live", capability: "d360_ci_validate" },
+        { ok: false, status: 500, error: "API_DISABLED_FOR_ORG This feature is not supported" },
+      ),
+    ).toMatchObject({ outcome: "feature_gated", fail: false });
+
+    expect(
+      classifySweepResult(
+        { stage: "live", capability: "d360_ci_run_status" },
+        { ok: false, status: 500, error: "METHOD_NOT_ALLOWED HTTP Method 'GET' not allowed" },
+      ),
+    ).toMatchObject({ outcome: "skipped_needs_payload", fail: false });
 
     expect(
       classifySweepResult(
