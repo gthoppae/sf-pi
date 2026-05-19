@@ -249,6 +249,7 @@ extensions/sf-data360/
   index.ts                  ← Pi extension entry point
   manifest.json             ← source-of-truth extension metadata
   README.md                 ← human + agent walkthrough
+  ROADMAP.md                ← extension-specific phased roadmap
 ```
 
 <!-- GENERATED:file-structure:end -->
@@ -309,7 +310,7 @@ D360_SWEEP_ALLOW_DESTRUCTIVE=AgentforceSTDM npm run e2e:d360-sweep -- \
   --cleanup-stale
 ```
 
-The sweep writes JSON and Markdown artifacts to a temp directory and reports expected org-state limitations as structured non-failing outcomes.
+The sweep writes JSON and Markdown artifacts to a temp directory and reports expected org-state limitations as structured non-failing outcomes. Pending lifecycle work is tracked in [`ROADMAP.md`](./ROADMAP.md).
 
 Covered by unit tests:
 
