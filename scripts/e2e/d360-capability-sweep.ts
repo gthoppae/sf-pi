@@ -264,6 +264,107 @@ export function buildSemanticModelLifecyclePlan(runId: string): DmoLifecyclePlan
   };
 }
 
+export function buildSemanticDataObjectLifecyclePlan(runId: string): DmoLifecyclePlan {
+  const resourceName = `PiSweepSdmDo_${runId}`;
+  const dmoResourceName = `PiSweepSdmDmo_${runId}`;
+  const dmoName = `${dmoResourceName}__dlm`;
+  const dataObjectApiName = `PiSweepSdmDataObject_${runId}`;
+  return {
+    resourceName,
+    dmoName,
+    modelApiNameOrId: resourceName,
+    steps: [
+      {
+        stage: "mutate",
+        capability: "d360_dmo_create",
+        family: "DMO",
+        safety: "confirmed",
+        params: { body: buildDmoCreateBody(dmoResourceName, runId, "Pi Sweep SDM DMO") },
+      },
+      {
+        stage: "live",
+        capability: "d360_dmo_get",
+        family: "DMO",
+        safety: "read",
+        params: { dmoName },
+        sourceCapability: "sdm_data_object_dmo_create_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_sdm_create",
+        family: "Semantic Retrieval",
+        safety: "confirmed",
+        params: { body: buildSemanticModelCreateBody(resourceName, runId) },
+      },
+      {
+        stage: "live",
+        capability: "d360_sdm_get",
+        family: "Semantic Retrieval",
+        safety: "read",
+        params: { modelApiNameOrId: resourceName },
+        sourceCapability: "sdm_data_object_model_create_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_sdm_data_object_create",
+        family: "Semantic Retrieval",
+        safety: "confirmed",
+        params: {
+          modelApiNameOrId: resourceName,
+          body: buildSemanticDataObjectCreateBody(dataObjectApiName, dmoName, runId),
+        },
+      },
+      {
+        stage: "live",
+        capability: "d360_sdm_data_objects_list",
+        family: "Semantic Retrieval",
+        safety: "read",
+        params: { modelApiNameOrId: resourceName },
+        sourceCapability: "sdm_data_object_create_verify",
+      },
+      {
+        stage: "live",
+        capability: "d360_sdm_validate",
+        family: "Semantic Retrieval",
+        safety: "read",
+        params: { modelApiNameOrId: resourceName },
+        sourceCapability: "sdm_data_object_validate",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_sdm_delete",
+        family: "Semantic Retrieval",
+        safety: "destructive",
+        params: { modelApiNameOrId: resourceName },
+      },
+      {
+        stage: "live",
+        capability: "d360_sdm_get",
+        family: "Semantic Retrieval",
+        safety: "read",
+        params: { modelApiNameOrId: resourceName },
+        sourceCapability: "sdm_data_object_model_delete_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_dmo_delete",
+        family: "DMO",
+        safety: "destructive",
+        params: { dmoName },
+        sourceCapability: "sdm_data_object_cleanup_dmo",
+      },
+      {
+        stage: "live",
+        capability: "d360_dmo_get",
+        family: "DMO",
+        safety: "read",
+        params: { dmoName },
+        sourceCapability: "sdm_data_object_dmo_delete_verify",
+      },
+    ],
+  };
+}
+
 export function buildMappingLifecyclePlan(runId: string): DmoLifecyclePlan {
   const resourceName = `PiSweepMapping_${runId}`;
   const dmoResourceName = `PiSweepMapDmo_${runId}`;
@@ -649,6 +750,7 @@ async function main(): Promise<void> {
       buildDloLifecyclePlan(runId),
       buildMappingLifecyclePlan(runId),
       buildSemanticModelLifecyclePlan(runId),
+      buildSemanticDataObjectLifecyclePlan(runId),
     ]) {
       for (const check of lifecycle.steps) {
         const key = checkKey(check);
@@ -1069,6 +1171,20 @@ function buildMappingCreateBody(dloName: string, dmoName: string): Record<string
       { sourceFieldDeveloperName: "Id__c", targetFieldDeveloperName: "Id__c" },
       { sourceFieldDeveloperName: "Name__c", targetFieldDeveloperName: "Name__c" },
     ],
+  };
+}
+
+function buildSemanticDataObjectCreateBody(
+  apiName: string,
+  dmoName: string,
+  runId: string,
+): Record<string, unknown> {
+  return {
+    apiName,
+    label: `Pi Sweep SDM Data Object ${runId}`,
+    dataObjectType: "Dmo",
+    dataObjectName: dmoName,
+    shouldIncludeAllFields: true,
   };
 }
 

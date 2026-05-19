@@ -7,6 +7,7 @@ import {
   buildDmoLifecyclePlan,
   buildDynamicFollowUpChecks,
   buildMappingLifecyclePlan,
+  buildSemanticDataObjectLifecyclePlan,
   buildSemanticModelLifecyclePlan,
   canRunMutationLifecycle,
   classifySweepResult,
@@ -404,6 +405,37 @@ describe("d360 capability sweep planning", () => {
     });
     expect(lifecycle.steps[3].params).toEqual({
       modelApiNameOrId: "PiSweepSdm_20260519010101",
+    });
+  });
+
+  it("builds a sweep-owned semantic data-object lifecycle plan", () => {
+    const lifecycle = buildSemanticDataObjectLifecyclePlan("20260519010101");
+
+    expect(lifecycle.resourceName).toBe("PiSweepSdmDo_20260519010101");
+    expect(lifecycle.dmoName).toBe("PiSweepSdmDmo_20260519010101__dlm");
+    expect(lifecycle.modelApiNameOrId).toBe("PiSweepSdmDo_20260519010101");
+    expect(lifecycle.steps.map((step) => step.capability)).toEqual([
+      "d360_dmo_create",
+      "d360_dmo_get",
+      "d360_sdm_create",
+      "d360_sdm_get",
+      "d360_sdm_data_object_create",
+      "d360_sdm_data_objects_list",
+      "d360_sdm_validate",
+      "d360_sdm_delete",
+      "d360_sdm_get",
+      "d360_dmo_delete",
+      "d360_dmo_get",
+    ]);
+    expect(lifecycle.steps[4].params).toEqual({
+      modelApiNameOrId: "PiSweepSdmDo_20260519010101",
+      body: {
+        apiName: "PiSweepSdmDataObject_20260519010101",
+        label: "Pi Sweep SDM Data Object 20260519010101",
+        dataObjectType: "Dmo",
+        dataObjectName: "PiSweepSdmDmo_20260519010101__dlm",
+        shouldIncludeAllFields: true,
+      },
     });
   });
 
