@@ -5,10 +5,12 @@ import {
   buildCapabilitySweepPlan,
   buildDloLifecyclePlan,
   buildDmoLifecyclePlan,
+  buildMappingLifecyclePlan,
   buildDynamicFollowUpChecks,
   canRunMutationLifecycle,
   classifySweepResult,
   containsPlaceholderValue,
+  insertFollowUpChecks,
   paramsForDryRun,
   paramsForLiveCheck,
   shouldRetrySweepResult,
@@ -251,6 +253,28 @@ describe("d360 capability sweep planning", () => {
     expect(paramsForLiveCheck(semanticQueryCapability)).toBeUndefined();
   });
 
+  it("inserts dynamic follow-ups immediately after the source check", () => {
+    const plan = [
+      { stage: "live" as const, capability: "d360_dmo_mapping_list" },
+      { stage: "mutate" as const, capability: "d360_dmo_delete" },
+    ];
+    const seen = new Set(plan.map((check) => `${check.stage}:${check.capability}`));
+
+    insertFollowUpChecks(plan, 0, seen, [
+      {
+        stage: "live",
+        capability: "d360_dmo_mapping_get",
+        params: { mappingName: "mapping-1" },
+      },
+    ]);
+
+    expect(plan.map((check) => check.capability)).toEqual([
+      "d360_dmo_mapping_list",
+      "d360_dmo_mapping_get",
+      "d360_dmo_delete",
+    ]);
+  });
+
   it("builds placeholder params for dry-run request resolution without using them for live checks", () => {
     expect(paramsForDryRun(destructiveCapability)).toEqual({ dmoName: "SweepDryRunDmoName" });
     expect(paramsForLiveCheck(destructiveCapability)).toBeUndefined();
@@ -329,6 +353,34 @@ describe("d360 capability sweep planning", () => {
       ),
     ).toBe(true);
     expect(shouldRetrySweepResult({ ok: false, error: "Unrecognized field" })).toBe(false);
+  });
+
+  it("builds a sweep-owned DLO-to-DMO mapping lifecycle plan", () => {
+    const lifecycle = buildMappingLifecyclePlan("20260519010101");
+
+    expect(lifecycle.resourceName).toBe("PiSweepMapping_20260519010101");
+    expect(lifecycle.dmoName).toBe("PiSweepMapDmo_20260519010101__dlm");
+    expect(lifecycle.dloName).toBe("PiSweepMapDlo_20260519010101__dll");
+    expect(lifecycle.steps.map((step) => step.capability)).toEqual([
+      "d360_dlo_create",
+      "d360_dlo_get",
+      "d360_dmo_create",
+      "d360_dmo_get",
+      "d360_dmo_mapping_create",
+      "d360_dmo_mapping_list",
+      "d360_dmo_delete",
+      "d360_dmo_get",
+      "d360_dlo_delete",
+      "d360_dlo_get",
+    ]);
+    expect(lifecycle.steps[4].params?.body).toEqual({
+      sourceEntityDeveloperName: "PiSweepMapDlo_20260519010101__dll",
+      targetEntityDeveloperName: "PiSweepMapDmo_20260519010101__dlm",
+      fieldMapping: [
+        { sourceFieldDeveloperName: "Id__c", targetFieldDeveloperName: "Id__c" },
+        { sourceFieldDeveloperName: "Name__c", targetFieldDeveloperName: "Name__c" },
+      ],
+    });
   });
 
   it("requires explicit mutation gate for sweep-owned destructive lifecycle checks", () => {

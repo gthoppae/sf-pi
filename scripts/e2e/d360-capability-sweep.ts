@@ -215,6 +215,97 @@ export function buildDloLifecyclePlan(runId: string): DmoLifecyclePlan {
   };
 }
 
+export function buildMappingLifecyclePlan(runId: string): DmoLifecyclePlan {
+  const resourceName = `PiSweepMapping_${runId}`;
+  const dmoResourceName = `PiSweepMapDmo_${runId}`;
+  const dmoName = `${dmoResourceName}__dlm`;
+  const dloName = `PiSweepMapDlo_${runId}__dll`;
+  return {
+    resourceName,
+    dmoName,
+    dloName,
+    steps: [
+      {
+        stage: "mutate",
+        capability: "d360_dlo_create",
+        family: "DLO",
+        safety: "confirmed",
+        params: { body: buildDloCreateBody(dloName, runId, "Pi Sweep Mapping DLO") },
+      },
+      {
+        stage: "live",
+        capability: "d360_dlo_get",
+        family: "DLO",
+        safety: "read",
+        params: { dloName },
+        sourceCapability: "mapping_dlo_create_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_dmo_create",
+        family: "DMO",
+        safety: "confirmed",
+        params: { body: buildDmoCreateBody(dmoResourceName, runId, "Pi Sweep Mapping DMO") },
+      },
+      {
+        stage: "live",
+        capability: "d360_dmo_get",
+        family: "DMO",
+        safety: "read",
+        params: { dmoName },
+        sourceCapability: "mapping_dmo_create_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_dmo_mapping_create",
+        family: "Mappings",
+        safety: "confirmed",
+        params: { body: buildMappingCreateBody(dloName, dmoName) },
+      },
+      {
+        stage: "live",
+        capability: "d360_dmo_mapping_list",
+        family: "Mappings",
+        safety: "read",
+        params: { dmoDeveloperName: dmoName },
+        sourceCapability: "mapping_create_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_dmo_delete",
+        family: "DMO",
+        safety: "destructive",
+        params: { dmoName },
+        sourceCapability: "mapping_cleanup_dmo",
+      },
+      {
+        stage: "live",
+        capability: "d360_dmo_get",
+        family: "DMO",
+        safety: "read",
+        params: { dmoName },
+        sourceCapability: "mapping_dmo_delete_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_dlo_delete",
+        family: "DLO",
+        safety: "destructive",
+        params: { dloName },
+        sourceCapability: "mapping_cleanup_dlo",
+      },
+      {
+        stage: "live",
+        capability: "d360_dlo_get",
+        family: "DLO",
+        safety: "read",
+        params: { dloName },
+        sourceCapability: "mapping_dlo_delete_verify",
+      },
+    ],
+  };
+}
+
 export function buildDmoLifecyclePlan(runId: string): DmoLifecyclePlan {
   const resourceName = `PiSweepDmo_${runId}`;
   const dmoName = `${resourceName}__dlm`;
@@ -275,6 +366,23 @@ export function buildDmoLifecyclePlan(runId: string): DmoLifecyclePlan {
       },
     ],
   };
+}
+
+export function insertFollowUpChecks(
+  plan: SweepCheck[],
+  index: number,
+  seenChecks: Set<string>,
+  followUps: SweepCheck[],
+): void {
+  const newChecks: SweepCheck[] = [];
+  for (const followUp of followUps) {
+    const key = checkKey(followUp);
+    if (!seenChecks.has(key)) {
+      seenChecks.add(key);
+      newChecks.push(followUp);
+    }
+  }
+  if (newChecks.length) plan.splice(index + 1, 0, ...newChecks);
 }
 
 export function buildDynamicFollowUpChecks(
@@ -485,7 +593,11 @@ async function main(): Promise<void> {
       destructiveEnvValue: process.env.D360_SWEEP_ALLOW_DESTRUCTIVE,
     });
     if (gate.ok !== true) throw new Error(gate.reason);
-    for (const lifecycle of [buildDmoLifecyclePlan(runId), buildDloLifecyclePlan(runId)]) {
+    for (const lifecycle of [
+      buildDmoLifecyclePlan(runId),
+      buildDloLifecyclePlan(runId),
+      buildMappingLifecyclePlan(runId),
+    ]) {
       for (const check of lifecycle.steps) {
         const key = checkKey(check);
         if (!seenChecks.has(key)) {
@@ -525,13 +637,12 @@ async function main(): Promise<void> {
         const activeCtx = check.stage === "mutate" ? mutationCtx : ctx;
         const result = await runFacadeWithRetry(input, env, activeCtx, check);
         classified = classifySweepResult(check, result);
-        for (const followUp of buildDynamicFollowUpChecks(check, result, capabilities)) {
-          const key = checkKey(followUp);
-          if (!seenChecks.has(key)) {
-            seenChecks.add(key);
-            plan.push(followUp);
-          }
-        }
+        insertFollowUpChecks(
+          plan,
+          index,
+          seenChecks,
+          buildDynamicFollowUpChecks(check, result, capabilities),
+        );
       }
     } catch (err) {
       classified = classifySweepResult(check, {
@@ -652,6 +763,7 @@ const nameCandidates = ["name", "apiName", "developerName", "devName", "catalogN
 const apiNameCandidates = ["apiName", "name", "developerName", "devName", "id"];
 const dmoNameCandidates = ["apiName", "name", "developerName", "dmoName"];
 const dloNameCandidates = ["apiName", "name", "developerName", "dloName"];
+const mappingNameCandidates = ["developerName", "name", "mappingName", "id"];
 
 const dynamicFollowUps: Record<string, DynamicFollowUp[]> = {
   d360_data_spaces_list: [
@@ -865,6 +977,9 @@ const dynamicFollowUps: Record<string, DynamicFollowUp[]> = {
   ],
   d360_dmo_list: [{ capability: "d360_dmo_get", params: { dmoName: dmoNameCandidates } }],
   d360_dlo_list: [{ capability: "d360_dlo_get", params: { dloName: dloNameCandidates } }],
+  d360_dmo_mapping_list: [
+    { capability: "d360_dmo_mapping_get", params: { mappingName: mappingNameCandidates } },
+  ],
 };
 
 const dynamicDetailCapabilities = new Set(
@@ -873,10 +988,14 @@ const dynamicDetailCapabilities = new Set(
   ),
 );
 
-function buildDloCreateBody(resourceName: string, runId: string): Record<string, unknown> {
+function buildDloCreateBody(
+  resourceName: string,
+  runId: string,
+  labelPrefix = "Pi Sweep DLO",
+): Record<string, unknown> {
   return {
     name: resourceName,
-    label: `Pi Sweep DLO ${runId}`,
+    label: `${labelPrefix} ${runId}`,
     category: "Other",
     dataspaceInfo: [{ name: "default" }],
     dataLakeFieldInputRepresentations: buildDloFields(),
@@ -890,10 +1009,25 @@ function buildDloFields(): Array<Record<string, unknown>> {
   ];
 }
 
-function buildDmoCreateBody(resourceName: string, runId: string): Record<string, unknown> {
+function buildMappingCreateBody(dloName: string, dmoName: string): Record<string, unknown> {
+  return {
+    sourceEntityDeveloperName: dloName,
+    targetEntityDeveloperName: dmoName,
+    fieldMapping: [
+      { sourceFieldDeveloperName: "Id__c", targetFieldDeveloperName: "Id__c" },
+      { sourceFieldDeveloperName: "Name__c", targetFieldDeveloperName: "Name__c" },
+    ],
+  };
+}
+
+function buildDmoCreateBody(
+  resourceName: string,
+  runId: string,
+  labelPrefix = "Pi Sweep DMO",
+): Record<string, unknown> {
   return {
     name: resourceName,
-    label: `Pi Sweep DMO ${runId}`,
+    label: `${labelPrefix} ${runId}`,
     category: "PROFILE",
     dataSpaceName: "default",
     description: `Sweep-owned DMO created by run ${runId}.`,
