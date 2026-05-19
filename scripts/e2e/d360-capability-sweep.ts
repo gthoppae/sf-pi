@@ -1170,7 +1170,10 @@ export function shouldRetrySweepResult(
     .join(" ")
     .toLowerCase();
   return (
-    message.includes("currently in processing or deleting") || message.includes("try again later")
+    message.includes("currently in processing or deleting") ||
+    message.includes("currently: processing") ||
+    message.includes("being processed") ||
+    message.includes("try again later")
   );
 }
 
@@ -1218,6 +1221,9 @@ export function classifySweepResult(
     message.includes("no stdm interaction found") ||
     message.includes("no stdm session found") ||
     message.includes("semantic object not found") ||
+    (message.includes("semantic definition") &&
+      message.includes("doesn") &&
+      message.includes("exist")) ||
     message.includes("semantic_entity_not_exist") ||
     (check.sourceCapability?.endsWith("_delete_verify") &&
       message.includes("provide a valid recordid"))
@@ -1772,17 +1778,21 @@ function buildSemanticRelationshipCreateBody(
   runId: string,
 ): Record<string, unknown> {
   return {
+    apiName: `PiSweepRelationship_${runId}`,
     label: `Pi Sweep Relationship ${runId}`,
     leftSemanticDefinitionApiName: leftDataObjectApiName,
     rightSemanticDefinitionApiName: rightDataObjectApiName,
     cardinality: "ManyToOne",
     joinType: "Auto",
-    criteria: JSON.stringify({
-      leftFieldType: "TableField",
-      leftSemanticFieldApiName: "Id",
-      rightFieldType: "TableField",
-      rightSemanticFieldApiName: "Id",
-    }),
+    criteria: [
+      {
+        joinOperator: "Equals",
+        leftFieldType: "TableField",
+        leftSemanticFieldApiName: "Id",
+        rightFieldType: "TableField",
+        rightSemanticFieldApiName: "Id",
+      },
+    ],
   };
 }
 

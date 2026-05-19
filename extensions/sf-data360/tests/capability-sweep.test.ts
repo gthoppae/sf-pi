@@ -353,6 +353,20 @@ describe("d360 capability sweep planning", () => {
       }),
     ).toBe(true);
     expect(
+      shouldRetrySweepResult({
+        ok: false,
+        error:
+          "Cannot schedule a transform that is not active, transform X is currently: PROCESSING",
+      }),
+    ).toBe(true);
+    expect(
+      shouldRetrySweepResult({
+        ok: false,
+        error:
+          "You can't delete data transforms that are either being processed or are being deleted.",
+      }),
+    ).toBe(true);
+    expect(
       shouldRetrySweepResult(
         { ok: true },
         { stage: "live", capability: "d360_dlo_get", sourceCapability: "dlo_delete_verify" },
@@ -561,17 +575,21 @@ describe("d360 capability sweep planning", () => {
       "d360_dlo_get",
     ]);
     expect(lifecycle.steps[8].params?.body).toEqual({
+      apiName: "PiSweepRelationship_20260519010101",
       label: "Pi Sweep Relationship 20260519010101",
       leftSemanticDefinitionApiName: "PiSweepRelLeftObject_20260519010101",
       rightSemanticDefinitionApiName: "PiSweepRelRightObject_20260519010101",
       cardinality: "ManyToOne",
       joinType: "Auto",
-      criteria: JSON.stringify({
-        leftFieldType: "TableField",
-        leftSemanticFieldApiName: "Id",
-        rightFieldType: "TableField",
-        rightSemanticFieldApiName: "Id",
-      }),
+      criteria: [
+        {
+          joinOperator: "Equals",
+          leftFieldType: "TableField",
+          leftSemanticFieldApiName: "Id",
+          rightFieldType: "TableField",
+          rightSemanticFieldApiName: "Id",
+        },
+      ],
     });
   });
 
@@ -729,6 +747,21 @@ describe("d360 capability sweep planning", () => {
           ok: false,
           status: 500,
           error: "SemanticAuthoringError: Semantic object not found",
+        },
+      ),
+    ).toMatchObject({ outcome: "not_found_optional", fail: false });
+
+    expect(
+      classifySweepResult(
+        {
+          stage: "live",
+          capability: "d360_sdm_relationship_get",
+          sourceCapability: "sdm_relationship_delete_verify",
+        },
+        {
+          ok: false,
+          status: 500,
+          error: "Semantic definition (RelA) doesn't exist in semantic model.",
         },
       ),
     ).toMatchObject({ outcome: "not_found_optional", fail: false });
