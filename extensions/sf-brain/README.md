@@ -23,10 +23,15 @@ that teaches the agent:
    Setup with `sf org open --path`.
 9. **Org safety** — production confirmation gate, auth-error handling.
 10. **Defer to loaded `sf-*` skills** for language-specific work.
-11. **CLI install guidance** if `sf --version` fails.
+11. **Lazy reference map guidance** for choosing the smallest SF Pi or Salesforce
+    source of truth when the kernel is not enough.
+12. **CLI install guidance** if `sf --version` fails.
 
-The kernel body is the single source of truth in [`SF_KERNEL.md`](./SF_KERNEL.md).
-Users can override it by creating `<globalAgentDir>/sf-brain/SF_KERNEL.md`.
+The always-injected kernel body lives in [`SF_KERNEL.md`](./SF_KERNEL.md).
+Broader SF Pi and Salesforce routing guidance lives in
+[`SF_REFERENCE_MAP.md`](./SF_REFERENCE_MAP.md) and is read only when needed.
+Users can override the injected kernel by creating
+`<globalAgentDir>/sf-brain/SF_KERNEL.md`.
 
 ## Runtime Flow
 
@@ -94,7 +99,7 @@ extensions/sf-brain/
   tests/
     injection.test.ts       ← unit / smoke test
     kernel.test.ts          ← unit / smoke test
-    should-inject-kernel.test.ts← unit / smoke test
+    reference-map.test.ts   ← unit / smoke test
     smoke.test.ts           ← unit / smoke test
   index.ts                  ← Pi extension entry point
   manifest.json             ← source-of-truth extension metadata
@@ -116,6 +121,10 @@ Covered by unit tests:
   independent of any user override.
 - A user override at `<globalAgentDir>/sf-brain/SF_KERNEL.md` replaces the
   bundled body when CLI is installed, and is ignored when CLI is missing.
+- The injected kernel points to `SF_REFERENCE_MAP.md` without inlining the full
+  map.
+- The reference map routes user intent to repo-local Salesforce resources and
+  active SF skills.
 - The `before_agent_start` handler is a no-op if a `sf-brain-kernel` entry
   already exists in the session, and injects a hidden message otherwise.
 

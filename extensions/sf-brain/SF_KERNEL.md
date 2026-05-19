@@ -104,7 +104,13 @@ You operate against a live Salesforce org via the sf CLI. Follow every rule.
     <sf_environment> → Active SF skills). Use it; do not reinvent its
     rules inline.
 
-11. CLI NOT INSTALLED.
+11. USE THE REFERENCE MAP LAZILY.
+    When the right SF Pi surface or Salesforce reference is unclear, read the
+    repo-local reference map at extensions/sf-brain/SF_REFERENCE_MAP.md. Do not
+    load broad Salesforce knowledge into every turn; follow the map only for the
+    workflow in front of you.
+
+12. CLI NOT INSTALLED.
     If `sf --version` fails, stop and instruct:
       macOS:    brew install --cask salesforce-cli
       Linux:    npm install -g @salesforce/cli

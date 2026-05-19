@@ -10,7 +10,7 @@
  * a kernel.
  *
  * When the sf CLI is not installed, the full kernel is replaced by a short
- * install stub. Rule 11 in the full kernel still covers this for sessions that
+ * install stub. Rule 12 in the full kernel still covers this for sessions that
  * somehow get the full kernel despite a missing CLI, but the stub keeps the
  * common case tight.
  */
@@ -21,10 +21,7 @@ import { fileURLToPath } from "node:url";
 import type { SessionEntry } from "@earendil-works/pi-coding-agent";
 
 import { globalAgentPath } from "../../../lib/common/pi-paths.ts";
-import {
-  isLiveCustomMessageEntry,
-  shouldInjectOnce,
-} from "../../../lib/common/session/inject-once.ts";
+import { shouldInjectOnce } from "../../../lib/common/session/inject-once.ts";
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -99,14 +96,6 @@ export function loadKernel(options: { cliInstalled: boolean }): string {
   }
 
   return readBundledKernel();
-}
-
-/**
- * Type guard for a kernel custom_message entry. Thin wrapper over the
- * shared helper so callers don't repeat the customType.
- */
-export function isLiveKernelEntry(entry: unknown): boolean {
-  return isLiveCustomMessageEntry(entry, KERNEL_ENTRY_TYPE);
 }
 
 /**
