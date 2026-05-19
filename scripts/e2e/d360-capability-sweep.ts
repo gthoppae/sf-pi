@@ -87,7 +87,8 @@ interface MutationGateOptions {
 
 interface DmoLifecyclePlan {
   resourceName: string;
-  dmoName: string;
+  dmoName?: string;
+  dloName?: string;
   steps: SweepCheck[];
 }
 
@@ -151,6 +152,67 @@ export function canRunMutationLifecycle(
     return { ok: false, reason: "Mutation lifecycle requires a stable alphanumeric run id." };
   }
   return { ok: true };
+}
+
+export function buildDloLifecyclePlan(runId: string): DmoLifecyclePlan {
+  const resourceName = `PiSweepDlo_${runId}__dll`;
+  const dloName = resourceName;
+  return {
+    resourceName,
+    dloName,
+    steps: [
+      {
+        stage: "mutate",
+        capability: "d360_dlo_create",
+        family: "DLO",
+        safety: "confirmed",
+        params: { body: buildDloCreateBody(resourceName, runId) },
+      },
+      {
+        stage: "live",
+        capability: "d360_dlo_get",
+        family: "DLO",
+        safety: "read",
+        params: { dloName },
+        sourceCapability: "dlo_create_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_dlo_update",
+        family: "DLO",
+        safety: "confirmed",
+        params: {
+          dloName,
+          body: {
+            label: `Pi Sweep DLO ${runId} Updated`,
+          },
+        },
+      },
+      {
+        stage: "live",
+        capability: "d360_dlo_get",
+        family: "DLO",
+        safety: "read",
+        params: { dloName },
+        sourceCapability: "dlo_update_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_dlo_delete",
+        family: "DLO",
+        safety: "destructive",
+        params: { dloName },
+      },
+      {
+        stage: "live",
+        capability: "d360_dlo_get",
+        family: "DLO",
+        safety: "read",
+        params: { dloName },
+        sourceCapability: "dlo_delete_verify",
+      },
+    ],
+  };
 }
 
 export function buildDmoLifecyclePlan(runId: string): DmoLifecyclePlan {
@@ -298,8 +360,26 @@ export function containsPlaceholderValue(value: unknown): boolean {
   return false;
 }
 
+export function shouldRetrySweepResult(
+  result: Record<string, unknown>,
+  check?: SweepCheck,
+): boolean {
+  if (check?.sourceCapability?.endsWith("_delete_verify") && result.ok === true) return true;
+
+  const message = [
+    stringValue(result.summary),
+    stringValue(result.error),
+    JSON.stringify(result.response ?? ""),
+  ]
+    .join(" ")
+    .toLowerCase();
+  return (
+    message.includes("currently in processing or deleting") || message.includes("try again later")
+  );
+}
+
 export function classifySweepResult(
-  check: Pick<SweepCheck, "stage" | "capability" | "skipReason">,
+  check: Pick<SweepCheck, "stage" | "capability" | "skipReason" | "sourceCapability">,
   result: Record<string, unknown>,
 ): Pick<SweepRecord, "outcome" | "fail" | "summary" | "status" | "error"> {
   if (check.stage === "contract") {
@@ -340,7 +420,9 @@ export function classifySweepResult(
     message.includes("not_found") ||
     message.includes("does not exist") ||
     message.includes("no stdm interaction found") ||
-    message.includes("no stdm session found")
+    message.includes("no stdm session found") ||
+    (check.sourceCapability?.endsWith("_delete_verify") &&
+      message.includes("provide a valid recordid"))
   ) {
     return { outcome: "not_found_optional", fail: false, summary, status, error };
   }
@@ -403,11 +485,13 @@ async function main(): Promise<void> {
       destructiveEnvValue: process.env.D360_SWEEP_ALLOW_DESTRUCTIVE,
     });
     if (gate.ok !== true) throw new Error(gate.reason);
-    for (const check of buildDmoLifecyclePlan(runId).steps) {
-      const key = checkKey(check);
-      if (!seenChecks.has(key)) {
-        seenChecks.add(key);
-        plan.push(check);
+    for (const lifecycle of [buildDmoLifecyclePlan(runId), buildDloLifecyclePlan(runId)]) {
+      for (const check of lifecycle.steps) {
+        const key = checkKey(check);
+        if (!seenChecks.has(key)) {
+          seenChecks.add(key);
+          plan.push(check);
+        }
       }
     }
   }
@@ -439,7 +523,7 @@ async function main(): Promise<void> {
           output_mode: "summary",
         };
         const activeCtx = check.stage === "mutate" ? mutationCtx : ctx;
-        const result = await runFacade(input, env, activeCtx, activeCtx.signal);
+        const result = await runFacadeWithRetry(input, env, activeCtx, check);
         classified = classifySweepResult(check, result);
         for (const followUp of buildDynamicFollowUpChecks(check, result, capabilities)) {
           const key = checkKey(followUp);
@@ -490,6 +574,27 @@ async function main(): Promise<void> {
   console.log(`JSON: ${jsonPath}`);
   console.log(`Markdown: ${mdPath}`);
   process.exit(summary.failed === 0 ? 0 : 1);
+}
+
+async function runFacadeWithRetry(
+  input: D360FacadeInput,
+  env: SfEnvironment,
+  ctx: ExtensionContext,
+  check: SweepCheck,
+): Promise<Record<string, unknown>> {
+  const maxAttempts =
+    input.allow_confirmed || check.sourceCapability?.endsWith("_delete_verify") ? 6 : 1;
+  let result: Record<string, unknown> = {};
+  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
+    result = await runFacade(input, env, ctx, ctx.signal);
+    if (!shouldRetrySweepResult(result, check) || attempt === maxAttempts) return result;
+    await sleep(10_000);
+  }
+  return result;
+}
+
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
 function checkKey(check: SweepCheck): string {
@@ -767,6 +872,23 @@ const dynamicDetailCapabilities = new Set(
     followUps.map((followUp) => followUp.capability),
   ),
 );
+
+function buildDloCreateBody(resourceName: string, runId: string): Record<string, unknown> {
+  return {
+    name: resourceName,
+    label: `Pi Sweep DLO ${runId}`,
+    category: "Other",
+    dataspaceInfo: [{ name: "default" }],
+    dataLakeFieldInputRepresentations: buildDloFields(),
+  };
+}
+
+function buildDloFields(): Array<Record<string, unknown>> {
+  return [
+    { name: "Id__c", label: "Id", dataType: "Text", isPrimaryKey: true },
+    { name: "Name__c", label: "Name", dataType: "Text", isPrimaryKey: false },
+  ];
+}
 
 function buildDmoCreateBody(resourceName: string, runId: string): Record<string, unknown> {
   return {

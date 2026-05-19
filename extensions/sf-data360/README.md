@@ -268,7 +268,7 @@ npm run e2e:d360-sweep -- --target-org AgentforceSTDM --dry-run-only
 npm run e2e:d360-sweep -- --target-org AgentforceSTDM --max-live 20
 ```
 
-Run the sweep-owned DMO mutation lifecycle only against the disposable sweep org:
+Run the sweep-owned DMO and DLO mutation lifecycles only against the disposable sweep org:
 
 ```bash
 D360_SWEEP_ALLOW_DESTRUCTIVE=AgentforceSTDM npm run e2e:d360-sweep -- \
@@ -289,7 +289,7 @@ Covered by unit tests:
 - HTTP errors from `Connection.request` surface as `{ status, body }` and are classified by `responseLooksLikeError`; the tool emits an error envelope instead of throwing.
 - Salesforce REST error arrays embedded in 2xx responses are still classified as failed calls.
 - Generated phase skills are committed, reproducible from `registry/phases.json`, and checked in the normal lint path.
-- The capability sweep plans dry-run coverage for every facade capability, runs bounded read/safe-post live checks, dynamically follows list responses into detail reads when public-safe identifiers are available, and can run a sweep-owned DMO create/get/update/delete lifecycle behind an explicit destructive gate.
+- The capability sweep plans dry-run coverage for every facade capability, runs bounded read/safe-post live checks, dynamically follows list responses into detail reads when public-safe identifiers are available, and can run sweep-owned DMO/DLO create/get/update/delete lifecycles behind an explicit destructive gate.
 
 ## Troubleshooting
 

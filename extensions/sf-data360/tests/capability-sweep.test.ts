@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildCapabilitySweepPlan,
+  buildDloLifecyclePlan,
   buildDmoLifecyclePlan,
   buildDynamicFollowUpChecks,
   canRunMutationLifecycle,
@@ -10,6 +11,7 @@ import {
   containsPlaceholderValue,
   paramsForDryRun,
   paramsForLiveCheck,
+  shouldRetrySweepResult,
 } from "../../../scripts/e2e/d360-capability-sweep.ts";
 import type { D360Capability } from "../lib/facade/registry.ts";
 
@@ -287,6 +289,48 @@ describe("d360 capability sweep planning", () => {
     expect(lifecycle.steps[4].params).toEqual({ dmoName: "PiSweepDmo_20260519010101__dlm" });
   });
 
+  it("builds a sweep-owned DLO lifecycle plan", () => {
+    const lifecycle = buildDloLifecyclePlan("20260519010101");
+
+    expect(lifecycle.resourceName).toBe("PiSweepDlo_20260519010101__dll");
+    expect(lifecycle.dloName).toBe("PiSweepDlo_20260519010101__dll");
+    expect(lifecycle.steps.map((step) => step.capability)).toEqual([
+      "d360_dlo_create",
+      "d360_dlo_get",
+      "d360_dlo_update",
+      "d360_dlo_get",
+      "d360_dlo_delete",
+      "d360_dlo_get",
+    ]);
+    expect(lifecycle.steps[0].params?.body).toMatchObject({
+      name: "PiSweepDlo_20260519010101__dll",
+      label: "Pi Sweep DLO 20260519010101",
+      category: "Other",
+      dataspaceInfo: [{ name: "default" }],
+    });
+    expect(lifecycle.steps[2].params?.body).toEqual({
+      label: "Pi Sweep DLO 20260519010101 Updated",
+    });
+    expect(lifecycle.steps[4].params).toEqual({ dloName: "PiSweepDlo_20260519010101__dll" });
+  });
+
+  it("retries transient processing-state lifecycle responses", () => {
+    expect(
+      shouldRetrySweepResult({
+        ok: false,
+        error:
+          "Data Lake Object is currently in processing or deleting cannot be updated or deleted.",
+      }),
+    ).toBe(true);
+    expect(
+      shouldRetrySweepResult(
+        { ok: true },
+        { stage: "live", capability: "d360_dlo_get", sourceCapability: "dlo_delete_verify" },
+      ),
+    ).toBe(true);
+    expect(shouldRetrySweepResult({ ok: false, error: "Unrecognized field" })).toBe(false);
+  });
+
   it("requires explicit mutation gate for sweep-owned destructive lifecycle checks", () => {
     expect(
       canRunMutationLifecycle({
@@ -362,6 +406,18 @@ describe("d360 capability sweep planning", () => {
       classifySweepResult(
         { stage: "live", capability: "agent_observability.join_interaction_trace" },
         { ok: false, error: "No STDM interaction found for 'abc'." },
+      ),
+    ).toMatchObject({ outcome: "not_found_optional", fail: false });
+
+    expect(
+      classifySweepResult(
+        { stage: "live", capability: "d360_dlo_get", sourceCapability: "dlo_delete_verify" },
+        {
+          ok: false,
+          status: 500,
+          error:
+            "Please provide a valid recordId of type DataLakeObjectInstance or a valid developerName for a Data Lake Object.",
+        },
       ),
     ).toMatchObject({ outcome: "not_found_optional", fail: false });
 
