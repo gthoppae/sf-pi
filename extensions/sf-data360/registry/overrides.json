@@ -386,6 +386,7 @@
     "tips": "Validate first with d360_transform_validate, then dry_run the create request before execution."
   },
   "d360_transform_update": {
+    "method": "PUT",
     "requiredParams": ["transformId", "body"],
     "optionalParams": ["dataspace"],
     "safety": "confirmed",

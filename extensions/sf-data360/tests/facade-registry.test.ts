@@ -203,6 +203,14 @@ describe("d360 facade registry", () => {
     ]);
   });
 
+  it("uses the live data transform update method", () => {
+    expect(findCapability("d360_transform_update")?.operation).toMatchObject({
+      method: "PUT",
+      safety: "confirmed",
+      path: "/ssot/data-transforms/{transformId}",
+    });
+  });
+
   it("uses the live semantic metric update method", () => {
     expect(findCapability("d360_sdm_metric_update")?.operation).toMatchObject({
       method: "PUT",

@@ -822,7 +822,7 @@
     "name": "d360_transform_update",
     "family": "DataTransform",
     "description": "Update a data transform by id.",
-    "method": "PATCH",
+    "method": "PUT",
     "path": "/ssot/data-transforms/{transformId}",
     "requiredParams": ["transformId", "body"],
     "optionalParams": ["dataspace"],

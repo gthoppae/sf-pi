@@ -90,6 +90,8 @@ interface DmoLifecyclePlan {
   dmoName?: string;
   dloName?: string;
   modelApiNameOrId?: string;
+  secondaryDloName?: string;
+  transformName?: string;
   steps: SweepCheck[];
 }
 
@@ -259,6 +261,294 @@ export function buildSemanticModelLifecyclePlan(runId: string): DmoLifecyclePlan
         safety: "read",
         params: { modelApiNameOrId: resourceName },
         sourceCapability: "sdm_delete_verify",
+      },
+    ],
+  };
+}
+
+export function buildTransformLifecyclePlan(runId: string): DmoLifecyclePlan {
+  const resourceName = `PiSwTx_${runId}`;
+  const sourceDloName = "AIRetrieverRequest__dll";
+  const targetDloName = `PiSwTxTgt_${runId}__dll`;
+  const body = buildTransformBody(resourceName, sourceDloName, targetDloName, runId);
+  return {
+    resourceName,
+    dloName: targetDloName,
+    secondaryDloName: sourceDloName,
+    transformName: resourceName,
+    steps: [
+      {
+        stage: "live",
+        capability: "d360_dlo_get",
+        family: "DLO",
+        safety: "read",
+        params: { dloName: sourceDloName },
+        sourceCapability: "transform_source_dlo_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_dlo_create",
+        family: "DLO",
+        safety: "confirmed",
+        params: {
+          body: {
+            name: targetDloName,
+            label: `Pi Tx Target ${runId}`,
+            category: "Other",
+            dataspaceInfo: [{ name: "default" }],
+            dataLakeFieldInputRepresentations: [
+              { name: "Id__c", label: "Id", dataType: "Text", isPrimaryKey: true },
+            ],
+          },
+        },
+      },
+      {
+        stage: "live",
+        capability: "d360_dlo_get",
+        family: "DLO",
+        safety: "read",
+        params: { dloName: targetDloName },
+        sourceCapability: "transform_target_dlo_create_verify",
+      },
+      {
+        stage: "live",
+        capability: "d360_transform_validate",
+        family: "DataTransform",
+        safety: "safe_post",
+        params: { body },
+        sourceCapability: "transform_validate_before_create",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_transform_create",
+        family: "DataTransform",
+        safety: "confirmed",
+        params: { body },
+      },
+      {
+        stage: "live",
+        capability: "d360_transform_get",
+        family: "DataTransform",
+        safety: "read",
+        params: { transformId: resourceName },
+        sourceCapability: "transform_create_verify",
+      },
+
+      {
+        stage: "mutate",
+        capability: "d360_transform_delete",
+        family: "DataTransform",
+        safety: "destructive",
+        params: { transformId: resourceName },
+      },
+      {
+        stage: "live",
+        capability: "d360_transform_get",
+        family: "DataTransform",
+        safety: "read",
+        params: { transformId: resourceName },
+        sourceCapability: "transform_delete_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_dlo_delete",
+        family: "DLO",
+        safety: "destructive",
+        params: { dloName: targetDloName },
+        sourceCapability: "transform_cleanup_target_dlo",
+      },
+      {
+        stage: "live",
+        capability: "d360_dlo_get",
+        family: "DLO",
+        safety: "read",
+        params: { dloName: targetDloName },
+        sourceCapability: "transform_target_dlo_delete_verify",
+      },
+    ],
+  };
+}
+
+export function buildSemanticRelationshipLifecyclePlan(runId: string): DmoLifecyclePlan {
+  const resourceName = `PiSweepSdmRel_${runId}`;
+  const leftDloName = `PiSwRelL_${runId}__dll`;
+  const rightDloName = `PiSwRelR_${runId}__dll`;
+  const leftDataObjectApiName = `PiSweepRelLeftObject_${runId}`;
+  const rightDataObjectApiName = `PiSweepRelRightObject_${runId}`;
+  return {
+    resourceName,
+    dloName: leftDloName,
+    secondaryDloName: rightDloName,
+    modelApiNameOrId: resourceName,
+    steps: [
+      {
+        stage: "mutate",
+        capability: "d360_dlo_create",
+        family: "DLO",
+        safety: "confirmed",
+        params: { body: buildDloCreateBody(leftDloName, runId, "Pi Rel Left") },
+      },
+      {
+        stage: "live",
+        capability: "d360_dlo_get",
+        family: "DLO",
+        safety: "read",
+        params: { dloName: leftDloName },
+        sourceCapability: "sdm_relationship_left_dlo_create_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_dlo_create",
+        family: "DLO",
+        safety: "confirmed",
+        params: {
+          body: buildDloCreateBody(rightDloName, runId, "Pi Rel Right"),
+        },
+      },
+      {
+        stage: "live",
+        capability: "d360_dlo_get",
+        family: "DLO",
+        safety: "read",
+        params: { dloName: rightDloName },
+        sourceCapability: "sdm_relationship_right_dlo_create_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_sdm_create",
+        family: "Semantic Retrieval",
+        safety: "confirmed",
+        params: { body: buildSemanticModelCreateBody(resourceName, runId) },
+      },
+      {
+        stage: "live",
+        capability: "d360_sdm_get",
+        family: "Semantic Retrieval",
+        safety: "read",
+        params: { modelApiNameOrId: resourceName },
+        sourceCapability: "sdm_relationship_model_create_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_sdm_data_object_create",
+        family: "Semantic Retrieval",
+        safety: "confirmed",
+        params: {
+          modelApiNameOrId: resourceName,
+          body: buildRelationshipSemanticDataObjectCreateBody(
+            leftDataObjectApiName,
+            leftDloName,
+            runId,
+            "Left",
+          ),
+        },
+      },
+      {
+        stage: "mutate",
+        capability: "d360_sdm_data_object_create",
+        family: "Semantic Retrieval",
+        safety: "confirmed",
+        params: {
+          modelApiNameOrId: resourceName,
+          body: buildRelationshipSemanticDataObjectCreateBody(
+            rightDataObjectApiName,
+            rightDloName,
+            runId,
+            "Right",
+          ),
+        },
+      },
+      {
+        stage: "mutate",
+        capability: "d360_sdm_relationship_create",
+        family: "Semantic Retrieval",
+        safety: "confirmed",
+        params: {
+          modelApiNameOrId: resourceName,
+          body: buildSemanticRelationshipCreateBody(
+            leftDataObjectApiName,
+            rightDataObjectApiName,
+            runId,
+          ),
+        },
+      },
+      {
+        stage: "live",
+        capability: "d360_sdm_relationships_list",
+        family: "Semantic Retrieval",
+        safety: "read",
+        params: { modelApiNameOrId: resourceName },
+        sourceCapability: "sdm_relationship_create_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_sdm_relationship_delete",
+        family: "Semantic Retrieval",
+        safety: "destructive",
+        params: { modelApiNameOrId: resourceName, relationshipId: `PiSweepRelationship_${runId}` },
+      },
+      {
+        stage: "live",
+        capability: "d360_sdm_relationship_get",
+        family: "Semantic Retrieval",
+        safety: "read",
+        params: { modelApiNameOrId: resourceName, relationshipId: `PiSweepRelationship_${runId}` },
+        sourceCapability: "sdm_relationship_delete_verify",
+      },
+      {
+        stage: "live",
+        capability: "d360_sdm_validate",
+        family: "Semantic Retrieval",
+        safety: "read",
+        params: { modelApiNameOrId: resourceName },
+        sourceCapability: "sdm_relationship_validate",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_sdm_delete",
+        family: "Semantic Retrieval",
+        safety: "destructive",
+        params: { modelApiNameOrId: resourceName },
+      },
+      {
+        stage: "live",
+        capability: "d360_sdm_get",
+        family: "Semantic Retrieval",
+        safety: "read",
+        params: { modelApiNameOrId: resourceName },
+        sourceCapability: "sdm_relationship_model_delete_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_dlo_delete",
+        family: "DLO",
+        safety: "destructive",
+        params: { dloName: leftDloName },
+        sourceCapability: "sdm_relationship_cleanup_left_dlo",
+      },
+      {
+        stage: "live",
+        capability: "d360_dlo_get",
+        family: "DLO",
+        safety: "read",
+        params: { dloName: leftDloName },
+        sourceCapability: "sdm_relationship_left_dlo_delete_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_dlo_delete",
+        family: "DLO",
+        safety: "destructive",
+        params: { dloName: rightDloName },
+        sourceCapability: "sdm_relationship_cleanup_right_dlo",
+      },
+      {
+        stage: "live",
+        capability: "d360_dlo_get",
+        family: "DLO",
+        safety: "read",
+        params: { dloName: rightDloName },
+        sourceCapability: "sdm_relationship_right_dlo_delete_verify",
       },
     ],
   };
@@ -906,6 +1196,10 @@ export function classifySweepResult(
   ) {
     return { outcome: "feature_gated", fail: false, summary, status, error };
   }
+  if (message.includes("can not deserialize: unexpected array")) {
+    return { outcome: "skipped_needs_payload", fail: false, summary, status, error };
+  }
+
   if (
     message.includes("requires") ||
     message.includes("dependency") ||
@@ -965,6 +1259,8 @@ async function main(): Promise<void> {
       buildSemanticDataObjectLifecyclePlan(runId),
       buildSemanticCalculatedFieldsLifecyclePlan(runId),
       buildSemanticMetricLifecyclePlan(runId),
+      buildSemanticRelationshipLifecyclePlan(runId),
+      buildTransformLifecyclePlan(runId),
     ]) {
       for (const check of lifecycle.steps) {
         const key = checkKey(check);
@@ -1375,6 +1671,82 @@ function buildDloFields(): Array<Record<string, unknown>> {
     { name: "Id__c", label: "Id", dataType: "Text", isPrimaryKey: true },
     { name: "Name__c", label: "Name", dataType: "Text", isPrimaryKey: false },
   ];
+}
+
+function buildTransformBody(
+  transformName: string,
+  sourceDloName: string,
+  targetDloName: string,
+  runId: string,
+): Record<string, unknown> {
+  return {
+    label: `Pi Sweep Transform ${runId}`,
+    name: transformName,
+    type: "BATCH",
+    definition: {
+      type: "STL",
+      version: "66.0",
+      nodes: {
+        LOAD_DATASET0: {
+          action: "load",
+          parameters: {
+            dataset: { name: sourceDloName, type: "dataLakeObject" },
+            fields: ["id__c"],
+            sampleDetails: { sortBy: [], type: "TopN" },
+          },
+          sources: [],
+        },
+        OUTPUT0: {
+          action: "outputD360",
+          parameters: {
+            name: targetDloName,
+            type: "dataLakeObject",
+            writeMode: "OVERWRITE",
+            fieldsMappings: [{ sourceField: "id__c", targetField: "Id__c" }],
+          },
+          sources: ["LOAD_DATASET0"],
+        },
+      },
+    },
+  };
+}
+
+function buildRelationshipSemanticDataObjectCreateBody(
+  apiName: string,
+  dloName: string,
+  runId: string,
+  side: "Left" | "Right",
+): Record<string, unknown> {
+  return {
+    apiName,
+    label: `Pi Sweep Relationship ${side} Object ${runId}`,
+    dataObjectType: "Dlo",
+    dataObjectName: dloName,
+    shouldIncludeAllFields: false,
+    semanticDimensions: [
+      { apiName: "Id", label: "Id", dataType: "Text", dataObjectFieldName: "Id__c" },
+    ],
+  };
+}
+
+function buildSemanticRelationshipCreateBody(
+  leftDataObjectApiName: string,
+  rightDataObjectApiName: string,
+  runId: string,
+): Record<string, unknown> {
+  return {
+    label: `Pi Sweep Relationship ${runId}`,
+    leftSemanticDefinitionApiName: leftDataObjectApiName,
+    rightSemanticDefinitionApiName: rightDataObjectApiName,
+    cardinality: "ManyToOne",
+    joinType: "Auto",
+    criteria: JSON.stringify({
+      leftFieldType: "TableField",
+      leftSemanticFieldApiName: "Id",
+      rightFieldType: "TableField",
+      rightSemanticFieldApiName: "Id",
+    }),
+  };
 }
 
 function buildMetricDloCreateBody(dloName: string, runId: string): Record<string, unknown> {

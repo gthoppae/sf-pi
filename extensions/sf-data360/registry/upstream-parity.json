@@ -1531,7 +1531,7 @@
       "upstreamPath": "/ssot/data-transforms/{id}",
       "facadeOperation": "d360_transform_update",
       "facadeFamily": "DataTransform",
-      "facadeMethod": "PATCH",
+      "facadeMethod": "PUT",
       "facadePath": "/ssot/data-transforms/{transformId}",
       "safety": "confirmed",
       "kind": "rest_adjusted",

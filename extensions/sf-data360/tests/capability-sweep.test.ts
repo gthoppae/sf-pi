@@ -11,6 +11,8 @@ import {
   buildSemanticDataObjectLifecyclePlan,
   buildSemanticMetricLifecyclePlan,
   buildSemanticModelLifecyclePlan,
+  buildSemanticRelationshipLifecyclePlan,
+  buildTransformLifecyclePlan,
   canRunMutationLifecycle,
   classifySweepResult,
   containsPlaceholderValue,
@@ -530,6 +532,84 @@ describe("d360 capability sweep planning", () => {
     });
   });
 
+  it("builds a sweep-owned semantic relationship lifecycle plan", () => {
+    const lifecycle = buildSemanticRelationshipLifecyclePlan("20260519010101");
+
+    expect(lifecycle.resourceName).toBe("PiSweepSdmRel_20260519010101");
+    expect(lifecycle.dloName).toBe("PiSwRelL_20260519010101__dll");
+    expect(lifecycle.secondaryDloName).toBe("PiSwRelR_20260519010101__dll");
+    expect(lifecycle.modelApiNameOrId).toBe("PiSweepSdmRel_20260519010101");
+    expect(lifecycle.steps.map((step) => step.capability)).toEqual([
+      "d360_dlo_create",
+      "d360_dlo_get",
+      "d360_dlo_create",
+      "d360_dlo_get",
+      "d360_sdm_create",
+      "d360_sdm_get",
+      "d360_sdm_data_object_create",
+      "d360_sdm_data_object_create",
+      "d360_sdm_relationship_create",
+      "d360_sdm_relationships_list",
+      "d360_sdm_relationship_delete",
+      "d360_sdm_relationship_get",
+      "d360_sdm_validate",
+      "d360_sdm_delete",
+      "d360_sdm_get",
+      "d360_dlo_delete",
+      "d360_dlo_get",
+      "d360_dlo_delete",
+      "d360_dlo_get",
+    ]);
+    expect(lifecycle.steps[8].params?.body).toEqual({
+      label: "Pi Sweep Relationship 20260519010101",
+      leftSemanticDefinitionApiName: "PiSweepRelLeftObject_20260519010101",
+      rightSemanticDefinitionApiName: "PiSweepRelRightObject_20260519010101",
+      cardinality: "ManyToOne",
+      joinType: "Auto",
+      criteria: JSON.stringify({
+        leftFieldType: "TableField",
+        leftSemanticFieldApiName: "Id",
+        rightFieldType: "TableField",
+        rightSemanticFieldApiName: "Id",
+      }),
+    });
+  });
+
+  it("builds a sweep-owned data transform lifecycle plan", () => {
+    const lifecycle = buildTransformLifecyclePlan("20260519010101");
+
+    expect(lifecycle.resourceName).toBe("PiSwTx_20260519010101");
+    expect(lifecycle.dloName).toBe("PiSwTxTgt_20260519010101__dll");
+    expect(lifecycle.secondaryDloName).toBe("AIRetrieverRequest__dll");
+    expect(lifecycle.transformName).toBe("PiSwTx_20260519010101");
+    expect(lifecycle.steps.map((step) => step.capability)).toEqual([
+      "d360_dlo_get",
+      "d360_dlo_create",
+      "d360_dlo_get",
+      "d360_transform_validate",
+      "d360_transform_create",
+      "d360_transform_get",
+      "d360_transform_delete",
+      "d360_transform_get",
+      "d360_dlo_delete",
+      "d360_dlo_get",
+    ]);
+    expect(lifecycle.steps[3].params?.body).toMatchObject({
+      name: "PiSwTx_20260519010101",
+      label: "Pi Sweep Transform 20260519010101",
+      type: "BATCH",
+    });
+    expect(lifecycle.steps[4].params?.body).toMatchObject({
+      name: "PiSwTx_20260519010101",
+      label: "Pi Sweep Transform 20260519010101",
+      type: "BATCH",
+      definition: {
+        type: "STL",
+        version: "66.0",
+      },
+    });
+  });
+
   it("requires explicit mutation gate for sweep-owned destructive lifecycle checks", () => {
     expect(
       canRunMutationLifecycle({
@@ -600,6 +680,13 @@ describe("d360 capability sweep planning", () => {
         { ok: false, status: 500, error: "Field Ids should not be empty" },
       ),
     ).toMatchObject({ outcome: "dependency_missing", fail: false });
+
+    expect(
+      classifySweepResult(
+        { stage: "mutate", capability: "d360_sdm_relationship_create" },
+        { ok: false, status: 281, error: "Can not deserialize: unexpected array" },
+      ),
+    ).toMatchObject({ outcome: "skipped_needs_payload", fail: false });
 
     expect(
       classifySweepResult(
