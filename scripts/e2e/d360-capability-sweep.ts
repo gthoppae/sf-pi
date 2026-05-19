@@ -43,10 +43,12 @@ export type SweepOutcome =
   | "failed";
 
 export type MutationLifecycleName =
+  | "activation-target"
   | "calculated-insight"
   | "dmo"
   | "dlo"
   | "mapping"
+  | "segment"
   | "sdm"
   | "sdm-data-object"
   | "sdm-calculated-fields"
@@ -303,6 +305,69 @@ export function buildSemanticModelLifecyclePlan(runId: string): DmoLifecyclePlan
         safety: "read",
         params: { modelApiNameOrId: resourceName },
         sourceCapability: "sdm_delete_verify",
+      },
+    ],
+  };
+}
+
+export function buildActivationTargetLifecyclePlan(runId: string): DmoLifecyclePlan {
+  const activationTargetName = `PiSweepActTarget_${runId}`;
+  return {
+    resourceName: activationTargetName,
+    steps: [
+      {
+        stage: "mutate",
+        capability: "d360_activation_target_create",
+        family: "Activation",
+        safety: "confirmed",
+        params: { body: buildActivationTargetCreateBody(activationTargetName) },
+      },
+      {
+        stage: "live",
+        capability: "d360_activation_target_list",
+        family: "Activation",
+        safety: "read",
+        params: { limit: 10 },
+        sourceCapability: "activation_target_create_verify",
+      },
+    ],
+  };
+}
+
+export function buildSegmentLifecyclePlan(runId: string): DmoLifecyclePlan {
+  const segmentApiName = `PiSweepSegment_${runId}`;
+  return {
+    resourceName: segmentApiName,
+    steps: [
+      {
+        stage: "mutate",
+        capability: "d360_segment_create",
+        family: "Segment",
+        safety: "confirmed",
+        params: { body: buildSegmentCreateBody(segmentApiName, runId) },
+      },
+      {
+        stage: "live",
+        capability: "d360_segment_get",
+        family: "Segment",
+        safety: "read",
+        params: { segmentId: segmentApiName },
+        sourceCapability: "segment_create_verify",
+      },
+      {
+        stage: "mutate",
+        capability: "d360_segment_delete",
+        family: "Segment",
+        safety: "destructive",
+        params: { segmentApiName },
+      },
+      {
+        stage: "live",
+        capability: "d360_segment_get",
+        family: "Segment",
+        safety: "read",
+        params: { segmentId: segmentApiName },
+        sourceCapability: "segment_delete_verify",
       },
     ],
   };
@@ -1277,10 +1342,21 @@ export function buildCleanupLifecyclePlan(runId: string): DmoLifecyclePlan {
   const transformNames = [`PiSwTx_${runId}`];
   const dataActionNames = [`PiSweepAction_${runId}`];
   const calculatedInsightNames = [`PiSweepCi_${runId}__cio`];
+  const segmentNames = [`PiSweepSegment_${runId}`];
   const dataActionTargetNames = [`PiSweepTarget_${runId}`];
   return {
     resourceName: `PiSweepCleanup_${runId}`,
     steps: [
+      ...segmentNames.map(
+        (segmentApiName): SweepCheck => ({
+          stage: "mutate",
+          capability: "d360_segment_delete",
+          family: "Segment",
+          safety: "destructive",
+          params: { segmentApiName },
+          sourceCapability: "cleanup_segment",
+        }),
+      ),
       ...calculatedInsightNames.map(
         (ciName): SweepCheck => ({
           stage: "mutate",
@@ -1356,10 +1432,12 @@ export function buildCleanupLifecyclePlan(runId: string): DmoLifecyclePlan {
 }
 
 const lifecycleBuilders: Record<MutationLifecycleName, (runId: string) => DmoLifecyclePlan> = {
+  "activation-target": buildActivationTargetLifecyclePlan,
   "calculated-insight": buildCalculatedInsightLifecyclePlan,
   dmo: buildDmoLifecyclePlan,
   dlo: buildDloLifecyclePlan,
   mapping: buildMappingLifecyclePlan,
+  segment: buildSegmentLifecyclePlan,
   sdm: buildSemanticModelLifecyclePlan,
   "sdm-data-object": buildSemanticDataObjectLifecyclePlan,
   "sdm-calculated-fields": buildSemanticCalculatedFieldsLifecyclePlan,
@@ -1463,6 +1541,9 @@ export function buildDynamicFollowUpChecks(
   result: Record<string, unknown>,
   capabilities: D360Capability[] = getD360Capabilities(),
 ): SweepCheck[] {
+  if (result.ok === true && sourceCheck.capability === "d360_activation_target_create") {
+    return buildActivationTargetCreateFollowUps(sourceCheck, result);
+  }
   if (sourceCheck.stage !== "live" || result.ok !== true) return [];
   const followUps = dynamicFollowUps[sourceCheck.capability] ?? [];
   if (!followUps.length) return [];
@@ -1495,6 +1576,51 @@ export function buildDynamicFollowUpChecks(
       },
     ];
   });
+}
+
+function buildActivationTargetCreateFollowUps(
+  sourceCheck: SweepCheck,
+  result: Record<string, unknown>,
+): SweepCheck[] {
+  const row = firstObjectRow(result.response);
+  const activationTargetId = row ? firstString(row, ["id"]) : undefined;
+  const name = row ? firstString(row, ["name"]) : undefined;
+  if (!activationTargetId || !name) return [];
+  return [
+    {
+      stage: "live",
+      capability: "d360_activation_target_get",
+      family: "Activation",
+      safety: "read",
+      params: { activationTargetId },
+      sourceCapability: `${sourceCheck.capability}_get`,
+    },
+    {
+      stage: "mutate",
+      capability: "d360_activation_target_update",
+      family: "Activation",
+      safety: "confirmed",
+      params: {
+        activationTargetId,
+        body: {
+          name,
+          platformType: "DataCloud",
+          dataSpaceName: "default",
+          connector: {},
+          description: `Sweep-owned activation target updated from ${name}.`,
+        },
+      },
+      sourceCapability: `${sourceCheck.capability}_update`,
+    },
+    {
+      stage: "live",
+      capability: "d360_activation_target_get",
+      family: "Activation",
+      safety: "read",
+      params: { activationTargetId },
+      sourceCapability: `${sourceCheck.capability}_update_verify`,
+    },
+  ];
 }
 
 export function paramsForDryRun(capability: D360Capability): Record<string, unknown> {
@@ -2166,6 +2292,37 @@ function buildDloFields(): Array<Record<string, unknown>> {
     { name: "Id__c", label: "Id", dataType: "Text", isPrimaryKey: true },
     { name: "Name__c", label: "Name", dataType: "Text", isPrimaryKey: false },
   ];
+}
+
+function buildActivationTargetCreateBody(activationTargetName: string): Record<string, unknown> {
+  return {
+    name: activationTargetName,
+    platformType: "DataCloud",
+    dataSpaceName: "default",
+    connector: {},
+  };
+}
+
+function buildSegmentCreateBody(segmentApiName: string, runId: string): Record<string, unknown> {
+  return {
+    developerName: segmentApiName,
+    displayName: `Pi Sweep Segment ${runId}`,
+    description: `Sweep-owned segment created by run ${runId}.`,
+    segmentOnApiName: "ssot__AiAgentSession__dlm",
+    segmentType: "Dbt",
+    publishSchedule: "NoRefresh",
+    segmentCreationFlow: "Visual",
+    includeDbt: {
+      models: {
+        models: [
+          {
+            name: `pi_sweep_segment_${runId}`,
+            sql: "SELECT DISTINCT ssot__AiAgentSession__dlm.ssot__Id__c, ssot__AiAgentSession__dlm.KQ_Id__c FROM ssot__AiAgentSession__dlm",
+          },
+        ],
+      },
+    },
+  };
 }
 
 function buildCalculatedInsightValidateBody(runId: string): Record<string, unknown> {

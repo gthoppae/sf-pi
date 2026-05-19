@@ -375,6 +375,7 @@
     "tips": "Must reference a valid connection/connector target. Use dry_run first."
   },
   "d360_activation_target_update": {
+    "method": "PATCH",
     "requiredParams": ["activationTargetId", "body"],
     "safety": "confirmed",
     "tips": "Use dry_run first; activation target changes can affect downstream delivery."

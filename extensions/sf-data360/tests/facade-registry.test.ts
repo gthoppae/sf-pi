@@ -203,6 +203,14 @@ describe("d360 facade registry", () => {
     ]);
   });
 
+  it("uses the live activation target update method", () => {
+    expect(findCapability("d360_activation_target_update")?.operation).toMatchObject({
+      method: "PATCH",
+      safety: "confirmed",
+      path: "/ssot/activation-targets/{activationTargetId}",
+    });
+  });
+
   it("uses the live data transform update method", () => {
     expect(findCapability("d360_transform_update")?.operation).toMatchObject({
       method: "PUT",

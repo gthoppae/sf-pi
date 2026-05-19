@@ -2,6 +2,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  buildActivationTargetLifecyclePlan,
   buildCapabilitySweepPlan,
   applySweepPreset,
   buildCalculatedInsightLifecyclePlan,
@@ -16,6 +17,7 @@ import {
   buildMutationLifecyclePlans,
   buildSemanticCalculatedFieldsLifecyclePlan,
   buildSemanticDataObjectLifecyclePlan,
+  buildSegmentLifecyclePlan,
   buildSemanticMetricLifecyclePlan,
   buildSemanticModelLifecyclePlan,
   buildSemanticRelationshipLifecyclePlan,
@@ -730,6 +732,40 @@ describe("d360 capability sweep planning", () => {
           rightSemanticFieldApiName: "Id",
         },
       ],
+    });
+  });
+
+  it("builds a sweep-owned segment lifecycle plan", () => {
+    const lifecycle = buildSegmentLifecyclePlan("20260519010101");
+
+    expect(lifecycle.resourceName).toBe("PiSweepSegment_20260519010101");
+    expect(lifecycle.steps.map((step) => step.capability)).toEqual([
+      "d360_segment_create",
+      "d360_segment_get",
+      "d360_segment_delete",
+      "d360_segment_get",
+    ]);
+    expect(lifecycle.steps[0].params?.body).toMatchObject({
+      developerName: "PiSweepSegment_20260519010101",
+      segmentOnApiName: "ssot__AiAgentSession__dlm",
+      segmentType: "Dbt",
+      segmentCreationFlow: "Visual",
+    });
+  });
+
+  it("builds a sweep-owned activation target lifecycle plan", () => {
+    const lifecycle = buildActivationTargetLifecyclePlan("20260519010101");
+
+    expect(lifecycle.resourceName).toBe("PiSweepActTarget_20260519010101");
+    expect(lifecycle.steps.map((step) => step.capability)).toEqual([
+      "d360_activation_target_create",
+      "d360_activation_target_list",
+    ]);
+    expect(lifecycle.steps[0].params?.body).toEqual({
+      name: "PiSweepActTarget_20260519010101",
+      platformType: "DataCloud",
+      dataSpaceName: "default",
+      connector: {},
     });
   });
 

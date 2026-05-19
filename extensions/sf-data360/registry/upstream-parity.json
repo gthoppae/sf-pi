@@ -1327,7 +1327,7 @@
       "upstreamPath": "/ssot/activation-targets/{id}",
       "facadeOperation": "d360_activation_target_update",
       "facadeFamily": "Activation",
-      "facadeMethod": "PUT",
+      "facadeMethod": "PATCH",
       "facadePath": "/ssot/activation-targets/{activationTargetId}",
       "safety": "confirmed",
       "kind": "rest_adjusted",

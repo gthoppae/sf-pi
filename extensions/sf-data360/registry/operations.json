@@ -812,7 +812,7 @@
     "name": "d360_activation_target_update",
     "family": "Activation",
     "description": "Update an activation target by id.",
-    "method": "PUT",
+    "method": "PATCH",
     "path": "/ssot/activation-targets/{activationTargetId}",
     "requiredParams": ["activationTargetId", "body"],
     "safety": "confirmed",
