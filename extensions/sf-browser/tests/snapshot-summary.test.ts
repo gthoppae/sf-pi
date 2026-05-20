@@ -42,6 +42,26 @@ describe("snapshot summary", () => {
     expect(summary).toContain("user license doesn't allow");
   });
 
+  it("ignores short focus terms to avoid noisy matches", () => {
+    const snapshot = [
+      '- link "Skip to Navigation" [ref=e1]',
+      '- button "Global Actions" [ref=e2]',
+      '- heading "Agentforce Agents" [level=1, ref=e3]',
+    ].join("\n");
+
+    const summary = summarizeSnapshot({
+      snapshot,
+      fullSnapshotPath: "/tmp/snapshot.txt",
+      focus: ["On", "Agentforce"],
+    });
+
+    const focusSection = summary.split("Key controls:")[0] ?? summary;
+
+    expect(summary).toContain("Ignored short focus terms: On");
+    expect(focusSection).not.toContain('link "Skip to Navigation"');
+    expect(summary).toContain('heading "Agentforce Agents"');
+  });
+
   it("defaults unknown output mode to summary", () => {
     expect(snapshotOutputModeFromUnknown("bad")).toBe("summary");
   });

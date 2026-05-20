@@ -209,7 +209,7 @@ Use SF Browser only for UI-only setup screens, enablement toggles, or human-faci
 **UI Fallback Path**
 If a Data Cloud feature requires Setup UI enablement and no stable API is available:
 
-1. Open the relevant Data Cloud setup page or setup assistant through a curated destination if one exists.
+1. Open `data-cloud-setup` for Data Cloud Setup Home unless a more specific verified destination exists.
 2. Snapshot the current state.
 3. Follow visible setup steps only when explicitly requested.
 4. Capture Browser Evidence.
@@ -224,7 +224,7 @@ If a Data Cloud feature requires Setup UI enablement and no stable API is availa
 
 **Setup destinations**
 
-- Add Data Cloud destinations only after verifying stable paths.
+- `data-cloud-setup`
 
 ---
 
@@ -246,7 +246,7 @@ Use Setup UI screenshots to confirm policy, OAuth, or admin-console state that i
 **UI Fallback Path**
 If Metadata/API coverage is incomplete:
 
-1. Open the relevant Setup page through a curated destination or explicit path.
+1. Open `connected-apps` or `external-client-apps` through a curated destination, depending on the target app type.
 2. Search/open the target app.
 3. Snapshot configuration sections before editing.
 4. Make the minimal explicit change.
@@ -262,7 +262,8 @@ If Metadata/API coverage is incomplete:
 
 **Setup destinations**
 
-- Add `external-client-apps` and `connected-apps` only after verifying stable paths.
+- `connected-apps`
+- `external-client-apps`
 
 ---
 
@@ -280,7 +281,7 @@ Use Setup UI snapshots/screenshots for human confirmation of org-wide settings.
 **UI Fallback Path**
 If a specific setting is UI-only or API coverage fails:
 
-1. Open the relevant Setup page through a curated destination or explicit path.
+1. Open `sharing-settings`, `session-settings`, or another verified security destination.
 2. Snapshot current state.
 3. Change only the explicitly requested setting.
 4. Save and wait for confirmation.
@@ -296,7 +297,8 @@ If a specific setting is UI-only or API coverage fails:
 
 **Setup destinations**
 
-- Add `sharing-settings`, `session-settings`, and other security destinations only after verifying stable paths.
+- `sharing-settings`
+- `session-settings`
 
 ---
 

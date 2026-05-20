@@ -13,6 +13,10 @@ describe("setup destinations", () => {
       "/lightning/setup/EinsteinCopilot/home",
     );
     expect(resolveSetupDestination("object_manager")).toBe("/lightning/setup/ObjectManager/home");
+    expect(resolveSetupDestination("data cloud setup")).toBe("/lightning/setup/CDPSetupHome/home");
+    expect(resolveSetupDestination("external-client-apps")).toBe(
+      "/lightning/setup/ManageExternalClientApplication/home",
+    );
   });
 
   it("rejects combining setup and path", () => {

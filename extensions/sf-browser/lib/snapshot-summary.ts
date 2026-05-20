@@ -33,7 +33,7 @@ export function summarizeSnapshot(input: SnapshotSummaryInput): string {
     .split(/\r?\n/)
     .map((line) => line.trim())
     .filter(Boolean);
-  const focusTerms = (input.focus ?? []).map((term) => term.trim()).filter(Boolean);
+  const { focusTerms, ignoredFocusTerms } = normalizeFocusTerms(input.focus ?? []);
   const focusMatches = collectFocusMatches(lines, focusTerms);
   const alerts = collectAlerts(lines, focusMatches);
   const landmarks = collectMatching(lines, isLandmarkLine, MAX_LANDMARK_LINES, [
@@ -51,6 +51,13 @@ export function summarizeSnapshot(input: SnapshotSummaryInput): string {
   ]);
 
   const sections: string[] = ["Snapshot summary", `Full snapshot: ${input.fullSnapshotPath}`, ""];
+
+  if (ignoredFocusTerms.length) {
+    sections.push(
+      `Ignored short focus terms: ${ignoredFocusTerms.join(", ")}. Use at least 3 characters to avoid noisy matches.`,
+    );
+    sections.push("");
+  }
 
   appendSection(sections, "Focus matches", focusMatches);
   appendSection(sections, "Alerts / validation", alerts);
@@ -76,6 +83,24 @@ export function summarizeSnapshot(input: SnapshotSummaryInput): string {
     .join("\n")
     .replace(/\n{3,}/g, "\n\n")
     .trim();
+}
+
+function normalizeFocusTerms(rawTerms: string[]): {
+  focusTerms: string[];
+  ignoredFocusTerms: string[];
+} {
+  const focusTerms: string[] = [];
+  const ignoredFocusTerms: string[] = [];
+  for (const raw of rawTerms) {
+    const term = raw.trim();
+    if (!term) continue;
+    if (term.length < 3) {
+      ignoredFocusTerms.push(term);
+      continue;
+    }
+    focusTerms.push(term);
+  }
+  return { focusTerms, ignoredFocusTerms };
 }
 
 function collectFocusMatches(lines: string[], focusTerms: string[]): string[] {
