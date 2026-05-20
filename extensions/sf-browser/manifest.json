@@ -11,6 +11,7 @@
     "sf_browser_snapshot",
     "sf_browser_click",
     "sf_browser_fill",
+    "sf_browser_select",
     "sf_browser_press",
     "sf_browser_wait",
     "sf_browser_capture_evidence"
@@ -25,7 +26,10 @@
       "lib/setup-destinations.ts",
       "lib/overlay-dismissal.ts",
       "lib/snapshot-summary.ts",
-      "skills/sf-browser/SKILL.md"
+      "lib/sf_browser_select-tool.ts",
+      "skills/sf-browser/SKILL.md",
+      "skills/sf-browser/references/setup-runbooks.md",
+      "skills/sf-browser/references/setup-destinations.md"
     ],
     "stateFiles": [
       "<globalAgentDir>/sf-pi/browser-artifacts/latest/index.json",

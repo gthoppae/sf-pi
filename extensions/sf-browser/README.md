@@ -36,7 +36,7 @@ sf_browser_capture_evidence
 ## Key Architecture Decisions
 
 - `agent-browser` is a lazy external runtime. SF Browser does not start Chrome, probe CDP, or check installation during startup.
-- V1 exposes a Hot-Path Browser Tool Set: open, snapshot, click, fill, press, wait, and Browser Evidence capture.
+- V1 exposes a Hot-Path Browser Tool Set: open, snapshot, click, fill, select, press, wait, and Browser Evidence capture.
 - Long-tail browser work remains direct `agent-browser` usage.
 - Browser Evidence is artifact-first. Use `imageMode: "artifact"` for repeated captures and `thumbnail` when the model should inspect the current screen.
 - Snapshots are pi-native: `outputMode: "summary"` stores the full raw tree as an artifact and returns a compact decision-oriented summary by default.
@@ -82,9 +82,21 @@ sf_browser_capture_evidence
 | `sf_browser_snapshot`         | Capture a pi-native snapshot: compact summary by default, full raw tree stored as an artifact.                               |
 | `sf_browser_click`            | Click a ref from the latest snapshot.                                                                                        |
 | `sf_browser_fill`             | Fill a ref from the latest snapshot.                                                                                         |
+| `sf_browser_select`           | Select values in Salesforce select/listbox refs, including Classic Setup dual-list controls.                                 |
 | `sf_browser_press`            | Press keys such as `Enter`, `Escape`, or `Control+a`.                                                                        |
-| `sf_browser_wait`             | Wait for expected text, URL, load state, or last-resort milliseconds.                                                        |
+| `sf_browser_wait`             | Wait for expected text, URL, load state, or last-resort milliseconds; reports near-timeout waits as ambiguous.               |
 | `sf_browser_capture_evidence` | Capture private screenshot evidence, optionally dismiss known ambient overlays, and optionally return bounded image content. |
+
+## Setup Runbooks
+
+SF Browser includes documentation-first setup runbooks for API-first/browser-ready workflows:
+
+```text
+extensions/sf-browser/skills/sf-browser/references/setup-runbooks.md
+extensions/sf-browser/skills/sf-browser/references/setup-destinations.md
+```
+
+Runbooks document the preferred API or owning-extension path, the Browser Evidence path, and the UI Fallback Path for common setup/admin tasks.
 
 ## Salesforce Browser Contract
 
@@ -95,7 +107,9 @@ sf_browser_capture_evidence
 - For Salesforce lookup and combobox controls: fill the visible input, wait for options, snapshot, then click the desired option.
 - Use `imageMode: "artifact"` for batches; use `thumbnail` for model-visible current-screen inspection.
 - Leave `dismissOverlays` enabled for evidence capture unless the overlay is part of the task being documented.
-- Use direct `agent-browser` commands for scroll, select, hover, drag, upload, tabs, console, network, trace, video, HAR, eval, or advanced CDP.
+- Use `sf_browser_select` for Classic Setup listbox and dual-list controls, then click Add or Remove and snapshot before saving.
+- If `sf_browser_wait` reports an ambiguous wait, snapshot or verify through API before continuing.
+- Use direct `agent-browser` commands for scroll, hover, drag, upload, tabs, console, network, trace, video, HAR, eval, or advanced CDP.
 
 ## State and Artifacts
 
@@ -146,6 +160,7 @@ extensions/sf-browser/
     sf_browser_fill-tool.ts ← implementation module
     sf_browser_open_org-tool.ts← implementation module
     sf_browser_press-tool.ts← implementation module
+    sf_browser_select-tool.ts← implementation module
     sf_browser_snapshot-tool.ts← implementation module
     sf_browser_wait-tool.ts ← implementation module
     snapshot-summary.ts     ← implementation module
@@ -158,6 +173,7 @@ extensions/sf-browser/
     smoke.test.ts           ← unit / smoke test
     snapshot-summary.test.ts← unit / smoke test
     timing.test.ts          ← unit / smoke test
+    wait.test.ts            ← unit / smoke test
   index.ts                  ← Pi extension entry point
   manifest.json             ← source-of-truth extension metadata
   README.md                 ← human + agent walkthrough

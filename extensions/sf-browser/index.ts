@@ -52,6 +52,7 @@ import { registerSfBrowserClickTool } from "./lib/sf_browser_click-tool.ts";
 import { registerSfBrowserFillTool } from "./lib/sf_browser_fill-tool.ts";
 import { registerSfBrowserOpenOrgTool } from "./lib/sf_browser_open_org-tool.ts";
 import { registerSfBrowserPressTool } from "./lib/sf_browser_press-tool.ts";
+import { registerSfBrowserSelectTool } from "./lib/sf_browser_select-tool.ts";
 import { registerSfBrowserSnapshotTool } from "./lib/sf_browser_snapshot-tool.ts";
 import { registerSfBrowserWaitTool } from "./lib/sf_browser_wait-tool.ts";
 
@@ -69,6 +70,7 @@ export default function sfBrowser(pi: ExtensionAPI): void {
     registerSfBrowserSnapshotTool(pi);
     registerSfBrowserClickTool(pi);
     registerSfBrowserFillTool(pi);
+    registerSfBrowserSelectTool(pi);
     registerSfBrowserPressTool(pi);
     registerSfBrowserWaitTool(pi);
     registerSfBrowserCaptureEvidenceTool(pi);
@@ -297,6 +299,7 @@ function buildHelpText(): string {
     "  sf_browser_snapshot          Capture compact interactive refs for reasoning.",
     "  sf_browser_click             Click a ref from the latest snapshot.",
     "  sf_browser_fill              Fill a ref from the latest snapshot.",
+    "  sf_browser_select            Select values in Salesforce select/listbox refs.",
     "  sf_browser_press             Press keyboard keys such as Enter or Escape.",
     "  sf_browser_wait              Wait for expected text, URL, load state, or last-resort ms.",
     "  sf_browser_capture_evidence  Capture private screenshot evidence; thumbnail by default.",

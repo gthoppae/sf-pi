@@ -168,6 +168,30 @@ _Avoid_: context dump, raw accessibility tree by default, screenshot replacement
 A user-visible elapsed-time signal included in **SF Browser** results so humans can understand browser automation cost and compare optimized workflows.
 _Avoid_: performance benchmark, SLA, profiling trace
 
+**Setup Runbook**:
+A documented, stable, repeatable **SF Pi** workflow for a common Salesforce setup or admin task that defines the preferred API or extension path, the **SF Browser** evidence path, and the **UI Fallback Path**.
+_Avoid_: raw click script, browser-only admin automation, arbitrary UI macro, full Setup automation framework
+
+**API-First Browser-Ready**:
+The **SF Pi** setup posture where stable APIs or owning extensions are preferred for mutation and verification, while **SF Browser** maintains reliable UI evidence and fallback paths for the same task.
+_Avoid_: browser-only setup, API-only optimism, click-first automation
+
+**UI Fallback Path**:
+The **SF Browser** portion of a **Setup Runbook** that describes how to complete or verify the task through stable Salesforce UI navigation when the primary API or extension path fails or is unavailable.
+_Avoid_: primary path, arbitrary click script, unsupported workaround
+
+**Classic Setup Surface**:
+A Salesforce Setup page rendered inside the Lightning Setup shell with classic-style iframe behavior, form posts, dual-list controls, and validation messages that require **SF Browser** fallback patterns different from standard Lightning UI.
+_Avoid_: legacy page, iframe hack, old UI, unsupported surface
+
+**UI Fallback Recovery**:
+The part of a **UI Fallback Path** that returns the browser to a known safe page after a validation error, stale form, timeout, or ambiguous **Classic Setup Surface** state.
+_Avoid_: blind retry, Cancel-only recovery, keep clicking, ignore validation
+
+**Ambiguous Wait**:
+A browser wait result whose elapsed duration or output suggests the expected condition may not have matched, even though the underlying runtime did not return a hard failure.
+_Avoid_: success, completed, reliable wait, hidden timeout
+
 **SF Pi Reference Map**:
 A compact guide that points agents from SF Brain to repo-local sources of truth such as the extension catalog, command reference, extension READMEs, and bundled progressive skills. It may mention active SF skills as a runtime signal, but must not assume user-global skill-library paths.
 _Avoid_: duplicated docs, hardcoded personal skill paths, Salesforce encyclopedia
@@ -190,12 +214,17 @@ _Avoid_: duplicated docs, hardcoded personal skill paths, Salesforce encyclopedi
 - `agent-browser` is a **Lazy Browser Runtime** for **SF Browser**.
 - **SF Browser** v1 uses one default **SF Browser Session** instead of per-org or per-conversation browser sessions.
 - **Frictionless Browser Operation** keeps v1 free of browser-action permission prompts while preserving passive hygiene for URLs and artifacts.
-- The **Hot-Path Browser Tool Set** wraps only `open`, `snapshot`, `click`, `fill`, `press`, `wait`, and Browser Evidence capture; advanced browser work remains direct `agent-browser` usage.
+- The **Hot-Path Browser Tool Set** wraps only `open`, `snapshot`, `click`, `fill`, `select`, `press`, `wait`, and Browser Evidence capture; advanced browser work remains direct `agent-browser` usage.
 - **Salesforce Browser Contracts** cover stale refs, Lightning rerenders, Setup navigation, lookup and combobox flows, iframe surfaces, and API-first verification through tool descriptions, tool results, help, and optional progressive skills.
 - **Ambient Overlay Dismissal** is scoped to known non-workflow overlays and is appropriate for Browser Evidence cleanup before it is used around general click/fill flows.
 - A **Setup Destination** is intentionally curated and small; direct Salesforce Setup paths are preferred over UI search when the destination is known.
 - A **Pi-Native Browser Snapshot** separates model context from raw browser state: summary by default, artifact for full fidelity, and explicit full output only when requested.
 - **Browser Operation Duration** is reported in SF Browser tool results for user confidence; it is not treated as a formal performance benchmark.
+- A **Setup Runbook** records primary execution, evidence, and fallback paths so **SF Pi** stays **API-First Browser-Ready** instead of API-only or browser-only.
+- A **UI Fallback Path** should be hardened through repeated navigation, evidence capture, and documented edge cases, but it should not replace a stable primary API or owning extension path.
+- A **Classic Setup Surface** often needs `select` plus Add/Remove controls, API verification after save, and direct navigation recovery after validation failures.
+- **UI Fallback Recovery** captures the failure, verifies state through APIs when possible, then navigates to a known safe destination before retrying.
+- An **Ambiguous Wait** should prompt snapshot/API verification instead of being reported as an unconditional success.
 - **First-Class Data 360 Parity** guides how **SF Data 360** expands its workflow coverage.
 - **Generated Data 360 Parity** is the preferred delivery style for broad **First-Class Data 360 Parity**.
 - A **Runtime Code Budget** constrains hand-written **Runtime Surfaces**, not generated parity data.

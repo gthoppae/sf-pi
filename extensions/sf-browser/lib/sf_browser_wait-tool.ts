@@ -3,6 +3,7 @@
 import type { ExtensionAPI } from "@earendil-works/pi-coding-agent";
 import { StringEnum } from "@earendil-works/pi-ai";
 import { Type } from "typebox";
+import { DEFAULT_AGENT_BROWSER_TIMEOUT_MS } from "./constants.ts";
 import { runAgentBrowser } from "./agent-browser.ts";
 import { STALE_REF_HINT } from "./guidance.ts";
 import { startTimer } from "./timing.ts";
@@ -14,15 +15,36 @@ const LoadState = StringEnum(["domcontentloaded", "networkidle"] as const, {
   description: "Load state to wait for.",
 });
 
+export interface WaitClassification {
+  ambiguous: boolean;
+  label: string;
+  note?: string;
+}
+
+export function classifyWait(durationMs: number, params: { ms?: number }): WaitClassification {
+  if (typeof params.ms === "number") {
+    return { ambiguous: false, label: "Wait finished" };
+  }
+  if (durationMs >= DEFAULT_AGENT_BROWSER_TIMEOUT_MS * 0.9) {
+    return {
+      ambiguous: true,
+      label: "Wait may have timed out",
+      note: "No hard error was returned, but the wait reached the timeout window. Snapshot or verify through API before continuing.",
+    };
+  }
+  return { ambiguous: false, label: "Wait finished" };
+}
+
 export function registerSfBrowserWaitTool(pi: ExtensionAPI): void {
   pi.registerTool({
     name: SF_BROWSER_WAIT_TOOL_NAME,
     label: "SF Browser Wait",
     description:
-      "Wait for Salesforce UI progress using expected text, URL pattern, load state, or a last-resort millisecond delay. Prefer text or URL over fixed sleeps.",
+      "Wait for Salesforce UI progress using expected text, URL pattern, load state, or a last-resort millisecond delay. Prefer text or URL over fixed sleeps; long waits are reported as ambiguous when they reach the timeout window.",
     promptSnippet: "Wait for Salesforce UI text, URL, load state, or last-resort delay",
     promptGuidelines: [
       "Use sf_browser_wait with expected text or URL after Salesforce actions; use ms only as a last resort for Lightning async rendering.",
+      "If sf_browser_wait says the wait may have timed out, snapshot or verify through API before continuing.",
     ],
     parameters: Type.Object({
       text: Type.Optional(
@@ -46,19 +68,21 @@ export function registerSfBrowserWaitTool(pi: ExtensionAPI): void {
       const args = buildWaitArgs(params);
       await runAgentBrowser(pi, args, { cwd: ctx.cwd, signal });
       const duration = stopTimer();
+      const classification = classifyWait(duration.durationMs, params);
       return {
         content: [
           {
             type: "text" as const,
             text: okText([
-              `Wait completed: ${describeWait(params)}.`,
+              `${classification.label}: ${describeWait(params)}.`,
               `Duration: ${duration.durationText}`,
+              classification.note,
               "Prefer expected text or URL waits over fixed sleeps for Salesforce Lightning pages.",
               STALE_REF_HINT,
             ]),
           },
         ],
-        details: { ok: true, wait: params, ...duration },
+        details: { ok: true, ambiguous: classification.ambiguous, wait: params, ...duration },
       };
     },
   });

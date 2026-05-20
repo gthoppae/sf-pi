@@ -13,7 +13,7 @@ Use Salesforce APIs first for setup and verification. Use SF Browser and agent-b
 
 1. Open the org/path with `sf_browser_open_org`. Prefer a curated `setup` destination when the target Setup page is known (for example `setup: "agentforce-agents"`) instead of search-and-click navigation.
 2. Run `sf_browser_snapshot` before acting. It is pi-native by default: `outputMode: "summary"` returns compact decision-oriented context and stores the full raw snapshot as an artifact.
-3. Use refs from the latest snapshot with `sf_browser_click`, `sf_browser_fill`, or `sf_browser_press`.
+3. Use refs from the latest snapshot with `sf_browser_click`, `sf_browser_fill`, `sf_browser_select`, or `sf_browser_press`.
 4. After page-changing actions, run `sf_browser_wait`, then `sf_browser_snapshot` again.
 5. Capture Browser Evidence with `sf_browser_capture_evidence` when visual confirmation matters.
 
@@ -24,16 +24,26 @@ Refs are short-lived. Treat them as stale after clicks, saves, modal opens, navi
 - Prefer snapshot refs over CSS selectors. Salesforce generated ids and internal classes are not stable.
 - For lookup and combobox controls: fill the visible input, wait for options, snapshot, then click the desired option ref.
 - For Setup navigation, prefer curated Setup Destinations over UI search when available. Wait for expected text or URL patterns after navigation; DOMContentLoaded alone is often not enough.
-- For save flows, wait for visible confirmation such as a toast, success text, or expected page state, then snapshot again.
+- For Classic Setup Surface dual-list controls, use `sf_browser_select` on the source listbox, click Add or Remove, snapshot before Save, then verify through API after Save.
+- For save flows, wait for visible confirmation such as a toast, success text, or expected page state, then snapshot again. Treat near-timeout waits as ambiguous and verify before continuing.
 - If expected controls are missing, consider iframe/frame surfaces or use direct `agent-browser` commands as the escape hatch.
 - Use `imageMode: "artifact"` for repeated screenshots or batches; use `thumbnail` when the model should inspect the current screen; use `full` only when visual fidelity matters and the image is small enough.
 - Keep `dismissOverlays` enabled for Browser Evidence unless the overlay is part of the task. It is best-effort and only targets known non-workflow Salesforce overlays.
 
+## Setup Runbooks
+
+For common setup/admin tasks, use the reference runbooks before improvising UI automation:
+
+- `references/setup-runbooks.md` — API-first/browser-ready workflows and UI fallback paths.
+- `references/setup-destinations.md` — curated Setup Destination shortcuts.
+
+A Setup Runbook should prefer the primary API or owning SF Pi extension first, use SF Browser for evidence, and fall back to UI automation only when the primary path fails or is unavailable.
+
 ## Long-tail escape hatch
 
-SF Browser only wraps the hot path: open, snapshot, click, fill, press, wait, and Browser Evidence capture.
+SF Browser only wraps the hot path: open, snapshot, click, fill, select, press, wait, and Browser Evidence capture.
 
-For scroll, select, hover, drag, upload, tabs, state, console, network, eval, trace, video, HAR, or advanced CDP work, use direct `agent-browser` commands. Start with:
+For scroll, hover, drag, upload, tabs, state, console, network, eval, trace, video, HAR, or advanced CDP work, use direct `agent-browser` commands. Start with:
 
 ```bash
 agent-browser skills get core

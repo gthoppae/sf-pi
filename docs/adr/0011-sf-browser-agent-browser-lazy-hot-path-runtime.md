@@ -21,3 +21,5 @@ The first Agentforce setup check showed that SF Browser needs more Salesforce-sp
 - These refinements remain contracts and small helpers, not a broad DOM abstraction or full Setup sitemap.
 - Snapshot results should be pi-native: full `agent-browser` output is saved as an artifact, while the default model-visible content is a compact decision-oriented summary. Full inline snapshot output remains explicit opt-in.
 - SF Browser tool results should include user-visible elapsed duration to make optimized last-mile workflows measurable without treating the value as an SLA or benchmark.
+- SF Browser owns setup/admin UI evidence and fallback runbook references so SF Pi can stay API-first while remaining browser-ready when APIs or owning extensions fail.
+- Salesforce Classic Setup Surface runbooks should use `select` plus Add/Remove controls for dual-list pages, treat near-timeout waits as ambiguous, and recover from validation errors through evidence capture plus direct navigation.

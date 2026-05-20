@@ -25,6 +25,23 @@ describe("snapshot summary", () => {
     expect(summary).toContain('button "New Agent" [ref=e175]');
   });
 
+  it("preserves validation alert text in compact summaries", () => {
+    const snapshot = [
+      "- alert",
+      '- heading "Please fix the following:" [level=4, ref=e171]',
+      '- StaticText "• "',
+      '- StaticText "Can\'t assign permission set Agent STDM to user STDM Demo Agent User."',
+      '- StaticText "The user license doesn\'t allow the permission: Gives users permission to view Agentforce Optimization."',
+    ].join("\n");
+
+    const summary = summarizeSnapshot({ snapshot, fullSnapshotPath: "/tmp/snapshot.txt" });
+
+    expect(summary).toContain("Alerts / validation");
+    expect(summary).toContain("Please fix the following");
+    expect(summary).toContain("Can't assign permission set Agent STDM");
+    expect(summary).toContain("user license doesn't allow");
+  });
+
   it("defaults unknown output mode to summary", () => {
     expect(snapshotOutputModeFromUnknown("bad")).toBe("summary");
   });

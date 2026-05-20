@@ -1,0 +1,332 @@
+# SF Browser Setup Runbooks
+
+SF Pi setup work should be **API-First Browser-Ready**:
+
+1. Use stable Salesforce APIs, metadata, data objects, or the owning SF Pi extension first.
+2. Use SF Browser for UI evidence and last-mile gaps.
+3. Use the UI Fallback Path only when the primary path fails, is unavailable, or a human needs visual confirmation.
+
+These runbooks are intentionally documentation-first. Promote a runbook into a higher-level tool only after repeated real use proves the workflow is stable and worth encoding.
+
+## Runbook template
+
+Each runbook should answer:
+
+- **Intent** — What are we trying to accomplish?
+- **Primary path** — Which API, metadata, data object, or SF Pi extension should be used first?
+- **Evidence path** — How does SF Browser navigate and capture proof?
+- **UI Fallback Path** — If the primary path fails, what stable browser steps can complete or verify the task?
+- **Known edge cases** — What tends to go wrong?
+- **Setup destinations** — Which curated destination applies?
+
+---
+
+## Verify Agentforce enablement
+
+**Intent**
+Confirm whether Agentforce is enabled in an org.
+
+**Primary path**
+Use a stable API or metadata surface if one is available and verified for the target org/version. If no stable API is known, use the evidence path.
+
+**Evidence path**
+
+1. Open the Setup Destination:
+   ```json
+   { "setup": "agentforce-agents" }
+   ```
+2. Wait for `Agentforce Agents`.
+3. Run `sf_browser_snapshot` with focus terms:
+   ```json
+   { "focus": ["Agentforce", "New Agent", "Active"] }
+   ```
+4. Capture Browser Evidence with `dismissOverlays` enabled.
+5. Confirm visible signals:
+   - heading `Agentforce Agents`
+   - Agentforce toggle shows `On`
+   - `New Agent` button is visible
+   - agent list/table is visible
+
+**UI Fallback Path**
+If explicitly asked to enable Agentforce and no stable API path is available, use the same destination, snapshot the toggle, click the toggle only when it is visibly off, wait for the UI to settle, snapshot again, and capture evidence.
+
+**Known edge cases**
+
+- Ambient overlays can obscure the toggle; use Browser Evidence with `dismissOverlays: true`.
+- Setup page path may vary in future Salesforce releases; keep the destination curated, not guessed.
+- Permissions may allow viewing but not changing the toggle.
+
+**Setup destinations**
+
+- `agentforce-agents`
+
+---
+
+## Open user record and verify user access
+
+**Intent**
+Find a user record and capture evidence of the user's setup state.
+
+**Primary path**
+Use SOQL/Data API first for user facts:
+
+- `User`
+- `Profile`
+- `PermissionSetAssignment`
+- `PermissionSetGroup` / related assignment objects after verifying schema
+
+**Evidence path**
+
+1. Open the Setup Destination:
+   ```json
+   { "setup": "users" }
+   ```
+2. Use the Users setup search/list UI to find the user.
+3. Open the user detail page.
+4. Snapshot with focus terms such as user name, username, profile, permission, or assignment.
+5. Capture Browser Evidence.
+
+**UI Fallback Path**
+Use browser navigation to the user detail page when API lookup is insufficient for human confirmation or when the user must see the exact Setup UI state.
+
+**Known edge cases**
+
+- User search can match name, username, alias, or email differently.
+- Some orgs show user detail in Lightning; others expose classic-style setup detail pages.
+- Inactive/frozen users may need additional setup sections.
+
+**Setup destinations**
+
+- `users`
+
+---
+
+## Assign or remove a permission set
+
+**Intent**
+Assign or remove a permission set for a user.
+
+**Primary path**
+Use Salesforce data/API first after describing/verifying schema:
+
+- `User`
+- `PermissionSet`
+- `PermissionSetAssignment`
+
+For removal, delete the matching `PermissionSetAssignment`. For assignment, create the assignment only after confirming it does not already exist and the target user/license can accept the permission set.
+
+Before a UI fallback assignment, pre-check compatibility:
+
+1. Query the target user, profile, active state, and license-related fields available in the org.
+2. Query existing assignments.
+3. Query the candidate `PermissionSet` (`Id`, `Name`, `Label`, `LicenseId`).
+4. Prefer a known-compatible path: remove/re-add an existing assignment for fallback proof, or use a known empty/no-license permission set.
+5. Do not choose arbitrary permission sets for UI tests; license-permission mismatches can fail late in the Classic Setup Surface.
+
+**Evidence path**
+
+1. Open the target user record through the `users` destination.
+2. Navigate to the Permission Set Assignments area on the user detail page.
+3. Capture before/after Browser Evidence when a human needs confirmation.
+4. Verify final state through SOQL when possible.
+
+**UI Fallback Path**
+If API assignment fails or is unavailable:
+
+1. Open Users setup.
+2. Search/open the target user.
+3. Navigate to Permission Set Assignments.
+4. Open Edit Assignments.
+5. In the Classic Setup dual-list control, use `sf_browser_select` on the source listbox.
+6. Click Add or Remove.
+7. Snapshot before Save to confirm the option moved to the intended list.
+8. Save.
+9. Wait for the return state, but treat near-timeout waits as ambiguous.
+10. Snapshot and capture evidence.
+11. Verify through API if possible.
+12. If validation appears, capture error evidence, verify that no partial assignment occurred, and recover through direct navigation instead of repeated Cancel clicks.
+
+**Known edge cases**
+
+- Permission set is already assigned.
+- Permission set name vs label mismatch.
+- Permission Set Group is needed instead of a Permission Set.
+- User is inactive or frozen.
+- Admin lacks permission to assign the requested permission set.
+- Managed package permission sets can have namespace-specific names.
+- User license can reject permission contents even when the permission set appears in the UI.
+- The assignment editor is a Classic Setup Surface; `select` is more reliable than clicking options in the dual-list control.
+- Save failures can leave the page in a sticky validation state; use UI Fallback Recovery.
+
+**Setup destinations**
+
+- `users`
+
+---
+
+## Assign or remove a permission set group
+
+**Intent**
+Assign or remove a permission set group for a user.
+
+**Primary path**
+Use Salesforce data/API first, but verify exact assignment object and fields in the target org before mutation. Do not guess schema names.
+
+**Evidence path**
+Use the user detail page and permission assignment areas to capture before/after evidence.
+
+**UI Fallback Path**
+Follow the same pattern as permission set assignment, using the permission set group assignment UI if present.
+
+**Known edge cases**
+
+- Permission set group recalculation can delay effective access.
+- Muting permission sets can make assignment appear successful while access still differs.
+- The setup UI can surface permission sets and groups in nearby but distinct areas.
+
+**Setup destinations**
+
+- `users`
+
+---
+
+## Data Cloud setup and readiness
+
+**Intent**
+Check whether Data Cloud/Data 360 is present, ready, or requires UI-only enablement.
+
+**Primary path**
+Use SF Data 360 tools first:
+
+- `d360_probe`
+- `d360_metadata`
+- `d360` capabilities
+- `d360_api` for direct REST calls when a capability is not available
+
+**Evidence path**
+Use SF Browser only for UI-only setup screens, enablement toggles, or human-facing screenshots after API readiness checks.
+
+**UI Fallback Path**
+If a Data Cloud feature requires Setup UI enablement and no stable API is available:
+
+1. Open the relevant Data Cloud setup page or setup assistant through a curated destination if one exists.
+2. Snapshot the current state.
+3. Follow visible setup steps only when explicitly requested.
+4. Capture Browser Evidence.
+5. Re-run `d360_probe` or the relevant API check after the UI change.
+
+**Known edge cases**
+
+- Data Cloud features are often license-, permission-, and data-space-dependent.
+- Empty orgs can look like failures when they are simply unconfigured.
+- Some setup screens launch multi-step assistants.
+- Prefer `d360_probe` to distinguish readiness from feature gating.
+
+**Setup destinations**
+
+- Add Data Cloud destinations only after verifying stable paths.
+
+---
+
+## External Client Apps and Connected Apps
+
+**Intent**
+Create, inspect, or validate OAuth client configuration.
+
+**Primary path**
+Use Metadata/API surfaces first for known deployable configuration:
+
+- External Client App metadata when available
+- Connected App metadata when available
+- Permission policies and assignments through metadata/data APIs as appropriate
+
+**Evidence path**
+Use Setup UI screenshots to confirm policy, OAuth, or admin-console state that is difficult to infer from metadata alone.
+
+**UI Fallback Path**
+If Metadata/API coverage is incomplete:
+
+1. Open the relevant Setup page through a curated destination or explicit path.
+2. Search/open the target app.
+3. Snapshot configuration sections before editing.
+4. Make the minimal explicit change.
+5. Save, wait, snapshot, and capture evidence.
+6. Retrieve/query metadata where possible to verify the final state.
+
+**Known edge cases**
+
+- Connected Apps and External Client Apps are adjacent but distinct concepts.
+- OAuth policy settings can be split across app config and permission surfaces.
+- Some managed-package apps may restrict editable fields.
+- Avoid storing or exposing client secrets in screenshots or tool output.
+
+**Setup destinations**
+
+- Add `external-client-apps` and `connected-apps` only after verifying stable paths.
+
+---
+
+## Sharing Settings and Security Settings
+
+**Intent**
+Inspect or adjust org-wide security/sharing controls.
+
+**Primary path**
+Use Metadata/API where stable and available. Retrieve before edit and verify the target metadata type/field before mutation.
+
+**Evidence path**
+Use Setup UI snapshots/screenshots for human confirmation of org-wide settings.
+
+**UI Fallback Path**
+If a specific setting is UI-only or API coverage fails:
+
+1. Open the relevant Setup page through a curated destination or explicit path.
+2. Snapshot current state.
+3. Change only the explicitly requested setting.
+4. Save and wait for confirmation.
+5. Snapshot and capture evidence.
+6. Re-retrieve/query where possible.
+
+**Known edge cases**
+
+- Some settings have broad org impact.
+- Some changes are irreversible or have delayed recalculation effects.
+- Sharing recalculation can take time after changes.
+- Security pages often include adjacent settings that should not be changed accidentally.
+
+**Setup destinations**
+
+- Add `sharing-settings`, `session-settings`, and other security destinations only after verifying stable paths.
+
+---
+
+## Flow setup and activation evidence
+
+**Intent**
+Open, inspect, or confirm flow setup state.
+
+**Primary path**
+Use Metadata/Tooling APIs first for flow definitions, versions, and status.
+
+**Evidence path**
+Use the `flows` Setup Destination to capture the Flow list or launch Flow Builder for human evidence.
+
+**UI Fallback Path**
+If activation or builder-only state cannot be handled through metadata:
+
+1. Open `flows`.
+2. Search/open the target flow.
+3. Snapshot visible status/version/action controls.
+4. Perform the explicit action only if requested.
+5. Wait for confirmation, snapshot, and capture evidence.
+6. Retrieve/query flow state where possible.
+
+**Known edge cases**
+
+- Flow Builder may open in a builder surface with different frame/SPA behavior.
+- Flow versions and active state must be distinguished.
+- Some flows require tests or dependencies before activation.
+
+**Setup destinations**
+
+- `flows`
