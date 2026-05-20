@@ -1,0 +1,191 @@
+# SF Browser — Code Walkthrough
+
+## What It Does
+
+SF Browser is an experimental developer-assistive Bundled Extension for Salesforce UI last-mile work that Salesforce APIs cannot cover. It uses [`agent-browser`](https://www.npmjs.com/package/agent-browser) as a lazy CDP runtime and exposes a small, typed hot-path tool set for agents.
+
+It is not a general browser framework, a Playwright replacement, or a stable Salesforce UI automation contract.
+
+## Runtime Flow
+
+```
+Extension loads
+  ├─ registers /sf-browser
+  ├─ waits for session_start/resources_discover
+  ├─ registers hot-path tools only when the extension is enabled
+  └─ contributes the sf-browser skill only while enabled
+
+/sf-browser
+  ├─ opens a cache-first status/actions panel
+  └─ does not probe agent-browser until doctor or an explicit action runs
+
+sf_browser_open_org
+  ├─ resolves the active Salesforce target org from SF Pi environment cache when available
+  ├─ accepts curated Setup Destinations such as agentforce-agents
+  ├─ runs sf org open --url-only --json only after explicit intent
+  ├─ passes the session-bearing URL to agent-browser
+  └─ returns redacted next-step guidance
+
+sf_browser_capture_evidence
+  ├─ optionally dismisses known ambient Salesforce overlays
+  ├─ captures a full screenshot into the private Browser Evidence directory
+  ├─ records a monotonic evidence ID in the index
+  └─ optionally returns bounded image content to the model
+```
+
+## Key Architecture Decisions
+
+- `agent-browser` is a lazy external runtime. SF Browser does not start Chrome, probe CDP, or check installation during startup.
+- V1 exposes a Hot-Path Browser Tool Set: open, snapshot, click, fill, press, wait, and Browser Evidence capture.
+- Long-tail browser work remains direct `agent-browser` usage.
+- Browser Evidence is artifact-first. Use `imageMode: "artifact"` for repeated captures and `thumbnail` when the model should inspect the current screen.
+- Snapshots are pi-native: `outputMode: "summary"` stores the full raw tree as an artifact and returns a compact decision-oriented summary by default.
+- Ambient Overlay Dismissal is best-effort and scoped to known non-workflow Salesforce overlays before evidence capture.
+- Setup Destinations are curated shortcuts for known Setup paths; they are not a full Setup sitemap.
+- Tool results include a user-visible duration so users can understand the cost and compare optimized workflows.
+- V1 avoids permission gates and semantic browser-action mediation to reduce permission fatigue.
+- See [`../../docs/adr/0011-sf-browser-agent-browser-lazy-hot-path-runtime.md`](../../docs/adr/0011-sf-browser-agent-browser-lazy-hot-path-runtime.md).
+
+## Behavior Matrix
+
+| Event/Trigger            | Condition            | Result                                                             |
+| ------------------------ | -------------------- | ------------------------------------------------------------------ |
+| extension load           | pi version supported | Register `/sf-browser`; no browser probe                           |
+| `session_start`          | extension enabled    | Register SF Browser tools                                          |
+| `resources_discover`     | extension enabled    | Contribute `skills/sf-browser`                                     |
+| `/sf-browser`            | interactive          | Open cache-first command panel                                     |
+| `/sf-browser status`     | any                  | Print cached runtime status and artifact paths                     |
+| `/sf-browser doctor`     | explicit             | Run `agent-browser --version` and show install guidance if missing |
+| `/sf-browser open`       | explicit             | Open active target org home in `agent-browser`                     |
+| `/sf-browser setup`      | explicit             | Open Salesforce Setup home in `agent-browser`                      |
+| `/sf-browser screenshot` | explicit             | Capture Browser Evidence in thumbnail mode                         |
+| `sf_browser_*` tools     | explicit agent call  | Invoke `agent-browser` in the shared `sf-pi` session               |
+
+## Commands
+
+| Command                          | Description                                                                          |
+| -------------------------------- | ------------------------------------------------------------------------------------ |
+| `/sf-browser`                    | Open the status/actions panel.                                                       |
+| `/sf-browser status`             | Show cache-first SF Browser status without probing `agent-browser`.                  |
+| `/sf-browser doctor`             | Check whether `agent-browser` is installed.                                          |
+| `/sf-browser open [path\|setup]` | Open the active target org home, a provided Salesforce path, or a Setup Destination. |
+| `/sf-browser setup`              | Open Salesforce Setup home.                                                          |
+| `/sf-browser screenshot [label]` | Capture Browser Evidence with a private full screenshot and thumbnail image mode.    |
+| `/sf-browser guidance`           | Print the Salesforce Browser Contract.                                               |
+| `/sf-browser help`               | Print command and tool usage.                                                        |
+
+## Agent Tools
+
+| Tool                          | Purpose                                                                                                                      |
+| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
+| `sf_browser_open_org`         | Open a Salesforce org/path or curated Setup Destination in the shared `agent-browser` session without exposing login URLs.   |
+| `sf_browser_snapshot`         | Capture a pi-native snapshot: compact summary by default, full raw tree stored as an artifact.                               |
+| `sf_browser_click`            | Click a ref from the latest snapshot.                                                                                        |
+| `sf_browser_fill`             | Fill a ref from the latest snapshot.                                                                                         |
+| `sf_browser_press`            | Press keys such as `Enter`, `Escape`, or `Control+a`.                                                                        |
+| `sf_browser_wait`             | Wait for expected text, URL, load state, or last-resort milliseconds.                                                        |
+| `sf_browser_capture_evidence` | Capture private screenshot evidence, optionally dismiss known ambient overlays, and optionally return bounded image content. |
+
+## Salesforce Browser Contract
+
+- Use Salesforce APIs first for setup and verification.
+- Prefer curated Setup Destinations over search-and-click navigation when the target Setup path is known.
+- Run `sf_browser_snapshot` before acting. Use `focus` terms to keep relevant refs in the compact summary, and use `outputMode: "full"` only when the summary misses needed refs.
+- Treat refs as stale after clicks, saves, modal opens, navigation, tab switches, and Lightning rerenders.
+- For Salesforce lookup and combobox controls: fill the visible input, wait for options, snapshot, then click the desired option.
+- Use `imageMode: "artifact"` for batches; use `thumbnail` for model-visible current-screen inspection.
+- Leave `dismissOverlays` enabled for evidence capture unless the overlay is part of the task being documented.
+- Use direct `agent-browser` commands for scroll, select, hover, drag, upload, tabs, console, network, trace, video, HAR, eval, or advanced CDP.
+
+## State and Artifacts
+
+Browser Evidence is stored outside the project by default:
+
+```text
+<globalAgentDir>/sf-pi/browser-artifacts/latest/
+  index.json
+  000001-label.png
+  000001-label.thumb.jpg
+```
+
+The index keeps the latest capture metadata and monotonically increasing evidence IDs. V1 does not automatically clean old artifacts.
+
+## Installing agent-browser
+
+SF Browser does not auto-install dependencies. Install `agent-browser` explicitly:
+
+```bash
+npm i -g agent-browser
+agent-browser install
+```
+
+Then run:
+
+```text
+/sf-browser doctor
+```
+
+## File Structure
+
+<!-- GENERATED:file-structure:start -->
+
+```
+extensions/sf-browser/
+  lib/
+    agent-browser.ts        ← implementation module
+    artifacts.ts            ← implementation module
+    constants.ts            ← implementation module
+    guidance.ts             ← implementation module
+    operations.ts           ← implementation module
+    overlay-dismissal.ts    ← implementation module
+    redaction.ts            ← implementation module
+    salesforce-open.ts      ← implementation module
+    setup-destinations.ts   ← implementation module
+    sf_browser_capture_evidence-tool.ts← implementation module
+    sf_browser_click-tool.ts← implementation module
+    sf_browser_fill-tool.ts ← implementation module
+    sf_browser_open_org-tool.ts← implementation module
+    sf_browser_press-tool.ts← implementation module
+    sf_browser_snapshot-tool.ts← implementation module
+    sf_browser_wait-tool.ts ← implementation module
+    snapshot-summary.ts     ← implementation module
+    timing.ts               ← implementation module
+    tool-support.ts         ← implementation module
+  tests/
+    overlay-dismissal.test.ts← unit / smoke test
+    redaction.test.ts       ← unit / smoke test
+    setup-destinations.test.ts← unit / smoke test
+    smoke.test.ts           ← unit / smoke test
+    snapshot-summary.test.ts← unit / smoke test
+    timing.test.ts          ← unit / smoke test
+  index.ts                  ← Pi extension entry point
+  manifest.json             ← source-of-truth extension metadata
+  README.md                 ← human + agent walkthrough
+```
+
+<!-- GENERATED:file-structure:end -->
+
+## Testing Strategy
+
+Run targeted checks while iterating:
+
+```bash
+npm run check
+npm test -- extensions/sf-browser/tests/smoke.test.ts
+```
+
+Before commit, run the repo validation path from the root README/AGENTS guidance.
+
+## Troubleshooting
+
+**`agent-browser` is missing:**
+Run `npm i -g agent-browser && agent-browser install`, then `/sf-browser doctor`.
+
+**Snapshot refs fail:**
+Refs are stale after Salesforce page changes. Run `sf_browser_snapshot` again and retry with fresh refs. If the compact summary omits the control you need, retry with `focus` terms or `outputMode: "full"`.
+
+**Screenshots are too heavy:**
+Use `sf_browser_capture_evidence` with `imageMode: "artifact"` for repeated captures.
+
+**A browser action is outside the hot path:**
+Use direct `agent-browser` commands and keep SF Browser for opening, snapshots, simple actions, waits, and evidence.

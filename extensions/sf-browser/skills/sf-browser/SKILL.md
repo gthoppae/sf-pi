@@ -1,0 +1,40 @@
+---
+name: sf-browser
+description: Use when automating, inspecting, or capturing Salesforce UI with SF Browser or agent-browser. Trigger for Salesforce Setup UI, Lightning UI, builders, managed package configuration pages, UI-only checks, screenshots, and last-mile browser work that Salesforce APIs cannot cover.
+---
+
+# SF Browser
+
+SF Browser is an experimental developer-assistive surface for Salesforce UI last-mile work. It does not imply a stable Salesforce UI automation contract.
+
+Use Salesforce APIs first for setup and verification. Use SF Browser and agent-browser only for UI surfaces that are not reachable or trustworthy through APIs.
+
+## Core loop
+
+1. Open the org/path with `sf_browser_open_org`. Prefer a curated `setup` destination when the target Setup page is known (for example `setup: "agentforce-agents"`) instead of search-and-click navigation.
+2. Run `sf_browser_snapshot` before acting. It is pi-native by default: `outputMode: "summary"` returns compact decision-oriented context and stores the full raw snapshot as an artifact.
+3. Use refs from the latest snapshot with `sf_browser_click`, `sf_browser_fill`, or `sf_browser_press`.
+4. After page-changing actions, run `sf_browser_wait`, then `sf_browser_snapshot` again.
+5. Capture Browser Evidence with `sf_browser_capture_evidence` when visual confirmation matters.
+
+Refs are short-lived. Treat them as stale after clicks, saves, modal opens, navigation, tab switches, or Lightning rerenders. If the summary misses needed controls, retry with `focus` terms or explicitly request `outputMode: "full"`.
+
+## Salesforce UI patterns
+
+- Prefer snapshot refs over CSS selectors. Salesforce generated ids and internal classes are not stable.
+- For lookup and combobox controls: fill the visible input, wait for options, snapshot, then click the desired option ref.
+- For Setup navigation, prefer curated Setup Destinations over UI search when available. Wait for expected text or URL patterns after navigation; DOMContentLoaded alone is often not enough.
+- For save flows, wait for visible confirmation such as a toast, success text, or expected page state, then snapshot again.
+- If expected controls are missing, consider iframe/frame surfaces or use direct `agent-browser` commands as the escape hatch.
+- Use `imageMode: "artifact"` for repeated screenshots or batches; use `thumbnail` when the model should inspect the current screen; use `full` only when visual fidelity matters and the image is small enough.
+- Keep `dismissOverlays` enabled for Browser Evidence unless the overlay is part of the task. It is best-effort and only targets known non-workflow Salesforce overlays.
+
+## Long-tail escape hatch
+
+SF Browser only wraps the hot path: open, snapshot, click, fill, press, wait, and Browser Evidence capture.
+
+For scroll, select, hover, drag, upload, tabs, state, console, network, eval, trace, video, HAR, or advanced CDP work, use direct `agent-browser` commands. Start with:
+
+```bash
+agent-browser skills get core
+```

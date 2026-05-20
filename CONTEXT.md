@@ -32,6 +32,10 @@ _Avoid_: Salesforce encyclopedia, all-purpose memory dump
 The Bundled Extension that gives agents a compact, safe Data Cloud / Data 360 workflow surface with discovery, direct REST access, metadata helpers, and readiness checks.
 _Avoid_: plugin, MCP wrapper, endpoint dump
 
+**SF Browser**:
+The Bundled Extension that gives agents a compact Salesforce-aware affordance layer for `agent-browser` in last-mile UI work that Salesforce APIs cannot cover.
+_Avoid_: generic browser wrapper, Playwright replacement, UI testing framework, browser primitive clone
+
 **Upstream Reference Fallback**:
 A public-source fallback posture where agents consult an upstream project for missing reference context, while SF Pi remains responsible for its own runtime surface and user experience.
 _Avoid_: runtime fallback, embedded server, hidden dependency
@@ -116,6 +120,54 @@ _Avoid_: hidden automatic retry router, treating sf-skills as a second execution
 The dense, always-available operating rules for safe Salesforce work, including how to choose APIs, verify org state, and avoid guessing live-org details.
 _Avoid_: documentation index, Salesforce knowledge base
 
+**SF Browser Guidance**:
+Just-in-time guidance that teaches agents how to use `agent-browser` safely and efficiently for Salesforce UI last-mile work without adding an always-on prompt tax.
+_Avoid_: always-injected browser kernel, duplicated agent-browser manual, generic browser tutorial
+
+**Browser Evidence**:
+A private screenshot artifact captured from `agent-browser` that can optionally return a bounded image result for model vision while keeping the full-resolution original on disk.
+_Avoid_: trace, recording, visual assertion, unbounded image transcript, screenshot dump
+
+**Browser Evidence Index**:
+The lightweight per-session manifest that assigns monotonically increasing IDs to **Browser Evidence** artifacts.
+_Avoid_: screenshot database, trace store, media library
+
+**Lazy Browser Runtime**:
+An external browser automation dependency that **SF Browser** detects and invokes only after explicit command or tool intent, never during SF Pi startup.
+_Avoid_: bundled browser engine, startup probe, auto-installed dependency
+
+**SF Browser Session**:
+The default named `agent-browser` session used by **SF Browser** to keep browser state stable across turns.
+_Avoid_: per-tool browser launch, per-org browser profile, hidden browser pool
+
+**Frictionless Browser Operation**:
+The v1 **SF Browser** posture that adds Salesforce-aware browser tools and passive redaction/storage hygiene without permission gates or semantic action mediation.
+_Avoid_: permission gate, click guardrail, production browser blocker, semantic browser guardrail
+
+**Hot-Path Browser Tool Set**:
+The small typed **SF Browser** tool surface that covers the common `agent-browser` loop without pursuing feature parity with `agent-browser`.
+_Avoid_: browser primitive clone, workflow DSL, full CDP surface, Selenium-style driver API
+
+**Salesforce Browser Contract**:
+The tool and guidance rules that teach agents Salesforce UI behavior while keeping **SF Browser** mechanically thin.
+_Avoid_: browser framework, DOM abstraction, workflow automation layer
+
+**Ambient Overlay Dismissal**:
+A best-effort **SF Browser** behavior that closes known non-workflow Salesforce overlays before evidence capture or explicit cleanup without dismissing task-relevant modals.
+_Avoid_: modal auto-confirmation, workflow cancellation, popup blocker, destructive dialog handling
+
+**Setup Destination**:
+A curated public-safe shortcut from a stable name to a Salesforce Setup path used by **SF Browser** to avoid brittle search-and-click navigation.
+_Avoid_: full Setup sitemap, live menu scraper, arbitrary natural-language setup search, org-specific shortcut
+
+**Pi-Native Browser Snapshot**:
+An **SF Browser** snapshot result that stores the full `agent-browser` output as an artifact while sending only a compact decision-oriented summary to the LLM by default.
+_Avoid_: context dump, raw accessibility tree by default, screenshot replacement, lossy-only snapshot
+
+**Browser Operation Duration**:
+A user-visible elapsed-time signal included in **SF Browser** results so humans can understand browser automation cost and compare optimized workflows.
+_Avoid_: performance benchmark, SLA, profiling trace
+
 **SF Pi Reference Map**:
 A compact guide that points agents from SF Brain to repo-local sources of truth such as the extension catalog, command reference, extension READMEs, and bundled progressive skills. It may mention active SF skills as a runtime signal, but must not assume user-global skill-library paths.
 _Avoid_: duplicated docs, hardcoded personal skill paths, Salesforce encyclopedia
@@ -129,6 +181,21 @@ _Avoid_: duplicated docs, hardcoded personal skill paths, Salesforce encyclopedi
 - **SF Brain** is a **Bundled Extension** that provides the **Salesforce Operator Kernel**.
 - **SF Brain** routes Data 360 work to **SF Data 360** without embedding Data 360 operation details.
 - **SF Data 360** is a **Bundled Extension** with Data Cloud / Data 360 **Runtime Surfaces**.
+- **SF Browser** is a **Bundled Extension** with browser **Runtime Surfaces** backed by `agent-browser`.
+- **SF Browser** owns Salesforce context, safe org opening, artifact handling, and guidance; `agent-browser` owns generic browser execution.
+- **SF Browser** exposes a small v1 **Runtime Surface**: one cache-first `/sf-browser` command panel and a **Hot-Path Browser Tool Set**.
+- **SF Browser Guidance** is surfaced through SF Brain routing, SF Browser command/tool results, and optional progressive skills rather than an always-injected context block.
+- **Browser Evidence** is artifact-first: repeated captures reference stored files, while model-visible images are explicit and size-bounded.
+- **Browser Evidence** v1 is stored under `browser-artifacts/latest/` with a **Browser Evidence Index** and no automatic cleanup.
+- `agent-browser` is a **Lazy Browser Runtime** for **SF Browser**.
+- **SF Browser** v1 uses one default **SF Browser Session** instead of per-org or per-conversation browser sessions.
+- **Frictionless Browser Operation** keeps v1 free of browser-action permission prompts while preserving passive hygiene for URLs and artifacts.
+- The **Hot-Path Browser Tool Set** wraps only `open`, `snapshot`, `click`, `fill`, `press`, `wait`, and Browser Evidence capture; advanced browser work remains direct `agent-browser` usage.
+- **Salesforce Browser Contracts** cover stale refs, Lightning rerenders, Setup navigation, lookup and combobox flows, iframe surfaces, and API-first verification through tool descriptions, tool results, help, and optional progressive skills.
+- **Ambient Overlay Dismissal** is scoped to known non-workflow overlays and is appropriate for Browser Evidence cleanup before it is used around general click/fill flows.
+- A **Setup Destination** is intentionally curated and small; direct Salesforce Setup paths are preferred over UI search when the destination is known.
+- A **Pi-Native Browser Snapshot** separates model context from raw browser state: summary by default, artifact for full fidelity, and explicit full output only when requested.
+- **Browser Operation Duration** is reported in SF Browser tool results for user confidence; it is not treated as a formal performance benchmark.
 - **First-Class Data 360 Parity** guides how **SF Data 360** expands its workflow coverage.
 - **Generated Data 360 Parity** is the preferred delivery style for broad **First-Class Data 360 Parity**.
 - A **Runtime Code Budget** constrains hand-written **Runtime Surfaces**, not generated parity data.

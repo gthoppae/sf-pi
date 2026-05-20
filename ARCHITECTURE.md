@@ -24,6 +24,7 @@ sf-pi/
 ├── extensions/                 ← All extensions live here (self-contained)
 │   ├── sf-agentscript/
 │   ├── sf-brain/
+│   ├── sf-browser/
 │   ├── sf-data360/
 │   ├── sf-devbar/
 │   ├── sf-feedback/

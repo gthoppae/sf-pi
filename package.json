@@ -36,6 +36,7 @@
       "./extensions/sf-llm-gateway-internal/index.ts",
       "./extensions/sf-guardrail/index.ts",
       "./extensions/sf-brain/index.ts",
+      "./extensions/sf-browser/index.ts",
       "./extensions/sf-slack/index.ts",
       "./extensions/sf-data360/index.ts",
       "./extensions/sf-lsp/index.ts",

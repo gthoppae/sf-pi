@@ -1,0 +1,41 @@
+{
+  "id": "sf-browser",
+  "name": "SF Browser",
+  "description": "Salesforce-aware browser automation for last-mile UI work using agent-browser.",
+  "category": "agent-tool",
+  "maturity": "experimental",
+  "defaultEnabled": true,
+  "commands": ["/sf-browser"],
+  "tools": [
+    "sf_browser_open_org",
+    "sf_browser_snapshot",
+    "sf_browser_click",
+    "sf_browser_fill",
+    "sf_browser_press",
+    "sf_browser_wait",
+    "sf_browser_capture_evidence"
+  ],
+  "events": ["session_start", "session_shutdown", "resources_discover"],
+  "docs": {
+    "summary": "Salesforce-aware agent-browser affordance layer for UI last-mile work that Salesforce APIs cannot cover. It registers a cache-first /sf-browser panel plus a small hot-path browser tool set, curated Setup Destinations, Browser Evidence, and lazy agent-browser invocation after explicit command/tool intent.",
+    "primaryFiles": [
+      "index.ts",
+      "lib/agent-browser.ts",
+      "lib/operations.ts",
+      "lib/setup-destinations.ts",
+      "lib/overlay-dismissal.ts",
+      "lib/snapshot-summary.ts",
+      "skills/sf-browser/SKILL.md"
+    ],
+    "stateFiles": [
+      "<globalAgentDir>/sf-pi/browser-artifacts/latest/index.json",
+      "<globalAgentDir>/sf-pi/browser-artifacts/latest/*.png",
+      "<globalAgentDir>/sf-pi/browser-artifacts/latest/*.jpg"
+    ],
+    "safety": [
+      "No startup probes; agent-browser is detected only from /sf-browser doctor or explicit tool/command actions.",
+      "Browser Evidence is artifact-first and stored outside the project by default.",
+      "Session-bearing Salesforce org-open URLs are passed to agent-browser but not echoed in tool results."
+    ]
+  }
+}

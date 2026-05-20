@@ -41,6 +41,14 @@ _Single-plugin lifecycle for `.agent` files: in-process compile-on-save diagnost
 - Commands: `/sf-agentscript`
 - Tools: `agentscript_compile`, `agentscript_create`, `agentscript_inspect`, `agentscript_mutate`, `agentscript_preview`, `agentscript_eval`, `agentscript_lifecycle`
 
+### [SF Browser](../extensions/sf-browser/)
+
+_Salesforce-aware browser automation for last-mile UI work using agent-browser._
+
+- Default: **on**
+- Commands: `/sf-browser`
+- Tools: `sf_browser_open_org`, `sf_browser_snapshot`, `sf_browser_click`, `sf_browser_fill`, `sf_browser_press`, `sf_browser_wait`, `sf_browser_capture_evidence`
+
 ### [SF Data 360](../extensions/sf-data360/)
 
 _Data Cloud/Data 360 capability facade and direct REST helper — d360 search/examples/execute, d360_api, compact metadata discovery, readiness probe, and progressive-disclosure references_

@@ -30,6 +30,18 @@ export const SF_PI_REGISTRY: readonly SfPiExtension[] = [
     events: ["before_agent_start"],
   },
   {
+    id: "sf-browser",
+    name: "SF Browser",
+    description: "Salesforce-aware browser automation for last-mile UI work using agent-browser.",
+    file: "extensions/sf-browser/index.ts",
+    category: "agent-tool",
+    maturity: "experimental",
+    defaultEnabled: true,
+    commands: ["/sf-browser"],
+    tools: ["sf_browser_open_org","sf_browser_snapshot","sf_browser_click","sf_browser_fill","sf_browser_press","sf_browser_wait","sf_browser_capture_evidence"],
+    events: ["session_start","session_shutdown","resources_discover"],
+  },
+  {
     id: "sf-data360",
     name: "SF Data 360",
     description: "Data Cloud/Data 360 capability facade and direct REST helper — d360 search/examples/execute, d360_api, compact metadata discovery, readiness probe, and progressive-disclosure references",
