@@ -53,7 +53,12 @@ export async function openOrgInAgentBrowser(
 export async function captureEvidence(
   pi: ExtensionAPI,
   cwd: string,
-  input: { label?: string; imageMode?: EvidenceImageMode | string; dismissOverlays?: boolean },
+  input: {
+    label?: string;
+    imageMode?: EvidenceImageMode | string;
+    dismissOverlays?: boolean;
+    scrollToRef?: string;
+  },
   signal?: AbortSignal,
 ): Promise<{ content: Array<TextContent | ImageContent>; details: Record<string, unknown> }> {
   const stopTimer = startTimer();
@@ -63,6 +68,15 @@ export async function captureEvidence(
     input.dismissOverlays === false
       ? { dismissedRefs: [], snapshotChecked: false }
       : await dismissAmbientOverlays(pi, cwd, signal);
+  let scrolledToRef: string | undefined;
+  if (input.scrollToRef) {
+    await runAgentBrowser(pi, ["scrollintoview", input.scrollToRef], {
+      cwd,
+      signal,
+      timeoutMs: 15_000,
+    });
+    scrolledToRef = input.scrollToRef;
+  }
 
   await runAgentBrowser(pi, ["screenshot", planned.path], { cwd, signal });
 
@@ -102,6 +116,7 @@ export async function captureEvidence(
     `Path: ${capture.path}`,
     capture.thumbnailPath ? `Thumbnail: ${capture.thumbnailPath}` : undefined,
     capture.url ? `URL: ${capture.url}` : undefined,
+    scrolledToRef ? `Scrolled into view: ${scrolledToRef}` : undefined,
     overlayDismissal.dismissedRefs.length
       ? `Dismissed ambient overlays: ${overlayDismissal.dismissedRefs.join(", ")}`
       : undefined,
@@ -111,7 +126,7 @@ export async function captureEvidence(
   ]);
   const content: Array<TextContent | ImageContent> = [{ type: "text", text }];
   if (image) content.push(image);
-  return { content, details: { ok: true, capture, overlayDismissal, ...duration } };
+  return { content, details: { ok: true, capture, overlayDismissal, scrolledToRef, ...duration } };
 }
 
 async function getCurrentUrl(

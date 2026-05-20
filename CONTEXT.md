@@ -128,6 +128,10 @@ _Avoid_: always-injected browser kernel, duplicated agent-browser manual, generi
 A private screenshot artifact captured from `agent-browser` that can optionally return a bounded image result for model vision while keeping the full-resolution original on disk.
 _Avoid_: trace, recording, visual assertion, unbounded image transcript, screenshot dump
 
+**Targeted Browser Evidence**:
+**Browser Evidence** captured after optionally scrolling a known ref into view so screenshots prove the relevant UI section instead of only the page top.
+_Avoid_: automatic visual search, screenshot spam, page-top evidence for lower-page assertions
+
 **Browser Evidence Index**:
 The lightweight per-session manifest that assigns monotonically increasing IDs to **Browser Evidence** artifacts.
 _Avoid_: screenshot database, trace store, media library
@@ -163,6 +167,10 @@ _Avoid_: full Setup sitemap, live menu scraper, arbitrary natural-language setup
 **Pi-Native Browser Snapshot**:
 An **SF Browser** snapshot result that stores the full `agent-browser` output as an artifact while sending only a compact decision-oriented summary to the LLM by default.
 _Avoid_: context dump, raw accessibility tree by default, screenshot replacement, lossy-only snapshot
+
+**Smart Snapshot Summary**:
+A structured **Pi-Native Browser Snapshot** that classifies Salesforce UI state into page, surface, alert, action, navigation, and table sections while suppressing global browser/setup chrome by default.
+_Avoid_: raw line filter, full accessibility dump, screenshot-only reasoning
 
 **Browser Operation Duration**:
 A user-visible elapsed-time signal included in **SF Browser** results so humans can understand browser automation cost and compare optimized workflows.
@@ -211,6 +219,7 @@ _Avoid_: duplicated docs, hardcoded personal skill paths, Salesforce encyclopedi
 - **SF Browser Guidance** is surfaced through SF Brain routing, SF Browser command/tool results, and optional progressive skills rather than an always-injected context block.
 - **Browser Evidence** is artifact-first: repeated captures reference stored files, while model-visible images are explicit and size-bounded.
 - **Browser Evidence** v1 is stored under `browser-artifacts/latest/` with a **Browser Evidence Index** and no automatic cleanup.
+- **Targeted Browser Evidence** uses explicit refs for scroll targeting; focus-to-scroll remains a future design choice.
 - `agent-browser` is a **Lazy Browser Runtime** for **SF Browser**.
 - **SF Browser** v1 uses one default **SF Browser Session** instead of per-org or per-conversation browser sessions.
 - **Frictionless Browser Operation** keeps v1 free of browser-action permission prompts while preserving passive hygiene for URLs and artifacts.
@@ -219,6 +228,7 @@ _Avoid_: duplicated docs, hardcoded personal skill paths, Salesforce encyclopedi
 - **Ambient Overlay Dismissal** is scoped to known non-workflow overlays and is appropriate for Browser Evidence cleanup before it is used around general click/fill flows.
 - A **Setup Destination** is intentionally curated and small; direct Salesforce Setup paths are preferred over UI search when the destination is known.
 - A **Pi-Native Browser Snapshot** separates model context from raw browser state: summary by default, artifact for full fidelity, and explicit full output only when requested.
+- A **Smart Snapshot Summary** includes human-readable sections, lightweight icons, and the current page URL so agents and humans can quickly understand where they are and what matters.
 - **Browser Operation Duration** is reported in SF Browser tool results for user confidence; it is not treated as a formal performance benchmark.
 - A **Setup Runbook** records primary execution, evidence, and fallback paths so **SF Pi** stays **API-First Browser-Ready** instead of API-only or browser-only.
 - A **UI Fallback Path** should be hardened through repeated navigation, evidence capture, and documented edge cases, but it should not replace a stable primary API or owning extension path.

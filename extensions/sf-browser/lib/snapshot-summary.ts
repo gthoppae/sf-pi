@@ -8,6 +8,7 @@
  * snapshot as an artifact.
  */
 import { truncateLine } from "@earendil-works/pi-coding-agent";
+import { redactUrl } from "./redaction.ts";
 
 export type SnapshotOutputMode = "summary" | "artifact" | "full";
 
@@ -15,14 +16,54 @@ export interface SnapshotSummaryInput {
   snapshot: string;
   fullSnapshotPath: string;
   focus?: string[];
+  url?: string;
 }
 
 const MAX_LINE_BYTES = 260;
 const MAX_FOCUS_LINES = 24;
-const MAX_LANDMARK_LINES = 16;
-const MAX_CONTROL_LINES = 28;
-const MAX_TABLE_LINES = 24;
 const MAX_ALERT_LINES = 12;
+const MAX_ACTION_LINES = 28;
+const MAX_NAV_LINES = 12;
+const MAX_COLUMNS = 10;
+const MAX_ROWS = 8;
+const MIN_FOCUS_TERM_LENGTH = 3;
+
+const GLOBAL_CHROME_LABELS = [
+  "Skip to Navigation",
+  "Skip to Main Content",
+  "Global Actions",
+  "Guidance Center",
+  "Salesforce Help",
+  "Setup",
+  "Notifications",
+  "View profile",
+  "App Launcher",
+  "Object Manager List",
+  "Favorites list",
+  "This item doesn't support favorites",
+  "Search Setup",
+  "Quick Find",
+] as const;
+
+const PRIMARY_ACTION_LABELS = [
+  "Save",
+  "Cancel",
+  "Edit",
+  "Delete",
+  "New",
+  "New Agent",
+  "New Flow",
+  "New External Client App",
+  "Add",
+  "Remove",
+  "Edit Assignments",
+  "Reset Password",
+  "Freeze",
+  "View Summary",
+  "Go to Agentforce Studio",
+] as const;
+
+const LOW_VALUE_HEADINGS = new Set(["ADMINISTRATION", "PLATFORM TOOLS", "SETTINGS"]);
 
 export function snapshotOutputModeFromUnknown(value: unknown): SnapshotOutputMode {
   return value === "artifact" || value === "full" || value === "summary" ? value : "summary";
@@ -36,41 +77,33 @@ export function summarizeSnapshot(input: SnapshotSummaryInput): string {
   const { focusTerms, ignoredFocusTerms } = normalizeFocusTerms(input.focus ?? []);
   const focusMatches = collectFocusMatches(lines, focusTerms);
   const alerts = collectAlerts(lines, focusMatches);
-  const landmarks = collectMatching(lines, isLandmarkLine, MAX_LANDMARK_LINES, [
-    ...focusMatches,
-    ...alerts,
-  ]);
-  const controls = collectMatching(lines, isControlLine, MAX_CONTROL_LINES, [
-    ...focusMatches,
-    ...landmarks,
-  ]);
-  const tablePreview = collectMatching(lines, isTableLine, MAX_TABLE_LINES, [
-    ...focusMatches,
-    ...landmarks,
-    ...controls,
-  ]);
+  const page = summarizePage(lines, input.url, focusTerms);
+  const surface = classifySurface(lines, input.url);
+  const actions = collectPrimaryActions(lines, alerts);
+  const setupNavigation = collectSetupNavigation(lines, focusMatches);
+  const tableSummary = summarizeTables(lines, focusTerms);
 
-  const sections: string[] = ["Snapshot summary", `Full snapshot: ${input.fullSnapshotPath}`, ""];
-
+  const sections: string[] = ["🧭 Snapshot summary", ""];
+  appendSection(sections, "📍 Page", page);
+  appendSection(sections, "🧭 Surface", surface);
   if (ignoredFocusTerms.length) {
-    sections.push(
-      `Ignored short focus terms: ${ignoredFocusTerms.join(", ")}. Use at least 3 characters to avoid noisy matches.`,
-    );
-    sections.push("");
+    appendSection(sections, "🔎 Focus notes", [
+      `Ignored short focus terms: ${ignoredFocusTerms.join(", ")}. Use at least ${MIN_FOCUS_TERM_LENGTH} characters to avoid noisy matches.`,
+    ]);
   }
-
-  appendSection(sections, "Focus matches", focusMatches);
-  appendSection(sections, "Alerts / validation", alerts);
-  appendSection(sections, "Page landmarks", landmarks);
-  appendSection(sections, "Key controls", controls);
-  appendSection(sections, "Table/list preview", tablePreview);
+  appendSection(sections, "⚠️ Alerts / validation", alerts);
+  appendSection(sections, "🎯 Primary actions", actions);
+  appendSection(sections, "🗂️ Setup navigation", setupNavigation);
+  appendSection(sections, "📊 Tables / lists", tableSummary);
+  appendSection(sections, "🔎 Focus matches", focusMatches);
+  appendSection(sections, "📄 Artifact", [`Full snapshot: ${input.fullSnapshotPath}`]);
 
   if (
-    !focusMatches.length &&
     !alerts.length &&
-    !landmarks.length &&
-    !controls.length &&
-    !tablePreview.length
+    !actions.length &&
+    !setupNavigation.length &&
+    !tableSummary.length &&
+    !focusMatches.length
   ) {
     sections.push(
       "No compact summary lines matched. Use outputMode=full or inspect the full snapshot artifact.",
@@ -85,6 +118,59 @@ export function summarizeSnapshot(input: SnapshotSummaryInput): string {
     .trim();
 }
 
+function summarizePage(lines: string[], url: string | undefined, focusTerms: string[]): string[] {
+  const headingLines = lines.filter((line) => /^- heading /.test(line));
+  const focusHeadings = headingLines.filter((line) =>
+    focusTerms.some((term) => line.toLowerCase().includes(term.toLowerCase())),
+  );
+  const usefulHeadings = headingLines.filter(
+    (line) => !LOW_VALUE_HEADINGS.has(extractQuotedName(line)),
+  );
+  const headings = unique(
+    [...focusHeadings, ...usefulHeadings, ...headingLines].map(formatLine),
+  ).slice(0, 4);
+  return [
+    url ? `URL: ${redactUrl(url) ?? url}` : undefined,
+    ...headings.map((heading) => `Heading: ${heading}`),
+  ].filter((line): line is string => !!line);
+}
+
+function classifySurface(lines: string[], url: string | undefined): string[] {
+  const joined = lines.join("\n");
+  const safeUrl = url ?? "";
+  if (/heading "Page not found"/i.test(joined)) return ["Setup page not found"];
+  if (
+    /\/builder\//i.test(safeUrl) ||
+    /\/flowBuilder\//i.test(safeUrl) ||
+    /heading "(Flow Builder|Agentforce Builder|Lightning App Builder|Prompt Builder|Testing Center)"/i.test(
+      joined,
+    )
+  ) {
+    return ["Builder surface"];
+  }
+  if (
+    /\/lightning\/setup\/ObjectManager/i.test(safeUrl) ||
+    /tab "Object Manager" \[selected/i.test(joined)
+  ) {
+    return ["Object Manager page"];
+  }
+  if (/\/lightning\/r\//i.test(safeUrl)) return ["Record page"];
+  if (/\/lightning\/o\//i.test(safeUrl)) return ["List view"];
+  if (/\/lightning\/(page|n)\//i.test(safeUrl)) return ["Lightning app/page"];
+
+  const iframe = lines.find((line) => /^- Iframe /.test(line));
+  if (iframe || /LayoutTable|Classic Setup Surface/i.test(joined)) {
+    return [
+      "Classic Setup Surface inside iframe",
+      ...(iframe ? [`Iframe: ${formatLine(iframe)}`] : []),
+    ];
+  }
+  if (/\/lightning\/setup\//i.test(safeUrl) || /link "SETUP"/.test(joined)) {
+    return ["Lightning Setup page"];
+  }
+  return ["Unknown Salesforce page"];
+}
+
 function normalizeFocusTerms(rawTerms: string[]): {
   focusTerms: string[];
   ignoredFocusTerms: string[];
@@ -94,7 +180,7 @@ function normalizeFocusTerms(rawTerms: string[]): {
   for (const raw of rawTerms) {
     const term = raw.trim();
     if (!term) continue;
-    if (term.length < 3) {
+    if (term.length < MIN_FOCUS_TERM_LENGTH) {
       ignoredFocusTerms.push(term);
       continue;
     }
@@ -133,22 +219,62 @@ function collectAlerts(lines: string[], exclude: string[]): string[] {
   return unique(out);
 }
 
-function collectMatching(
-  lines: string[],
-  predicate: (line: string) => boolean,
-  limit: number,
-  exclude: string[],
-): string[] {
+function collectPrimaryActions(lines: string[], exclude: string[]): string[] {
   const excluded = new Set(exclude);
   const out: string[] = [];
   for (const line of lines) {
     const formatted = formatLine(line);
     if (excluded.has(formatted)) continue;
-    if (!predicate(line)) continue;
+    if (isGlobalChromeLine(line)) continue;
+    if (!isPrimaryActionLine(line)) continue;
     out.push(formatted);
-    if (out.length >= limit) break;
+    if (out.length >= MAX_ACTION_LINES) break;
   }
   return unique(out);
+}
+
+function collectSetupNavigation(lines: string[], exclude: string[]): string[] {
+  const excluded = new Set(exclude);
+  const out: string[] = [];
+  for (const line of lines) {
+    if (!isSetupNavigationLine(line)) continue;
+    const formatted = formatLine(line);
+    if (excluded.has(formatted)) continue;
+    out.push(formatted);
+    if (out.length >= MAX_NAV_LINES) break;
+  }
+  return unique(out);
+}
+
+function summarizeTables(lines: string[], focusTerms: string[]): string[] {
+  const columns = lines.filter((line) => /^- columnheader /.test(line)).map(extractQuotedName);
+  const rows = lines
+    .filter((line) => /^- rowheader /.test(line))
+    .map(extractQuotedName)
+    .map(cleanRowName);
+  const focusRows = collectFocusRows(lines, focusTerms);
+  const out: string[] = [];
+  if (columns.length) out.push(`Columns: ${unique(columns).slice(0, MAX_COLUMNS).join(", ")}`);
+  if (rows.length) out.push(`Rows: ${unique(rows).slice(0, MAX_ROWS).join("; ")}`);
+  if (focusRows.length) out.push(`Focus rows/cells: ${focusRows.join("; ")}`);
+  return out;
+}
+
+function collectFocusRows(lines: string[], focusTerms: string[]): string[] {
+  if (!focusTerms.length) return [];
+  const lowered = focusTerms.map((term) => term.toLowerCase());
+  return unique(
+    lines
+      .filter((line) => isTableLine(line))
+      .filter((line) => {
+        const lower = line.toLowerCase();
+        return lowered.some((term) => lower.includes(term));
+      })
+      .map(extractQuotedName)
+      .map(cleanRowName)
+      .filter(Boolean)
+      .slice(0, MAX_ROWS),
+  );
 }
 
 function isAlertLine(line: string): boolean {
@@ -160,27 +286,35 @@ function isAlertLine(line: string): boolean {
   );
 }
 
-function isLandmarkLine(line: string): boolean {
-  return (
-    /^- heading /.test(line) ||
-    /^- tab ".*" \[selected/.test(line) ||
-    /^- treeitem ".*" .*selected/.test(line) ||
-    /^- link "SETUP"/.test(line)
+function isPrimaryActionLine(line: string): boolean {
+  if (/^- (switch|checkbox|combobox|searchbox|textbox|listbox) /.test(line)) return true;
+  if (!/^- (button|link) /.test(line)) return false;
+  const label = extractQuotedName(line);
+  if (!label) return false;
+  return PRIMARY_ACTION_LABELS.some(
+    (primary) => label === primary || label.startsWith(`${primary} `),
   );
 }
 
-function isControlLine(line: string): boolean {
-  return /^- (button|switch|combobox|searchbox|textbox|link) /.test(line);
+function isSetupNavigationLine(line: string): boolean {
+  return /^- treeitem ".*" .*selected/.test(line) || /^- link "SETUP"/.test(line);
 }
 
 function isTableLine(line: string): boolean {
   return /^- (columnheader|rowheader|gridcell|cell) /.test(line);
 }
 
-function appendSection(lines: string[], title: string, items: string[]): void {
-  if (items.length === 0) return;
+function isGlobalChromeLine(line: string): boolean {
+  const label = extractQuotedName(line);
+  if (!label) return false;
+  return GLOBAL_CHROME_LABELS.some((global) => label === global || label.startsWith(`${global} `));
+}
+
+function appendSection(lines: string[], title: string, items: Array<string | undefined>): void {
+  const present = items.filter((item): item is string => !!item);
+  if (present.length === 0) return;
   lines.push(`${title}:`);
-  for (const item of items) lines.push(`- ${item}`);
+  for (const item of present) lines.push(`- ${item}`);
   lines.push("");
 }
 
@@ -192,6 +326,14 @@ function formatAlertLine(line: string): string | null {
   if (/^- (generic|image|layouttable|layouttablerow|layouttablecell)/i.test(normalized))
     return null;
   return formatLine(normalized);
+}
+
+function cleanRowName(value: string): string {
+  return value.replace(/^Expand\s+(.+)\s+\1$/, "$1");
+}
+
+function extractQuotedName(line: string): string {
+  return line.match(/"([^"]+)"/)?.[1] ?? formatLine(line).replace(/^- \w+ /, "");
 }
 
 function formatLine(line: string): string {

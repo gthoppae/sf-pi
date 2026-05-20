@@ -12,7 +12,7 @@ Use Salesforce APIs first for setup and verification. Use SF Browser and agent-b
 ## Core loop
 
 1. Open the org/path with `sf_browser_open_org`. Prefer a curated `setup` destination when the target Setup page is known (for example `setup: "agentforce-agents"`) instead of search-and-click navigation.
-2. Run `sf_browser_snapshot` before acting. It is pi-native by default: `outputMode: "summary"` returns compact decision-oriented context and stores the full raw snapshot as an artifact.
+2. Run `sf_browser_snapshot` before acting. It is pi-native by default: `outputMode: "summary"` returns compact decision-oriented context with page URL, surface, primary actions, alerts, table/list summaries, and a full raw snapshot artifact.
 3. Use refs from the latest snapshot with `sf_browser_click`, `sf_browser_fill`, `sf_browser_select`, or `sf_browser_press`.
 4. After page-changing actions, run `sf_browser_wait`, then `sf_browser_snapshot` again.
 5. Capture Browser Evidence with `sf_browser_capture_evidence` when visual confirmation matters.
@@ -27,7 +27,7 @@ Refs are short-lived. Treat them as stale after clicks, saves, modal opens, navi
 - For Classic Setup Surface dual-list controls, use `sf_browser_select` on the source listbox, click Add or Remove, snapshot before Save, then verify through API after Save.
 - For save flows, wait for visible confirmation such as a toast, success text, or expected page state, then snapshot again. Treat near-timeout waits as ambiguous and verify before continuing.
 - If expected controls are missing, consider iframe/frame surfaces or use direct `agent-browser` commands as the escape hatch.
-- Use `imageMode: "artifact"` for repeated screenshots or batches; use `thumbnail` when the model should inspect the current screen; use `full` only when visual fidelity matters and the image is small enough.
+- Use `imageMode: "artifact"` for repeated screenshots or batches; use `thumbnail` when the model should inspect the current screen; use `full` only when visual fidelity matters and the image is small enough. Use `scrollToRef` when evidence needs a lower-page section in view.
 - Keep `dismissOverlays` enabled for Browser Evidence unless the overlay is part of the task. It is best-effort and only targets known non-workflow Salesforce overlays.
 
 ## Setup Runbooks

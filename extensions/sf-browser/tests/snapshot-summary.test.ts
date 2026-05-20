@@ -19,10 +19,45 @@ describe("snapshot summary", () => {
       focus: ["Agentforce"],
     });
 
+    expect(summary).toContain("📍 Page:");
     expect(summary).toContain("Full snapshot: /tmp/snapshot.txt");
     expect(summary).toContain('heading "Agentforce Agents"');
     expect(summary).toContain('switch "label" [checked=true, ref=e189]');
     expect(summary).toContain('button "New Agent" [ref=e175]');
+    expect(summary).toContain("Rows: Demo Greeter");
+  });
+
+  it("classifies URLs and Salesforce surfaces", () => {
+    const setup = summarizeSnapshot({
+      snapshot: '- heading "Agentforce Agents" [level=1, ref=e151]',
+      fullSnapshotPath: "/tmp/snapshot.txt",
+      url: "https://example.my.salesforce-setup.com/lightning/setup/EinsteinCopilot/home",
+    });
+    const record = summarizeSnapshot({
+      snapshot: '- heading "Acme" [level=1, ref=e1]',
+      fullSnapshotPath: "/tmp/snapshot.txt",
+      url: "https://example.my.salesforce.com/lightning/r/Account/001xx/view",
+    });
+
+    expect(setup).toContain(
+      "URL: https://example.my.salesforce-setup.com/lightning/setup/EinsteinCopilot/home",
+    );
+    expect(setup).toContain("Lightning Setup page");
+    expect(record).toContain("Record page");
+  });
+
+  it("does not classify setup pages as builders from promotional text alone", () => {
+    const summary = summarizeSnapshot({
+      snapshot: [
+        '- heading "Agentforce Agents" [level=1, ref=e1]',
+        '- StaticText "Try the new Agentforce Builder!"',
+      ].join("\n"),
+      fullSnapshotPath: "/tmp/snapshot.txt",
+      url: "https://example.my.salesforce-setup.com/lightning/setup/EinsteinCopilot/home",
+    });
+
+    expect(summary).toContain("Lightning Setup page");
+    expect(summary).not.toContain("Builder surface");
   });
 
   it("preserves validation alert text in compact summaries", () => {

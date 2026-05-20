@@ -159,7 +159,7 @@
     "entry": "extensions/sf-browser/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 1721
+    "srcLoc": 1889
   },
   {
     "id": "sf-data360",

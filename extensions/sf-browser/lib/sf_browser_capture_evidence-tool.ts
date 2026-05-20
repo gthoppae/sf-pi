@@ -34,6 +34,12 @@ export function registerSfBrowserCaptureEvidenceTool(pi: ExtensionAPI): void {
             "Best-effort dismissal of known non-workflow Salesforce overlays before capture. Defaults to true.",
         }),
       ),
+      scrollToRef: Type.Optional(
+        Type.String({
+          description:
+            "Optional ref to scroll into view before capturing evidence, useful for lower-page sections.",
+        }),
+      ),
     }),
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
       return captureEvidence(pi, ctx.cwd, params, signal);

@@ -39,7 +39,8 @@ sf_browser_capture_evidence
 - V1 exposes a Hot-Path Browser Tool Set: open, snapshot, click, fill, select, press, wait, and Browser Evidence capture.
 - Long-tail browser work remains direct `agent-browser` usage.
 - Browser Evidence is artifact-first. Use `imageMode: "artifact"` for repeated captures and `thumbnail` when the model should inspect the current screen.
-- Snapshots are pi-native: `outputMode: "summary"` stores the full raw tree as an artifact and returns a compact decision-oriented summary by default.
+- Targeted Browser Evidence can scroll an explicit ref into view before screenshot capture with `scrollToRef`.
+- Snapshots are smart and pi-native: `outputMode: "summary"` reports page URL, surface, actions, alerts, tables, and an artifact pointer by default.
 - Ambient Overlay Dismissal is best-effort and scoped to known non-workflow Salesforce overlays before evidence capture.
 - Setup Destinations are curated shortcuts for known Setup paths; they are not a full Setup sitemap.
 - Tool results include a user-visible duration so users can understand the cost and compare optimized workflows.
@@ -79,13 +80,13 @@ sf_browser_capture_evidence
 | Tool                          | Purpose                                                                                                                      |
 | ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
 | `sf_browser_open_org`         | Open a Salesforce org/path or curated Setup Destination in the shared `agent-browser` session without exposing login URLs.   |
-| `sf_browser_snapshot`         | Capture a pi-native snapshot: compact summary by default, full raw tree stored as an artifact.                               |
+| `sf_browser_snapshot`         | Capture a smart pi-native snapshot: page URL, surface, actions, tables, alerts, and artifact pointer.                        |
 | `sf_browser_click`            | Click a ref from the latest snapshot.                                                                                        |
 | `sf_browser_fill`             | Fill a ref from the latest snapshot.                                                                                         |
 | `sf_browser_select`           | Select values in Salesforce select/listbox refs, including Classic Setup dual-list controls.                                 |
 | `sf_browser_press`            | Press keys such as `Enter`, `Escape`, or `Control+a`.                                                                        |
 | `sf_browser_wait`             | Wait for expected text, URL, load state, or last-resort milliseconds; reports near-timeout waits as ambiguous.               |
-| `sf_browser_capture_evidence` | Capture private screenshot evidence, optionally dismiss known ambient overlays, and optionally return bounded image content. |
+| `sf_browser_capture_evidence` | Capture private screenshot evidence, optionally scroll to a ref, dismiss ambient overlays, and return bounded image content. |
 
 ## Setup Runbooks
 
@@ -102,10 +103,10 @@ Runbooks document the preferred API or owning-extension path, the Browser Eviden
 
 - Use Salesforce APIs first for setup and verification.
 - Prefer curated Setup Destinations over search-and-click navigation when the target Setup path is known.
-- Run `sf_browser_snapshot` before acting. Use `focus` terms to keep relevant refs in the compact summary, and use `outputMode: "full"` only when the summary misses needed refs.
+- Run `sf_browser_snapshot` before acting. It reports page URL, surface type, primary actions, tables/lists, alerts, and focus matches while storing the full raw tree as an artifact.
 - Treat refs as stale after clicks, saves, modal opens, navigation, tab switches, and Lightning rerenders.
 - For Salesforce lookup and combobox controls: fill the visible input, wait for options, snapshot, then click the desired option.
-- Use `imageMode: "artifact"` for batches; use `thumbnail` for model-visible current-screen inspection.
+- Use `imageMode: "artifact"` for batches; use `thumbnail` for model-visible current-screen inspection. Use `scrollToRef` when evidence needs to prove a lower-page section.
 - Leave `dismissOverlays` enabled for evidence capture unless the overlay is part of the task being documented.
 - Use `sf_browser_select` for Classic Setup listbox and dual-list controls, then click Add or Remove and snapshot before saving.
 - If `sf_browser_wait` reports an ambiguous wait, snapshot or verify through API before continuing.

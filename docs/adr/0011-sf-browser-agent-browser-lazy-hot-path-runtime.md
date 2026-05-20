@@ -19,7 +19,8 @@ The first Agentforce setup check showed that SF Browser needs more Salesforce-sp
 - Browser Evidence should perform best-effort Ambient Overlay Dismissal for known non-workflow Salesforce overlays so screenshots are not obscured by guidance, security, or contact panels.
 - SF Browser should prefer curated Setup Destinations, such as `agentforce-agents`, over search-and-click navigation when the target Setup path is known.
 - These refinements remain contracts and small helpers, not a broad DOM abstraction or full Setup sitemap.
-- Snapshot results should be pi-native: full `agent-browser` output is saved as an artifact, while the default model-visible content is a compact decision-oriented summary. Full inline snapshot output remains explicit opt-in.
+- Snapshot results should be pi-native: full `agent-browser` output is saved as an artifact, while the default model-visible content is a smart, icon-labeled summary with page URL, surface classification, alerts, primary actions, table/list summaries, and focus matches. Full inline snapshot output remains explicit opt-in.
 - SF Browser tool results should include user-visible elapsed duration to make optimized last-mile workflows measurable without treating the value as an SLA or benchmark.
 - SF Browser owns setup/admin UI evidence and fallback runbook references so SF Pi can stay API-first while remaining browser-ready when APIs or owning extensions fail.
 - Salesforce Classic Setup Surface runbooks should use `select` plus Add/Remove controls for dual-list pages, treat near-timeout waits as ambiguous, and recover from validation errors through evidence capture plus direct navigation.
+- Browser Evidence should support explicit scroll targeting (`scrollToRef`) so lower-page assertions can produce useful screenshots without adding automatic visual search.

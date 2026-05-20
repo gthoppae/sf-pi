@@ -54,6 +54,7 @@ export function registerSfBrowserSnapshotTool(pi: ExtensionAPI): void {
       }
 
       const result = await runAgentBrowser(pi, args, { cwd: ctx.cwd, signal });
+      const currentUrl = await getCurrentUrl(pi, ctx.cwd, signal);
       const rawSnapshot = result.stdout.trim();
       const fullSnapshotPath = writeBrowserArtifact(rawSnapshot, {
         label: "snapshot",
@@ -63,7 +64,7 @@ export function registerSfBrowserSnapshotTool(pi: ExtensionAPI): void {
       const focus = Array.isArray(params.focus) ? params.focus : [];
       const duration = stopTimer();
 
-      const body = buildSnapshotBody(rawSnapshot, fullSnapshotPath, outputMode, focus);
+      const body = buildSnapshotBody(rawSnapshot, fullSnapshotPath, outputMode, focus, currentUrl);
       const text = okText([
         body,
         `Duration: ${duration.durationText}`,
@@ -77,6 +78,7 @@ export function registerSfBrowserSnapshotTool(pi: ExtensionAPI): void {
           ok: true,
           outputMode,
           fullSnapshotPath,
+          currentUrl,
           focus,
           rawLength: rawSnapshot.length,
           ...duration,
@@ -91,6 +93,7 @@ function buildSnapshotBody(
   fullSnapshotPath: string,
   outputMode: "summary" | "artifact" | "full",
   focus: string[],
+  url: string | undefined,
 ): string {
   if (outputMode === "artifact") {
     return [
@@ -116,5 +119,18 @@ function buildSnapshotBody(
     ]);
   }
 
-  return summarizeSnapshot({ snapshot: rawSnapshot, fullSnapshotPath, focus });
+  return summarizeSnapshot({ snapshot: rawSnapshot, fullSnapshotPath, focus, url });
+}
+
+async function getCurrentUrl(
+  pi: ExtensionAPI,
+  cwd: string,
+  signal: AbortSignal | undefined,
+): Promise<string | undefined> {
+  try {
+    const result = await runAgentBrowser(pi, ["get", "url"], { cwd, signal, timeoutMs: 15_000 });
+    return result.stdout.trim() || undefined;
+  } catch {
+    return undefined;
+  }
 }
