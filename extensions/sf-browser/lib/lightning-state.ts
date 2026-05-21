@@ -47,12 +47,7 @@ function parseLightningUrl(
 ): Omit<LightningState, "hasModal" | "hasSpinner" | "hasValidation"> {
   if (!url) return { surface: "unknown" };
   const safeUrl = redactUrl(url) ?? url;
-  let pathname = "";
-  try {
-    pathname = new URL(safeUrl).pathname;
-  } catch {
-    pathname = safeUrl;
-  }
+  const pathname = parsePathname(safeUrl);
 
   const record = pathname.match(
     /\/lightning\/r\/([^/]+)\/([a-zA-Z0-9]{15}(?:[a-zA-Z0-9]{3})?)\/([^/?#]+)/,
@@ -85,6 +80,14 @@ function parseLightningUrl(
   }
 
   return { surface: "unknown" };
+}
+
+function parsePathname(value: string): string {
+  try {
+    return new URL(value).pathname;
+  } catch {
+    return value;
+  }
 }
 
 function parseSnapshotState(
