@@ -27,12 +27,14 @@
       "lib/setup-destinations.ts",
       "lib/overlay-dismissal.ts",
       "lib/snapshot-summary.ts",
+      "lib/lightning-wait.ts",
       "lib/sf_browser_select-tool.ts",
       "lib/sf_browser_resolve_path-tool.ts",
       "lib/salesforce-path-resolver.ts",
       "skills/sf-browser/SKILL.md",
       "skills/sf-browser/references/setup-runbooks.md",
-      "skills/sf-browser/references/setup-destinations.md"
+      "skills/sf-browser/references/setup-destinations.md",
+      "skills/sf-browser/references/live-smoke.md"
     ],
     "stateFiles": [
       "<globalAgentDir>/sf-pi/browser-artifacts/sessions/<session-id>/index.json",

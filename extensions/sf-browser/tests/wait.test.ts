@@ -2,10 +2,11 @@
 /** Tests for SF Browser wait result classification. */
 import { describe, expect, it } from "vitest";
 import {
+  buildLightningOutcomeExpression,
   buildLightningWaitExpression,
-  buildWaitArgs,
-  classifyWait,
-} from "../lib/sf_browser_wait-tool.ts";
+  LIGHTNING_WAIT_HELPERS,
+} from "../lib/lightning-wait.ts";
+import { buildWaitArgs, classifyWait } from "../lib/sf_browser_wait-tool.ts";
 
 describe("wait classification", () => {
   it("marks near-timeout conditional waits as ambiguous", () => {
@@ -36,5 +37,20 @@ describe("wait classification", () => {
     expect(expression).toContain("success-toast");
     expect(expression).toContain("validation-error");
     expect(expression).toContain("classic-error");
+  });
+
+  it("uses hardened Salesforce modal/toast/spinner selectors", () => {
+    expect(LIGHTNING_WAIT_HELPERS).toContain('[role="dialog"]');
+    expect(LIGHTNING_WAIT_HELPERS).toContain(".uiModal");
+    expect(LIGHTNING_WAIT_HELPERS).toContain('[data-aura-class*="forceToastMessage"]');
+    expect(LIGHTNING_WAIT_HELPERS).toContain('[aria-busy="true"]');
+    expect(LIGHTNING_WAIT_HELPERS).toContain("[data-error-message]");
+  });
+
+  it("builds separate Lightning outcome expressions for structured details", () => {
+    const expression = buildLightningOutcomeExpression("toast");
+
+    expect(expression).toContain("__sfPiLightningOutcome");
+    expect(expression).toContain('"toast"');
   });
 });

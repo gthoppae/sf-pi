@@ -87,7 +87,7 @@ sf_browser_capture_evidence
 | `sf_browser_fill`             | Fill a ref from the latest snapshot.                                                                                                                                              |
 | `sf_browser_select`           | Select values in Salesforce select/listbox refs, including Classic Setup dual-list controls.                                                                                      |
 | `sf_browser_press`            | Press keys such as `Enter`, `Escape`, or `Control+a`.                                                                                                                             |
-| `sf_browser_wait`             | Wait for expected text, URL, load state, or last-resort milliseconds; reports near-timeout waits as ambiguous.                                                                    |
+| `sf_browser_wait`             | Wait for expected text, URL, load state, Lightning semantic state, or last-resort milliseconds; reports near-timeout waits as ambiguous.                                          |
 | `sf_browser_capture_evidence` | Capture session-scoped screenshot evidence, optionally scroll to a ref, dismiss ambient overlays, enrich with recent Setup Audit Trail context, and return bounded image content. |
 | `sf_browser_resolve_path`     | Resolve structured Salesforce routes and bounded fuzzy Setup Destinations to deterministic paths without opening the browser.                                                     |
 
@@ -98,9 +98,10 @@ SF Browser includes documentation-first setup runbooks for API-first/browser-rea
 ```text
 extensions/sf-browser/skills/sf-browser/references/setup-runbooks.md
 extensions/sf-browser/skills/sf-browser/references/setup-destinations.md
+extensions/sf-browser/skills/sf-browser/references/live-smoke.md
 ```
 
-Runbooks document the preferred API or owning-extension path, the Browser Evidence path, and the UI Fallback Path for common setup/admin tasks.
+Runbooks document the preferred API or owning-extension path, the Browser Evidence path, and the UI Fallback Path for common setup/admin tasks. `live-smoke.md` documents a read-only checklist for validating route resolution, Lightning waits, snapshots, and session-scoped evidence against a connected sandbox/dev org.
 
 ## Salesforce Browser Contract
 
@@ -155,6 +156,7 @@ extensions/sf-browser/
     constants.ts            ← implementation module
     guidance.ts             ← implementation module
     lightning-state.ts      ← implementation module
+    lightning-wait.ts       ← implementation module
     operations.ts           ← implementation module
     overlay-dismissal.ts    ← implementation module
     redaction.ts            ← implementation module

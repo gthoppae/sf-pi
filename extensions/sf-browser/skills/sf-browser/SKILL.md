@@ -36,6 +36,7 @@ For common setup/admin tasks, use the reference runbooks before improvising UI a
 
 - `references/setup-runbooks.md` — API-first/browser-ready workflows and UI fallback paths.
 - `references/setup-destinations.md` — curated Setup Destination shortcuts.
+- `references/live-smoke.md` — read-only live smoke checklist for route resolution, Lightning waits, snapshots, and session-scoped evidence.
 
 A Setup Runbook should prefer the primary API or owning SF Pi extension first, use SF Browser for evidence, and fall back to UI automation only when the primary path fails or is unavailable.
 
