@@ -20,6 +20,8 @@ export default tseslint.config(
       "node_modules/**",
       "dist/**",
       "coverage/**",
+      "docs/.vitepress/cache/**",
+      "docs/.vitepress/dist/**",
       "catalog/registry.ts", // generated
       "**/*.d.ts",
       // Vendored upstream bundle — synced from salesforce/agentscript,

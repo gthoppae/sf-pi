@@ -49,6 +49,9 @@ jobs:
       - name: Check docs health
         run: npm run docs:health:check
 
+      - name: Build documentation site
+        run: npm run docs:build
+
       - name: Check SPDX headers
         run: npm run spdx:check
 

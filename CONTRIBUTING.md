@@ -169,6 +169,7 @@ The most common entry points, grouped by purpose:
 | Format                   | `npm run format`                                   | `npm run format:check`                |
 | SPDX headers             | `npm run spdx`                                     | `npm run spdx:check`                  |
 | Docs health              | `npm run docs:health`                              | `npm run docs:health:check`           |
+| Docs site                | `npm run docs:dev` / `npm run docs:preview`        | `npm run docs:build`                  |
 | Docs impact summary      | —                                                  | `npm run docs:changed`                |
 | ESLint                   | `npm run eslint:fix`                               | `npm run eslint`                      |
 | Type check               | —                                                  | `npm run check`                       |
@@ -184,7 +185,7 @@ The most common entry points, grouped by purpose:
 `npm run lint` is a convenience bundle that runs `format:check`,
 `generate-catalog:check`, `docs:health:check`, `spdx:check`, and `eslint`
 in order. Prefer `npm run validate:ci` before opening a PR — it runs the
-full validation path, ESLint, docs-health, and the LLM-artifact guard.
+full validation path, ESLint, docs-health, docs-site build, and the LLM-artifact guard.
 
 ## Source of truth
 
@@ -201,6 +202,7 @@ Do not edit these manually:
 
 - `catalog/registry.ts`
 - `catalog/index.json`
+- `docs/extensions.md`
 - `docs/commands.md`
 - `docs/agent-orientation.md`
 - generated sections in `README.md`: bundled extensions, command reference,

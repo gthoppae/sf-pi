@@ -9,6 +9,8 @@
 [![Last commit](https://img.shields.io/github/last-commit/salesforce/sf-pi)](https://github.com/salesforce/sf-pi/commits/main)
 [![PRs welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](./CONTRIBUTING.md)
 
+📚 **Documentation:** [salesforce.github.io/sf-pi](https://salesforce.github.io/sf-pi/)
+
 ## What is this?
 
 `sf-pi` is a bundle of opinionated extensions for the
@@ -506,13 +508,15 @@ npm run check
 # Run tests
 npm test
 
-# Full local validation (generate + docs health + SPDX + format + check + test)
+# Full local validation (generate + docs health/build + SPDX + format + check + test)
 npm run validate
 
 # CI-like local validation, including ESLint and the LLM-artifact guard
 npm run validate:ci
 
-# Documentation drift helpers
+# Documentation site and drift helpers
+npm run docs:dev
+npm run docs:build
 npm run docs:health:check
 npm run docs:changed
 ```

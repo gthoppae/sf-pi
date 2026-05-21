@@ -41,6 +41,9 @@ node scripts/add-spdx-headers.mjs --check
 banner "Docs health check"
 node scripts/docs-health.mjs --check
 
+banner "Docs site build"
+npm run docs:build
+
 banner "Format check"
 npx prettier --check --log-level=warn .
 

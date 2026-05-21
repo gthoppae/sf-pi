@@ -83,7 +83,10 @@
     "preinstall": "node scripts/check-node-version.mjs",
     "prepare": "node scripts/prepare.mjs",
     "generate-d360-parity": "node scripts/generate-d360-parity.mjs",
-    "generate-d360-parity:check": "node scripts/generate-d360-parity.mjs --check"
+    "generate-d360-parity:check": "node scripts/generate-d360-parity.mjs --check",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "peerDependencies": {
     "@earendil-works/pi-ai": "*",
@@ -108,7 +111,8 @@
     "typebox": "^1.1.37",
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.59.4",
-    "vitest": "^4.1.7"
+    "vitest": "^4.1.7",
+    "vitepress": "^1.6.4"
   },
   "dependencies": {
     "@salesforce/core": "^8.30.4",

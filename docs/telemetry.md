@@ -21,7 +21,7 @@ sf-pi does not collect or transmit:
 ## Aggregate metrics we archive
 
 The repository includes a scheduled GitHub Actions workflow,
-[`.github/workflows/metrics-archive.yml`](../.github/workflows/metrics-archive.yml),
+[`.github/workflows/metrics-archive.yml`](https://github.com/salesforce/sf-pi/blob/main/.github/workflows/metrics-archive.yml),
 that archives aggregate maintainer metrics to a separate `metrics` branch.
 
 The workflow runs on GitHub-hosted infrastructure, not on user machines. It
@@ -68,7 +68,7 @@ Manage the setting via the standard `/sf-pi` surface:
 
 The live state is also rendered on the sf-welcome splash as a `Privacy:
 telemetry off (sf-pi default)` row — see
-[`extensions/sf-welcome/`](../extensions/sf-welcome/README.md).
+[`extensions/sf-welcome/`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-welcome/README.md).
 
 ## Active telemetry policy
 

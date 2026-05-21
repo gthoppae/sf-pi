@@ -1,7 +1,7 @@
 # sf-pi Human Orientation
 
 This guide is for contributors who want the practical map without reading every
-extension first. The root [`README.md`](../README.md) remains the user-facing
+extension first. The root [`README.md`](https://github.com/salesforce/sf-pi/blob/main/README.md) remains the user-facing
 install guide; this page is contributor-facing.
 
 ## What this repo is
@@ -12,8 +12,8 @@ under `lib/common/`.
 
 ## Where to start
 
-1. Read [`README.md`](../README.md) for install and user-facing behavior.
-2. Read [`ARCHITECTURE.md`](../ARCHITECTURE.md) for repo structure and source of truth.
+1. Read [`README.md`](https://github.com/salesforce/sf-pi/blob/main/README.md) for install and user-facing behavior.
+2. Read [`ARCHITECTURE.md`](https://github.com/salesforce/sf-pi/blob/main/ARCHITECTURE.md) for repo structure and source of truth.
 3. Open [`docs/agent-orientation.md`](./agent-orientation.md) for the generated inventory.
 4. For a specific extension, read:
    - `extensions/<id>/README.md`
@@ -39,6 +39,7 @@ Use the fast path while iterating:
 
 ```bash
 npm run generate-catalog:check
+npm run docs:build
 npm run format:check
 npm run check
 npm test
@@ -55,6 +56,7 @@ Useful documentation-only helpers:
 ```bash
 npm run docs:changed
 npm run docs:health:check
+npm run docs:build
 ```
 
 ## Generated vs hand-authored docs
@@ -63,6 +65,7 @@ Generated or partially generated:
 
 - `catalog/index.json`
 - `catalog/registry.ts`
+- `docs/extensions.md`
 - `docs/commands.md`
 - `docs/agent-orientation.md`
 - generated marker blocks in root `README.md`

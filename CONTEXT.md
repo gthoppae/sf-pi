@@ -12,6 +12,50 @@ _Avoid_: sf-pi repo, plugin collection
 The current distribution posture for **SF Pi**: users install the public GitHub repository through pi's package installer rather than consuming a published npm package.
 _Avoid_: npm-published package, local-only checkout, private package
 
+**Documentation Site**:
+The GitHub Pages-hosted, VitePress-powered public documentation surface for **SF Pi**, sourced from Markdown and generated inventories in the same repository.
+_Avoid_: wiki, external docs portal, marketing site
+
+**User-First Documentation**:
+The documentation posture where installation, extension value, and operator workflows are primary, while contributor and agent navigation remain discoverable secondary paths.
+_Avoid_: engineering handbook as homepage, agent-only docs, equal-audience landing page
+
+**Curated Documentation Layer**:
+The small set of hand-authored **Documentation Site** pages that organize existing repo docs for users without moving or duplicating every source Markdown file.
+_Avoid_: mirror of every README, docs fork, generated-doc rewrite
+
+**Docs Navigation Set**:
+The first-version **Documentation Site** navigation: Home, Install, Quickstart, Extensions, Commands, Privacy & telemetry, Troubleshooting, and Contributing.
+_Avoid_: full README table of contents, one page per extension by default, site-minimal placeholder
+
+**Light Generated Docs**:
+The docs-maintenance pattern where factual inventory pages are generated or marker-updated from existing catalog metadata while narrative pages remain hand-authored.
+_Avoid_: fully generated site, hand-maintained extension inventory, duplicated command reference
+
+**Reference-Inspired Documentation**:
+A documentation style choice that borrows proven structure from a public reference site while using SF Pi-specific wording, navigation, examples, and brand treatment.
+_Avoid_: cloned docs, copied theme, source-attributed design dependency
+
+**GitHub Pages Publication**:
+The deployment path where the **Documentation Site** is built in GitHub Actions and published to the repository's default GitHub Pages URL.
+_Avoid_: wiki publishing, manual gh-pages commits, custom domain prerequisite
+
+**SF Pi Docs Theme**:
+The **Documentation Site** visual treatment based on SF Pi's existing dark terminal palette with blue, cyan, and teal accents.
+_Avoid_: copied reference-site colors, heavy custom component system, logo-dependent theme
+
+**Docs Build Contract**:
+The validation expectation that the **Documentation Site** has local npm scripts and is built in CI before public publication.
+_Avoid_: Pages-only validation, ad hoc npx builds, unchecked markdown site
+
+**README Quickstart Role**:
+The root README remains a complete GitHub-facing quickstart and generated inventory while adding a prominent link to the **Documentation Site** for deeper navigation.
+_Avoid_: README replacement, aggressive README migration, contributor-only README
+
+**Source Deep Link**:
+An absolute GitHub URL from the **Documentation Site** to detailed repository documentation that lives outside the VitePress source root.
+_Avoid_: broken relative Pages link, copied extension README, symlinked docs mirror
+
 **Bundled Extension**:
 A first-party extension shipped as part of SF Pi and managed through the shared extension catalog.
 _Avoid_: plugin, add-on, module
@@ -251,6 +295,17 @@ _Avoid_: duplicated docs, hardcoded personal skill paths, Salesforce encyclopedi
 ## Relationships
 
 - **SF Pi** is currently distributed as a **Git-Installed SF Pi Package**.
+- **SF Pi** publishes a **Documentation Site** from the same repository as its source code and hand-authored docs.
+- The **Documentation Site** follows **User-First Documentation**.
+- The **Documentation Site** uses a **Curated Documentation Layer** over the existing Markdown and generated inventory sources.
+- The **Curated Documentation Layer** is expressed through the **Docs Navigation Set**.
+- The **Documentation Site** uses **Light Generated Docs** for extension and command inventory.
+- The **Documentation Site** follows **Reference-Inspired Documentation** rather than cloning another project's content or visual identity.
+- The **Documentation Site** is published through **GitHub Pages Publication**.
+- The **Documentation Site** uses the **SF Pi Docs Theme**.
+- The root README keeps the **README Quickstart Role** after the **Documentation Site** is introduced.
+- The **Documentation Site** uses **Source Deep Links** for detailed docs outside `docs/`.
+- The **Documentation Site** follows the **Docs Build Contract**.
 - **SF Pi** contains one or more **Bundled Extensions**.
 - A **Bundled Extension** exposes zero or more **Runtime Surfaces**.
 - The **Welcome Splash** is a **Runtime Surface** owned by a **Bundled Extension**.
@@ -318,3 +373,5 @@ _Avoid_: duplicated docs, hardcoded personal skill paths, Salesforce encyclopedi
 
 - "plugin" is ambiguous because pi calls them extensions; resolved: use **Bundled Extension** for SF Pi-owned extensions.
 - "brain" could mean an all-purpose knowledge base; resolved: **SF Brain** stays compact and routes to the **SF Pi Reference Map** instead of loading broad Salesforce content eagerly.
+- "GitHub documentation link" could mean a wiki, README-only docs, or a static site; resolved: use **Documentation Site** for the VitePress/GitHub Pages surface.
+- "like Peekaboo" could mean copied content/theme or structural inspiration; resolved: use **Reference-Inspired Documentation** with SF Pi-specific branding.

@@ -6,6 +6,8 @@ catalog/registry.ts
 reports/dependency-license-report.md
 reports/licenses-all.json
 reports/licenses-production.json
+docs/.vitepress/cache/
+docs/.vitepress/dist/
 
 # Vendored @agentscript/agentforce bundle — do not reformat.
 # It's a prebuilt upstream artifact synced by scripts/sync-agentforce-sdk.mjs.

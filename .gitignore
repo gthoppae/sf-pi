@@ -45,6 +45,10 @@ scripts/apex/*
 # Private internal-only docs (plans, backlogs, drafts)
 docs/internal/
 
+# VitePress local cache/build output
+docs/.vitepress/cache/
+docs/.vitepress/dist/
+
 # Coverage output
 coverage/
 *.log

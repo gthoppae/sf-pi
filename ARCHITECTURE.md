@@ -44,6 +44,8 @@ sf-pi/
 │   ├── registry.ts             ← GENERATED from manifest.json files
 │   └── index.json              ← GENERATED machine-readable index
 ├── docs/
+│   ├── .vitepress/             ← VitePress config/theme for GitHub Pages docs
+│   ├── extensions.md           ← GENERATED bundled-extension site inventory
 │   ├── commands.md             ← GENERATED per-extension command reference
 │   ├── agent-orientation.md    ← GENERATED agent navigation map
 │   ├── human-orientation.md    ← contributor walkthrough
@@ -63,22 +65,21 @@ sf-pi/
 The generated tree above intentionally stays compact. These scripts are the
 ones agents and maintainers most often need:
 
-| Script                              | Purpose                                                                                                            |
-| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
-| `scripts/generate-catalog.mjs`      | Regenerates catalog files, generated docs, and generated README marker blocks.                                     |
-| `scripts/docs-health.mjs`           | Checks factual doc drift contracts and public-safe examples.                                                       |
-| `scripts/docs-changed.mjs`          | Summarizes which docs are implicated by a diff.                                                                    |
-| `scripts/add-spdx-headers.mjs`      | Adds or checks SPDX headers for source scripts. Pre-commit auto-adds missing headers; CI uses the check path.      |
-| `scripts/check-llm-artifacts.sh`    | CI guard for unresolved conflict markers, prompt-template tokens, and LLM TODO markers.                            |
-| `scripts/scaffold.mjs`              | Creates a new extension folder and refreshes generated catalog/docs.                                               |
-| `scripts/sync-agentforce-sdk.mjs`   | Refreshes the vendored Agentforce SDK snapshot used by `sf-agentscript`.                                           |
-| `scripts/validate.sh`               | Agent-friendly local validation: generate catalog, SPDX check, docs health check, format check, type check, tests. |
-| `scripts/preview-pi-salesforce.mjs` | Local visual preview for the animated `sf-welcome` Pi + SALESFORCE header.                                         |
-| `scripts/preview-sf-logo.mjs`       | Local visual preview for the compact Salesforce wordmark.                                                          |
-| `scripts/render-splash-header.mjs`  | Renders splash-header frames for review / screenshots.                                                             |
+| Script                              | Purpose                                                                                                                   |
+| ----------------------------------- | ------------------------------------------------------------------------------------------------------------------------- |
+| `scripts/generate-catalog.mjs`      | Regenerates catalog files, generated docs, and generated README marker blocks.                                            |
+| `scripts/docs-health.mjs`           | Checks factual doc drift contracts and public-safe examples.                                                              |
+| `scripts/docs-changed.mjs`          | Summarizes which docs are implicated by a diff.                                                                           |
+| `scripts/add-spdx-headers.mjs`      | Adds or checks SPDX headers for source scripts. Pre-commit auto-adds missing headers; CI uses the check path.             |
+| `scripts/check-llm-artifacts.sh`    | CI guard for unresolved conflict markers, prompt-template tokens, and LLM TODO markers.                                   |
+| `scripts/scaffold.mjs`              | Creates a new extension folder and refreshes generated catalog/docs.                                                      |
+| `scripts/sync-agentforce-sdk.mjs`   | Refreshes the vendored Agentforce SDK snapshot used by `sf-agentscript`.                                                  |
+| `scripts/validate.sh`               | Agent-friendly local validation: generate catalog, SPDX check, docs health/build checks, format check, type check, tests. |
+| `scripts/preview-pi-salesforce.mjs` | Local visual preview for the animated `sf-welcome` Pi + SALESFORCE header.                                                |
+| `scripts/preview-sf-logo.mjs`       | Local visual preview for the compact Salesforce wordmark.                                                                 |
+| `scripts/render-splash-header.mjs`  | Renders splash-header frames for review / screenshots.                                                                    |
 
-CI additionally runs ESLint, docs-health, and `scripts/check-llm-artifacts.sh`;
-use `npm run validate:ci` when you want to mirror CI locally.
+CI additionally runs ESLint, docs-health, the VitePress docs build, and `scripts/check-llm-artifacts.sh`; use `npm run validate:ci` when you want to mirror CI locally.
 
 ## Where does X live? (agent quick-reference)
 
@@ -101,8 +102,10 @@ When an agent (or human) needs to change something, start here:
 | Shared display profile + diagnostics contract   | `lib/common/display/`                                                      |
 | Generated registry (for runtime extension load) | `catalog/registry.ts` — **generated, do not edit**                         |
 | Generated machine-readable index                | `catalog/index.json` — **generated, do not edit**                          |
+| Generated docs-site extension inventory         | `docs/extensions.md` — **generated, do not edit**                          |
 | Generated command reference                     | `docs/commands.md` — **generated, do not edit**                            |
 | Generated agent orientation                     | `docs/agent-orientation.md` — **generated, do not edit**                   |
+| VitePress documentation site                    | `docs/.vitepress/`, `docs/index.md`, and curated docs pages                |
 | Human contributor orientation                   | `docs/human-orientation.md`                                                |
 | Documentation source/check map                  | `docs/doc-ownership.json`                                                  |
 | Generated bundled-extension table               | Inside `README.md` between `GENERATED:bundled-extensions` markers          |

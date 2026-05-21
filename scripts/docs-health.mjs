@@ -30,6 +30,7 @@ const REQUIRED_README_SECTIONS = [
 const GENERATED_FILES = [
   "catalog/index.json",
   "catalog/registry.ts",
+  "docs/extensions.md",
   "docs/commands.md",
   "docs/agent-orientation.md",
 ];

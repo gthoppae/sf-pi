@@ -17,15 +17,20 @@
     "source": ["package.json scripts", ".github/workflows/*", "repo workflow"],
     "checks": ["npm run docs:health:check"]
   },
+  "docs/extensions.md": {
+    "source": ["extensions/*/manifest.json", "catalog/index.json"],
+    "generated": true,
+    "checks": ["npm run generate-catalog:check", "npm run docs:build"]
+  },
   "docs/commands.md": {
     "source": ["extensions/*/manifest.json"],
     "generated": true,
-    "checks": ["npm run generate-catalog:check"]
+    "checks": ["npm run generate-catalog:check", "npm run docs:build"]
   },
   "docs/agent-orientation.md": {
     "source": ["extensions/*/manifest.json", "catalog/index.json"],
     "generated": true,
-    "checks": ["npm run generate-catalog:check"]
+    "checks": ["npm run generate-catalog:check", "npm run docs:build"]
   },
   "extensions/*/README.md": {
     "source": ["extension behavior", "extension file tree", "extensions/*/manifest.json"],
