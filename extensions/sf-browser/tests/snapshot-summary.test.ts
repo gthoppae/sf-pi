@@ -36,14 +36,29 @@ describe("snapshot summary", () => {
     const record = summarizeSnapshot({
       snapshot: '- heading "Acme" [level=1, ref=e1]',
       fullSnapshotPath: "/tmp/snapshot.txt",
-      url: "https://example.my.salesforce.com/lightning/r/Account/001xx/view",
+      url: "https://example.my.salesforce.com/lightning/r/Account/001000000000001AAA/view",
+    });
+    const objectNew = summarizeSnapshot({
+      snapshot: '- heading "New Account" [level=2, ref=e1]',
+      fullSnapshotPath: "/tmp/snapshot.txt",
+      url: "https://example.my.salesforce.com/lightning/o/Account/new?count=1",
     });
 
     expect(setup).toContain(
       "URL: https://example.my.salesforce-setup.com/lightning/setup/EinsteinCopilot/home",
     );
     expect(setup).toContain("Lightning Setup page");
+    expect(setup).toContain("Surface: setup-page");
+    expect(setup).toContain("Setup destination: agentforce-agents");
     expect(record).toContain("Record page");
+    expect(record).toContain("Lightning state");
+    expect(record).toContain("Surface: record-page");
+    expect(record).toContain("Object: Account");
+    expect(record).toContain("Record Id: 001000000000001AAA");
+    expect(record).toContain("Mode: view");
+    expect(objectNew).toContain("Object new page");
+    expect(objectNew).toContain("Surface: object-new");
+    expect(objectNew).not.toContain("List view");
   });
 
   it("does not classify setup pages as builders from promotional text alone", () => {

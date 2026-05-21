@@ -16,6 +16,7 @@ import {
 import { OPEN_NEXT_STEPS } from "./guidance.ts";
 import { dismissAmbientOverlays } from "./overlay-dismissal.ts";
 import { redactUrl } from "./redaction.ts";
+import { fetchSetupAuditTrail, summarizeSetupAuditTrail } from "./setup-audit-trail.ts";
 import { resolveOpenOrgUrl, summarizeOpenTarget, type OpenOrgInput } from "./salesforce-open.ts";
 import { startTimer } from "./timing.ts";
 import { okText } from "./tool-support.ts";
@@ -52,39 +53,43 @@ export async function openOrgInAgentBrowser(
 
 export async function captureEvidence(
   pi: ExtensionAPI,
-  cwd: string,
+  ctx: ExtensionContext,
   input: {
     label?: string;
     imageMode?: EvidenceImageMode | string;
     dismissOverlays?: boolean;
     scrollToRef?: string;
+    target_org?: string;
+    includeSetupAuditTrail?: boolean;
+    auditLookbackMinutes?: number;
   },
   signal?: AbortSignal,
 ): Promise<{ content: Array<TextContent | ImageContent>; details: Record<string, unknown> }> {
   const stopTimer = startTimer();
+  const sessionId = ctx.sessionManager.getSessionId();
   const mode = evidenceModeFromUnknown(input.imageMode);
-  const planned = planEvidenceCapture(input.label);
+  const planned = planEvidenceCapture(input.label, sessionId);
   const overlayDismissal =
     input.dismissOverlays === false
       ? { dismissedRefs: [], snapshotChecked: false }
-      : await dismissAmbientOverlays(pi, cwd, signal);
+      : await dismissAmbientOverlays(pi, ctx.cwd, signal);
   let scrolledToRef: string | undefined;
   if (input.scrollToRef) {
     await runAgentBrowser(pi, ["scrollintoview", input.scrollToRef], {
-      cwd,
+      cwd: ctx.cwd,
       signal,
       timeoutMs: 15_000,
     });
     scrolledToRef = input.scrollToRef;
   }
 
-  await runAgentBrowser(pi, ["screenshot", planned.path], { cwd, signal });
+  await runAgentBrowser(pi, ["screenshot", planned.path], { cwd: ctx.cwd, signal });
 
   let image: ImageContent | null = null;
   let thumbnailPath: string | undefined;
   if (mode === "thumbnail") {
     await runAgentBrowser(pi, ["screenshot", planned.thumbnailPath], {
-      cwd,
+      cwd: ctx.cwd,
       signal,
       extraGlobalArgs: ["--screenshot-format", "jpeg", "--screenshot-quality", "55"],
     });
@@ -94,18 +99,30 @@ export async function captureEvidence(
     image = imageContentFromFile(planned.path, "image/png");
   }
 
-  const currentUrl = await getCurrentUrl(pi, cwd, signal);
+  const currentUrl = await getCurrentUrl(pi, ctx.cwd, signal);
+  const setupAuditTrail = input.includeSetupAuditTrail
+    ? await fetchSetupAuditTrail(
+        pi,
+        ctx,
+        { target_org: input.target_org, auditLookbackMinutes: input.auditLookbackMinutes },
+        signal,
+      )
+    : undefined;
   const duration = stopTimer();
-  const capture = commitEvidenceCapture({
-    id: planned.id,
-    label: planned.label,
-    path: planned.path,
-    thumbnailPath,
-    createdAt: new Date().toISOString(),
-    imageMode: mode,
-    includedImage: image !== null,
-    url: currentUrl,
-  });
+  const capture = commitEvidenceCapture(
+    {
+      id: planned.id,
+      label: planned.label,
+      path: planned.path,
+      thumbnailPath,
+      createdAt: new Date().toISOString(),
+      imageMode: mode,
+      includedImage: image !== null,
+      url: currentUrl,
+      setupAuditTrail,
+    },
+    sessionId,
+  );
 
   const text = okText([
     `Captured Browser Evidence #${capture.id}.`,
@@ -113,6 +130,7 @@ export async function captureEvidence(
     `Mode: ${capture.imageMode}`,
     `Image included: ${capture.includedImage ? "yes" : "no"}`,
     `Duration: ${duration.durationText}`,
+    `Session: ${sessionId}`,
     `Path: ${capture.path}`,
     capture.thumbnailPath ? `Thumbnail: ${capture.thumbnailPath}` : undefined,
     capture.url ? `URL: ${capture.url}` : undefined,
@@ -120,13 +138,17 @@ export async function captureEvidence(
     overlayDismissal.dismissedRefs.length
       ? `Dismissed ambient overlays: ${overlayDismissal.dismissedRefs.join(", ")}`
       : undefined,
+    ...(setupAuditTrail ? summarizeSetupAuditTrail(setupAuditTrail) : []),
     mode === "artifact"
       ? "Artifact mode is best for repeated or batch captures."
       : "Use artifact mode for repeated captures; thumbnail mode is for current-screen model inspection.",
   ]);
   const content: Array<TextContent | ImageContent> = [{ type: "text", text }];
   if (image) content.push(image);
-  return { content, details: { ok: true, capture, overlayDismissal, scrolledToRef, ...duration } };
+  return {
+    content,
+    details: { ok: true, sessionId, capture, overlayDismissal, scrolledToRef, ...duration },
+  };
 }
 
 async function getCurrentUrl(

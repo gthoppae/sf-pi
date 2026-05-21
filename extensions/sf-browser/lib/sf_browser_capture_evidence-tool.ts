@@ -17,7 +17,7 @@ export function registerSfBrowserCaptureEvidenceTool(pi: ExtensionAPI): void {
     name: SF_BROWSER_CAPTURE_EVIDENCE_TOOL_NAME,
     label: "SF Browser Capture Evidence",
     description:
-      "Capture Browser Evidence from agent-browser. Stores a full private screenshot artifact, optionally dismisses known ambient Salesforce overlays, and optionally returns a bounded image for model vision. Use artifact mode for batches.",
+      "Capture session-scoped Browser Evidence from agent-browser. Stores a full private screenshot artifact, optionally dismisses known ambient Salesforce overlays, can enrich with recent Setup Audit Trail context, and optionally returns a bounded image for model vision. Use artifact mode for batches.",
     promptSnippet:
       "Capture private Salesforce browser screenshots with optional bounded model-visible images",
     promptGuidelines: [
@@ -40,9 +40,27 @@ export function registerSfBrowserCaptureEvidenceTool(pi: ExtensionAPI): void {
             "Optional ref to scroll into view before capturing evidence, useful for lower-page sections.",
         }),
       ),
+      target_org: Type.Optional(
+        Type.String({
+          description:
+            "Salesforce org alias or username for optional Setup Audit Trail enrichment. Defaults to active sf-pi target org.",
+        }),
+      ),
+      includeSetupAuditTrail: Type.Optional(
+        Type.Boolean({
+          description:
+            "When true, enrich the evidence capture with a best-effort, bounded recent Setup Audit Trail query. Defaults to false.",
+        }),
+      ),
+      auditLookbackMinutes: Type.Optional(
+        Type.Number({
+          description:
+            "Recent Setup Audit Trail lookback window in minutes. Defaults to 5 and is capped at 60.",
+        }),
+      ),
     }),
     async execute(_toolCallId, params, signal, _onUpdate, ctx) {
-      return captureEvidence(pi, ctx.cwd, params, signal);
+      return captureEvidence(pi, ctx, params, signal);
     },
   });
 }

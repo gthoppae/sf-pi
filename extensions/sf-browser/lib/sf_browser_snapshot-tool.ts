@@ -55,16 +55,25 @@ export function registerSfBrowserSnapshotTool(pi: ExtensionAPI): void {
 
       const result = await runAgentBrowser(pi, args, { cwd: ctx.cwd, signal });
       const currentUrl = await getCurrentUrl(pi, ctx.cwd, signal);
+      const sessionId = ctx.sessionManager.getSessionId();
       const rawSnapshot = result.stdout.trim();
       const fullSnapshotPath = writeBrowserArtifact(rawSnapshot, {
         label: "snapshot",
         extension: "txt",
+        sessionId,
       });
       const outputMode = snapshotOutputModeFromUnknown(params.outputMode);
       const focus = Array.isArray(params.focus) ? params.focus : [];
       const duration = stopTimer();
 
-      const body = buildSnapshotBody(rawSnapshot, fullSnapshotPath, outputMode, focus, currentUrl);
+      const body = buildSnapshotBody(
+        rawSnapshot,
+        fullSnapshotPath,
+        outputMode,
+        focus,
+        currentUrl,
+        sessionId,
+      );
       const text = okText([
         body,
         `Duration: ${duration.durationText}`,
@@ -79,6 +88,7 @@ export function registerSfBrowserSnapshotTool(pi: ExtensionAPI): void {
           outputMode,
           fullSnapshotPath,
           currentUrl,
+          sessionId,
           focus,
           rawLength: rawSnapshot.length,
           ...duration,
@@ -94,6 +104,7 @@ function buildSnapshotBody(
   outputMode: "summary" | "artifact" | "full",
   focus: string[],
   url: string | undefined,
+  sessionId: string,
 ): string {
   if (outputMode === "artifact") {
     return [
@@ -112,6 +123,7 @@ function buildSnapshotBody(
       extension: "txt",
       maxBytes: 50_000,
       maxLines: 2_000,
+      sessionId,
     });
     return okText([
       formatted.text,

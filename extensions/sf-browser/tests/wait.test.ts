@@ -1,7 +1,11 @@
 /* SPDX-License-Identifier: Apache-2.0 */
 /** Tests for SF Browser wait result classification. */
 import { describe, expect, it } from "vitest";
-import { classifyWait } from "../lib/sf_browser_wait-tool.ts";
+import {
+  buildLightningWaitExpression,
+  buildWaitArgs,
+  classifyWait,
+} from "../lib/sf_browser_wait-tool.ts";
 
 describe("wait classification", () => {
   it("marks near-timeout conditional waits as ambiguous", () => {
@@ -14,5 +18,23 @@ describe("wait classification", () => {
     const result = classifyWait(60_000, { ms: 60_000 });
     expect(result.ambiguous).toBe(false);
     expect(result.label).toBe("Wait finished");
+  });
+
+  it("builds Lightning-aware wait expressions", () => {
+    const args = buildWaitArgs({ lightning: "save-result" });
+
+    expect(args[0]).toBe("wait");
+    expect(args[1]).toBe("--fn");
+    expect(args[2]).toContain("__sfPiLightningWait");
+    expect(args[2]).toContain('"save-result"');
+  });
+
+  it("keeps save-result as an outcome classifier expression", () => {
+    const expression = buildLightningWaitExpression("save-result");
+
+    expect(expression).toContain("classifySaveResult");
+    expect(expression).toContain("success-toast");
+    expect(expression).toContain("validation-error");
+    expect(expression).toContain("classic-error");
   });
 });

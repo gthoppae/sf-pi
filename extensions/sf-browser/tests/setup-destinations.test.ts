@@ -31,7 +31,7 @@ describe("setup destinations", () => {
   it("rejects combining setup and path", () => {
     expect(() =>
       resolveOpenPath({ setup: "setup-home", path: "/lightning/setup/Flows/home" }),
-    ).toThrow("Pass either path or setup");
+    ).toThrow("Pass exactly one of path, setup, or route");
   });
 
   it("lists known destinations for unknown setup names", () => {

@@ -14,7 +14,8 @@
     "sf_browser_select",
     "sf_browser_press",
     "sf_browser_wait",
-    "sf_browser_capture_evidence"
+    "sf_browser_capture_evidence",
+    "sf_browser_resolve_path"
   ],
   "events": ["session_start", "session_shutdown", "resources_discover"],
   "docs": {
@@ -27,14 +28,17 @@
       "lib/overlay-dismissal.ts",
       "lib/snapshot-summary.ts",
       "lib/sf_browser_select-tool.ts",
+      "lib/sf_browser_resolve_path-tool.ts",
+      "lib/salesforce-path-resolver.ts",
       "skills/sf-browser/SKILL.md",
       "skills/sf-browser/references/setup-runbooks.md",
       "skills/sf-browser/references/setup-destinations.md"
     ],
     "stateFiles": [
-      "<globalAgentDir>/sf-pi/browser-artifacts/latest/index.json",
-      "<globalAgentDir>/sf-pi/browser-artifacts/latest/*.png",
-      "<globalAgentDir>/sf-pi/browser-artifacts/latest/*.jpg"
+      "<globalAgentDir>/sf-pi/browser-artifacts/sessions/<session-id>/index.json",
+      "<globalAgentDir>/sf-pi/browser-artifacts/sessions/<session-id>/*.png",
+      "<globalAgentDir>/sf-pi/browser-artifacts/sessions/<session-id>/*.jpg",
+      "<globalAgentDir>/sf-pi/browser-artifacts/latest/pointer.json"
     ],
     "safety": [
       "No startup probes; agent-browser is detected only from /sf-browser doctor or explicit tool/command actions.",

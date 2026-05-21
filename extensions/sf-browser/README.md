@@ -22,6 +22,7 @@ Extension loads
 sf_browser_open_org
   ├─ resolves the active Salesforce target org from SF Pi environment cache when available
   ├─ accepts curated Setup Destinations such as agentforce-agents
+  ├─ accepts structured routes such as object-list, object-new, and record-view
   ├─ runs sf org open --url-only --json only after explicit intent
   ├─ passes the session-bearing URL to agent-browser
   └─ returns redacted next-step guidance
@@ -38,11 +39,12 @@ sf_browser_capture_evidence
 - `agent-browser` is a lazy external runtime. SF Browser does not start Chrome, probe CDP, or check installation during startup.
 - V1 exposes a Hot-Path Browser Tool Set: open, snapshot, click, fill, select, press, wait, and Browser Evidence capture.
 - Long-tail browser work remains direct `agent-browser` usage.
-- Browser Evidence is artifact-first. Use `imageMode: "artifact"` for repeated captures and `thumbnail` when the model should inspect the current screen.
+- Browser Evidence is session-scoped and artifact-first. Use `imageMode: "artifact"` for repeated captures and `thumbnail` when the model should inspect the current screen. Use `includeSetupAuditTrail: true` on the after-capture when a UI Mutation Fallback should include recent Setup Audit Trail context.
 - Targeted Browser Evidence can scroll an explicit ref into view before screenshot capture with `scrollToRef`.
 - Snapshots are smart and pi-native: `outputMode: "summary"` reports page URL, surface, actions, alerts, tables, and an artifact pointer by default.
 - Ambient Overlay Dismissal is best-effort and scoped to known non-workflow Salesforce overlays before evidence capture.
 - Setup Destinations are curated shortcuts for known Setup paths; they are not a full Setup sitemap.
+- Structured routes can resolve common Lightning paths before opening the browser: `home`, `setup`, `object-list`, `object-new`, and `record-view`. Bounded fuzzy matching is limited to curated Setup Destinations and should ask the user to choose when multiple candidates are plausible. `object-new` opens Salesforce's deterministic new-record URL; org overrides or record-type flows can render differently, so verify with waits and snapshots after opening.
 - Tool results include a user-visible duration so users can understand the cost and compare optimized workflows.
 - V1 avoids permission gates and semantic browser-action mediation to reduce permission fatigue.
 - See [`../../docs/adr/0011-sf-browser-agent-browser-lazy-hot-path-runtime.md`](../../docs/adr/0011-sf-browser-agent-browser-lazy-hot-path-runtime.md).
@@ -77,16 +79,17 @@ sf_browser_capture_evidence
 
 ## Agent Tools
 
-| Tool                          | Purpose                                                                                                                      |
-| ----------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| `sf_browser_open_org`         | Open a Salesforce org/path or curated Setup Destination in the shared `agent-browser` session without exposing login URLs.   |
-| `sf_browser_snapshot`         | Capture a smart pi-native snapshot: page URL, surface, actions, tables, alerts, and artifact pointer.                        |
-| `sf_browser_click`            | Click a ref from the latest snapshot.                                                                                        |
-| `sf_browser_fill`             | Fill a ref from the latest snapshot.                                                                                         |
-| `sf_browser_select`           | Select values in Salesforce select/listbox refs, including Classic Setup dual-list controls.                                 |
-| `sf_browser_press`            | Press keys such as `Enter`, `Escape`, or `Control+a`.                                                                        |
-| `sf_browser_wait`             | Wait for expected text, URL, load state, or last-resort milliseconds; reports near-timeout waits as ambiguous.               |
-| `sf_browser_capture_evidence` | Capture private screenshot evidence, optionally scroll to a ref, dismiss ambient overlays, and return bounded image content. |
+| Tool                          | Purpose                                                                                                                                                                           |
+| ----------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `sf_browser_open_org`         | Open a Salesforce org/path or curated Setup Destination in the shared `agent-browser` session without exposing login URLs.                                                        |
+| `sf_browser_snapshot`         | Capture a smart pi-native snapshot: page URL, surface, actions, tables, alerts, and artifact pointer.                                                                             |
+| `sf_browser_click`            | Click a ref from the latest snapshot.                                                                                                                                             |
+| `sf_browser_fill`             | Fill a ref from the latest snapshot.                                                                                                                                              |
+| `sf_browser_select`           | Select values in Salesforce select/listbox refs, including Classic Setup dual-list controls.                                                                                      |
+| `sf_browser_press`            | Press keys such as `Enter`, `Escape`, or `Control+a`.                                                                                                                             |
+| `sf_browser_wait`             | Wait for expected text, URL, load state, or last-resort milliseconds; reports near-timeout waits as ambiguous.                                                                    |
+| `sf_browser_capture_evidence` | Capture session-scoped screenshot evidence, optionally scroll to a ref, dismiss ambient overlays, enrich with recent Setup Audit Trail context, and return bounded image content. |
+| `sf_browser_resolve_path`     | Resolve structured Salesforce routes and bounded fuzzy Setup Destinations to deterministic paths without opening the browser.                                                     |
 
 ## Setup Runbooks
 
@@ -114,16 +117,16 @@ Runbooks document the preferred API or owning-extension path, the Browser Eviden
 
 ## State and Artifacts
 
-Browser Evidence is stored outside the project by default:
+Browser Evidence is stored outside the project by default and scoped by pi session:
 
 ```text
-<globalAgentDir>/sf-pi/browser-artifacts/latest/
+<globalAgentDir>/sf-pi/browser-artifacts/sessions/<session-id>/
   index.json
   000001-label.png
   000001-label.thumb.jpg
 ```
 
-The index keeps the latest capture metadata and monotonically increasing evidence IDs. V1 does not automatically clean old artifacts.
+The session index keeps capture metadata and monotonically increasing evidence IDs for that session. The legacy `browser-artifacts/latest/pointer.json` location points to the current session evidence directory for quick access; screenshots are not duplicated there. V1 does not automatically clean old artifacts.
 
 ## Installing agent-browser
 
@@ -151,16 +154,21 @@ extensions/sf-browser/
     artifacts.ts            ← implementation module
     constants.ts            ← implementation module
     guidance.ts             ← implementation module
+    lightning-state.ts      ← implementation module
     operations.ts           ← implementation module
     overlay-dismissal.ts    ← implementation module
     redaction.ts            ← implementation module
     salesforce-open.ts      ← implementation module
+    salesforce-path-resolver.ts← implementation module
+    salesforce-path-schema.ts← implementation module
+    setup-audit-trail.ts    ← implementation module
     setup-destinations.ts   ← implementation module
     sf_browser_capture_evidence-tool.ts← implementation module
     sf_browser_click-tool.ts← implementation module
     sf_browser_fill-tool.ts ← implementation module
     sf_browser_open_org-tool.ts← implementation module
     sf_browser_press-tool.ts← implementation module
+    sf_browser_resolve_path-tool.ts← implementation module
     sf_browser_select-tool.ts← implementation module
     sf_browser_snapshot-tool.ts← implementation module
     sf_browser_wait-tool.ts ← implementation module
@@ -168,8 +176,11 @@ extensions/sf-browser/
     timing.ts               ← implementation module
     tool-support.ts         ← implementation module
   tests/
+    artifacts.test.ts       ← unit / smoke test
     overlay-dismissal.test.ts← unit / smoke test
     redaction.test.ts       ← unit / smoke test
+    salesforce-path-resolver.test.ts← unit / smoke test
+    setup-audit-trail.test.ts← unit / smoke test
     setup-destinations.test.ts← unit / smoke test
     smoke.test.ts           ← unit / smoke test
     snapshot-summary.test.ts← unit / smoke test

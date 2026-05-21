@@ -125,7 +125,7 @@ Just-in-time guidance that teaches agents how to use `agent-browser` safely and 
 _Avoid_: always-injected browser kernel, duplicated agent-browser manual, generic browser tutorial
 
 **Browser Evidence**:
-A private screenshot artifact captured from `agent-browser` that can optionally return a bounded image result for model vision while keeping the full-resolution original on disk.
+A session-scoped private screenshot artifact captured from `agent-browser` that can optionally return a bounded image result for model vision while keeping the full-resolution original on disk.
 _Avoid_: trace, recording, visual assertion, unbounded image transcript, screenshot dump
 
 **Targeted Browser Evidence**:
@@ -135,6 +135,10 @@ _Avoid_: automatic visual search, screenshot spam, page-top evidence for lower-p
 **Browser Evidence Index**:
 The lightweight per-session manifest that assigns monotonically increasing IDs to **Browser Evidence** artifacts.
 _Avoid_: screenshot database, trace store, media library
+
+**Browser Evidence Latest Pointer**:
+A compatibility reference from the legacy latest evidence location to the current session's **Browser Evidence** directory.
+_Avoid_: duplicate screenshot store, canonical evidence location, cross-session audit log
 
 **Lazy Browser Runtime**:
 An external browser automation dependency that **SF Browser** detects and invokes only after explicit command or tool intent, never during SF Pi startup.
@@ -164,12 +168,20 @@ _Avoid_: modal auto-confirmation, workflow cancellation, popup blocker, destruct
 A curated public-safe shortcut from a stable name to a Salesforce Setup path used by **SF Browser** to avoid brittle search-and-click navigation.
 _Avoid_: full Setup sitemap, live menu scraper, arbitrary natural-language setup search, org-specific shortcut
 
+**Salesforce Path Resolver**:
+A deterministic **SF Browser** helper that turns structured Salesforce route intent into a Lightning or Setup path without using UI search.
+_Avoid_: arbitrary natural-language navigator, Setup sitemap, live menu scraper, hidden click path
+
+**Path Resolution Clarification**:
+A human choice requested only when bounded fuzzy matching finds multiple plausible **Setup Destinations**.
+_Avoid_: mutation approval, safety gate, hidden best-guess navigation, generic setup search
+
 **Pi-Native Browser Snapshot**:
 An **SF Browser** snapshot result that stores the full `agent-browser` output as an artifact while sending only a compact decision-oriented summary to the LLM by default.
 _Avoid_: context dump, raw accessibility tree by default, screenshot replacement, lossy-only snapshot
 
 **Smart Snapshot Summary**:
-A structured **Pi-Native Browser Snapshot** that classifies Salesforce UI state into page, surface, alert, action, navigation, and table sections while suppressing global browser/setup chrome by default.
+A structured **Pi-Native Browser Snapshot** that classifies Salesforce UI state into page, Lightning state, surface, alert, action, navigation, and table sections while suppressing global browser/setup chrome by default.
 _Avoid_: raw line filter, full accessibility dump, screenshot-only reasoning
 
 **Browser Operation Duration**:
@@ -188,6 +200,14 @@ _Avoid_: browser-only setup, API-only optimism, click-first automation
 The **SF Browser** portion of a **Setup Runbook** that describes how to complete or verify the task through stable Salesforce UI navigation when the primary API or extension path fails or is unavailable.
 _Avoid_: primary path, arbitrary click script, unsupported workaround
 
+**UI Mutation Fallback**:
+A browser-driven Salesforce setup or configuration change performed only when a stable API, metadata, or data path is unavailable, unverified, or insufficient for the requested task.
+_Avoid_: default mutation path, arbitrary click script, browser-first setup, hidden UI change
+
+**Mutation Evidence**:
+Session-scoped before-and-after browser state plus optional Setup Audit Trail context captured around a **UI Mutation Fallback**.
+_Avoid_: human approval, permission gate, full audit system, hidden mutation log
+
 **Classic Setup Surface**:
 A Salesforce Setup page rendered inside the Lightning Setup shell with classic-style iframe behavior, form posts, dual-list controls, and validation messages that require **SF Browser** fallback patterns different from standard Lightning UI.
 _Avoid_: legacy page, iframe hack, old UI, unsupported surface
@@ -199,6 +219,10 @@ _Avoid_: blind retry, Cancel-only recovery, keep clicking, ignore validation
 **Ambiguous Wait**:
 A browser wait result whose elapsed duration or output suggests the expected condition may not have matched, even though the underlying runtime did not return a hard failure.
 _Avoid_: success, completed, reliable wait, hidden timeout
+
+**Lightning-Aware Wait**:
+A named **SF Browser** wait for Salesforce Lightning semantic state such as app readiness, record view, modal state, toast visibility, spinner completion, or save outcome.
+_Avoid_: bare sleep, DOMContentLoaded-only readiness, generic network idle, hidden compound step
 
 **SF Pi Reference Map**:
 A compact guide that points agents from SF Brain to repo-local sources of truth such as the extension catalog, command reference, extension READMEs, and bundled progressive skills. It may mention active SF skills as a runtime signal, but must not assume user-global skill-library paths.
@@ -217,8 +241,9 @@ _Avoid_: duplicated docs, hardcoded personal skill paths, Salesforce encyclopedi
 - **SF Browser** owns Salesforce context, safe org opening, artifact handling, and guidance; `agent-browser` owns generic browser execution.
 - **SF Browser** exposes a small v1 **Runtime Surface**: one cache-first `/sf-browser` command panel and a **Hot-Path Browser Tool Set**.
 - **SF Browser Guidance** is surfaced through SF Brain routing, SF Browser command/tool results, and optional progressive skills rather than an always-injected context block.
-- **Browser Evidence** is artifact-first: repeated captures reference stored files, while model-visible images are explicit and size-bounded.
-- **Browser Evidence** v1 is stored under `browser-artifacts/latest/` with a **Browser Evidence Index** and no automatic cleanup.
+- **Browser Evidence** is session-scoped and artifact-first: repeated captures reference stored files for the current session, while model-visible images are explicit and size-bounded.
+- **Browser Evidence** uses a **Browser Evidence Index** for the session and no automatic cleanup.
+- A **Browser Evidence Latest Pointer** may preserve quick access to the current session's evidence without duplicating screenshots.
 - **Targeted Browser Evidence** uses explicit refs for scroll targeting; focus-to-scroll remains a future design choice.
 - `agent-browser` is a **Lazy Browser Runtime** for **SF Browser**.
 - **SF Browser** v1 uses one default **SF Browser Session** instead of per-org or per-conversation browser sessions.
@@ -227,14 +252,18 @@ _Avoid_: duplicated docs, hardcoded personal skill paths, Salesforce encyclopedi
 - **Salesforce Browser Contracts** cover stale refs, Lightning rerenders, Setup navigation, lookup and combobox flows, iframe surfaces, and API-first verification through tool descriptions, tool results, help, and optional progressive skills.
 - **Ambient Overlay Dismissal** is scoped to known non-workflow overlays and is appropriate for Browser Evidence cleanup before it is used around general click/fill flows.
 - A **Setup Destination** is intentionally curated and small; direct Salesforce Setup paths are preferred over UI search when the destination is known.
+- A **Salesforce Path Resolver** may support bounded fuzzy matching only within curated **Setup Destinations**, using **Path Resolution Clarification** instead of guessing when multiple destinations are plausible.
 - A **Pi-Native Browser Snapshot** separates model context from raw browser state: summary by default, artifact for full fidelity, and explicit full output only when requested.
-- A **Smart Snapshot Summary** includes human-readable sections, lightweight icons, and the current page URL so agents and humans can quickly understand where they are and what matters.
+- A **Smart Snapshot Summary** includes human-readable sections, lightweight icons, the current page URL, and structured Lightning state so agents and humans can quickly understand where they are and what matters.
 - **Browser Operation Duration** is reported in SF Browser tool results for user confidence; it is not treated as a formal performance benchmark.
 - A **Setup Runbook** records primary execution, evidence, and fallback paths so **SF Pi** stays **API-First Browser-Ready** instead of API-only or browser-only.
 - A **UI Fallback Path** should be hardened through repeated navigation, evidence capture, and documented edge cases, but it should not replace a stable primary API or owning extension path.
+- A **UI Mutation Fallback** stays frictionless in the browser tool layer; **Mutation Evidence** provides transparency without human-in-the-loop confirmation.
+- **Mutation Evidence** is captured through normal **Browser Evidence** with clear before/after labels, should be auditable by session, and should surface Setup Audit Trail context when requested and available.
 - A **Classic Setup Surface** often needs `select` plus Add/Remove controls, API verification after save, and direct navigation recovery after validation failures.
 - **UI Fallback Recovery** captures the failure, verifies state through APIs when possible, then navigates to a known safe destination before retrying.
 - An **Ambiguous Wait** should prompt snapshot/API verification instead of being reported as an unconditional success.
+- A **Lightning-Aware Wait** keeps browser operations composable while avoiding repeated ad hoc Lightning readiness heuristics.
 - **First-Class Data 360 Parity** guides how **SF Data 360** expands its workflow coverage.
 - **Generated Data 360 Parity** is the preferred delivery style for broad **First-Class Data 360 Parity**.
 - A **Runtime Code Budget** constrains hand-written **Runtime Surfaces**, not generated parity data.

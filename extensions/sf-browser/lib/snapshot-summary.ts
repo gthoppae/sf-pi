@@ -8,6 +8,7 @@
  * snapshot as an artifact.
  */
 import { truncateLine } from "@earendil-works/pi-coding-agent";
+import { deriveLightningState, formatLightningState } from "./lightning-state.ts";
 import { redactUrl } from "./redaction.ts";
 
 export type SnapshotOutputMode = "summary" | "artifact" | "full";
@@ -78,6 +79,7 @@ export function summarizeSnapshot(input: SnapshotSummaryInput): string {
   const focusMatches = collectFocusMatches(lines, focusTerms);
   const alerts = collectAlerts(lines, focusMatches);
   const page = summarizePage(lines, input.url, focusTerms);
+  const lightningState = formatLightningState(deriveLightningState({ url: input.url, lines }));
   const surface = classifySurface(lines, input.url);
   const actions = collectPrimaryActions(lines, alerts);
   const setupNavigation = collectSetupNavigation(lines, focusMatches);
@@ -85,6 +87,7 @@ export function summarizeSnapshot(input: SnapshotSummaryInput): string {
 
   const sections: string[] = ["🧭 Snapshot summary", ""];
   appendSection(sections, "📍 Page", page);
+  appendSection(sections, "⚡ Lightning state", lightningState);
   appendSection(sections, "🧭 Surface", surface);
   if (ignoredFocusTerms.length) {
     appendSection(sections, "🔎 Focus notes", [
@@ -155,6 +158,7 @@ function classifySurface(lines: string[], url: string | undefined): string[] {
     return ["Object Manager page"];
   }
   if (/\/lightning\/r\//i.test(safeUrl)) return ["Record page"];
+  if (/\/lightning\/o\/[^/]+\/new\b/i.test(safeUrl)) return ["Object new page"];
   if (/\/lightning\/o\//i.test(safeUrl)) return ["List view"];
   if (/\/lightning\/(page|n)\//i.test(safeUrl)) return ["Lightning app/page"];
 

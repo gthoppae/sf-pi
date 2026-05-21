@@ -52,6 +52,7 @@ import { registerSfBrowserClickTool } from "./lib/sf_browser_click-tool.ts";
 import { registerSfBrowserFillTool } from "./lib/sf_browser_fill-tool.ts";
 import { registerSfBrowserOpenOrgTool } from "./lib/sf_browser_open_org-tool.ts";
 import { registerSfBrowserPressTool } from "./lib/sf_browser_press-tool.ts";
+import { registerSfBrowserResolvePathTool } from "./lib/sf_browser_resolve_path-tool.ts";
 import { registerSfBrowserSelectTool } from "./lib/sf_browser_select-tool.ts";
 import { registerSfBrowserSnapshotTool } from "./lib/sf_browser_snapshot-tool.ts";
 import { registerSfBrowserWaitTool } from "./lib/sf_browser_wait-tool.ts";
@@ -74,6 +75,7 @@ export default function sfBrowser(pi: ExtensionAPI): void {
     registerSfBrowserPressTool(pi);
     registerSfBrowserWaitTool(pi);
     registerSfBrowserCaptureEvidenceTool(pi);
+    registerSfBrowserResolvePathTool(pi);
     toolsRegistered = true;
   }
 
@@ -251,7 +253,7 @@ async function handleAction(
     return;
   }
   if (action === "screenshot") {
-    const result = await captureEvidence(pi, ctx.cwd, {
+    const result = await captureEvidence(pi, ctx, {
       label: args.join(" ") || "panel-capture",
       imageMode: "thumbnail",
     });
@@ -272,14 +274,16 @@ async function handleAction(
 
 function buildStatusLines(ctx: ExtensionCommandContext): string[] {
   const env = getCachedSfEnvironment(ctx.cwd);
-  const recent = latestEvidenceCaptures(3);
+  const sessionId = ctx.sessionManager.getSessionId();
+  const recent = latestEvidenceCaptures(3, sessionId);
   return [
     "• Runtime        agent-browser not checked (run doctor to probe)",
-    `• Session        ${SF_BROWSER_SESSION}`,
+    `• Browser       ${SF_BROWSER_SESSION}`,
+    `• Pi session    ${sessionId}`,
     `• Target org     ${env?.config.targetOrg ?? env?.org.alias ?? "not cached"}`,
     "• Evidence mode  thumbnail by default; use artifact for batches",
-    `• Artifacts      ${getEvidenceDir()}`,
-    `• Index          ${getEvidenceIndexPath()}`,
+    `• Artifacts      ${getEvidenceDir(sessionId)}`,
+    `• Index          ${getEvidenceIndexPath(sessionId)}`,
     recent.length
       ? `• Recent         ${recent.map((item) => `#${item.id} ${item.label}`).join(", ")}`
       : "• Recent         none",
@@ -303,6 +307,7 @@ function buildHelpText(): string {
     "  sf_browser_press             Press keyboard keys such as Enter or Escape.",
     "  sf_browser_wait              Wait for expected text, URL, load state, or last-resort ms.",
     "  sf_browser_capture_evidence  Capture private screenshot evidence; thumbnail by default.",
+    "  sf_browser_resolve_path       Resolve structured Salesforce routes and setup destinations without opening the browser.",
     "",
     SALESFORCE_BROWSER_GUIDANCE,
   ].join("\n");

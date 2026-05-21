@@ -15,12 +15,17 @@ import {
 import type { SfEnvironment } from "../../../lib/common/sf-environment/types.ts";
 import { DEFAULT_SF_OPEN_TIMEOUT_MS } from "./constants.ts";
 import { redactText, redactUrl } from "./redaction.ts";
-import { formatKnownSetupDestinations, resolveSetupDestination } from "./setup-destinations.ts";
+import {
+  isResolvedSalesforcePath,
+  resolveSalesforcePath,
+  type SalesforceRoute,
+} from "./salesforce-path-resolver.ts";
 
 export interface OpenOrgInput {
   target_org?: string;
   path?: string;
   setup?: string;
+  route?: SalesforceRoute;
   purpose?: string;
 }
 
@@ -79,15 +84,14 @@ export async function resolveTargetOrg(
 }
 
 export function resolveOpenPath(input: OpenOrgInput): string | undefined {
-  if (input.path && input.setup) {
-    throw new Error("Pass either path or setup, not both.");
-  }
-  if (!input.setup) return input.path;
-  const pathValue = resolveSetupDestination(input.setup);
-  if (pathValue) return pathValue;
-  throw new Error(
-    `Unknown setup destination ${JSON.stringify(input.setup)}. Known destinations: ${formatKnownSetupDestinations()}`,
-  );
+  if (!input.path && !input.setup && !input.route) return undefined;
+  const result = resolveSalesforcePath({
+    path: input.path,
+    setup: input.setup,
+    route: input.route,
+  });
+  if (isResolvedSalesforcePath(result)) return result.path;
+  throw new Error(result.message);
 }
 
 export function summarizeOpenTarget(targetOrg: string, pathValue: string | undefined): string {

@@ -2,14 +2,14 @@
 /**
  * Shared helpers for SF Browser tool results.
  */
-import { writeFileSync } from "node:fs";
+import { mkdirSync, writeFileSync } from "node:fs";
 import path from "node:path";
 import {
   DEFAULT_MAX_BYTES,
   DEFAULT_MAX_LINES,
   truncateHead,
 } from "@earendil-works/pi-coding-agent";
-import { getEvidenceDir } from "./artifacts.ts";
+import { getEvidenceDir, updateLatestEvidencePointer } from "./artifacts.ts";
 import { redactText, sanitizeLabel } from "./redaction.ts";
 
 export interface FormattedOutput {
@@ -20,7 +20,13 @@ export interface FormattedOutput {
 
 export function formatPossiblyLargeOutput(
   output: string,
-  options: { label: string; extension: string; maxBytes?: number; maxLines?: number },
+  options: {
+    label: string;
+    extension: string;
+    maxBytes?: number;
+    maxLines?: number;
+    sessionId?: string;
+  },
 ): FormattedOutput {
   const redacted = redactText(output);
   const truncation = truncateHead(redacted, {
@@ -31,7 +37,9 @@ export function formatPossiblyLargeOutput(
     return { text: truncation.content, truncated: false };
   }
 
-  const dir = getEvidenceDir();
+  const dir = getEvidenceDir(options.sessionId);
+  updateLatestEvidencePointer(options.sessionId);
+  mkdirSync(dir, { recursive: true });
   const file = path.join(
     dir,
     `${Date.now()}-${sanitizeLabel(options.label, "output")}.${options.extension}`,
@@ -53,10 +61,13 @@ export function formatPossiblyLargeOutput(
 
 export function writeBrowserArtifact(
   content: string,
-  options: { label: string; extension: string },
+  options: { label: string; extension: string; sessionId?: string },
 ): string {
+  const dir = getEvidenceDir(options.sessionId);
+  updateLatestEvidencePointer(options.sessionId);
+  mkdirSync(dir, { recursive: true });
   const file = path.join(
-    getEvidenceDir(),
+    dir,
     `${Date.now()}-${sanitizeLabel(options.label, "artifact")}.${options.extension}`,
   );
   writeFileSync(file, content, "utf8");

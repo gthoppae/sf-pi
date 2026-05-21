@@ -24,3 +24,17 @@ The first Agentforce setup check showed that SF Browser needs more Salesforce-sp
 - SF Browser owns setup/admin UI evidence and fallback runbook references so SF Pi can stay API-first while remaining browser-ready when APIs or owning extensions fail.
 - Salesforce Classic Setup Surface runbooks should use `select` plus Add/Remove controls for dual-list pages, treat near-timeout waits as ambiguous, and recover from validation errors through evidence capture plus direct navigation.
 - Browser Evidence should support explicit scroll targeting (`scrollToRef`) so lower-page assertions can produce useful screenshots without adding automatic visual search.
+
+## Follow-up decisions from Salesforce automation reliability review
+
+A later review of Salesforce Lightning automation patterns refined SF Browser's reliability direction while preserving the ADR's original boundary: SF Browser remains a composable Salesforce-aware affordance layer over `agent-browser`, not a Playwright replacement, workflow DSL, or UI testing framework.
+
+- Browser Evidence should be session-scoped. Canonical evidence artifacts live under a per-pi-session directory, while the legacy `latest` location may remain as a compatibility pointer to the current session. Screenshots should not be duplicated between locations.
+- Mutation transparency should be evidence-based, not approval-based. UI-only Salesforce setup/configuration changes remain frictionless; agents capture before/after Browser Evidence with clear labels, and may request best-effort Setup Audit Trail context on evidence capture.
+- SF Browser should not add a compound `sf_browser_step` / workflow tool. The product favors explicit, composable primitives even when that costs extra tool calls or tokens.
+- SF Browser should add a deterministic Salesforce Path Resolver for structured route intent (`home`, curated setup destination, object list, object new, record view). Bounded fuzzy matching is allowed only within curated Setup Destinations; ambiguous matches should ask the user to choose instead of guessing.
+- Path resolution should not perform live schema/data verification by default. It constructs known Lightning URL shapes with local validation only; workflows that require data correctness verify separately through Salesforce APIs.
+- `sf_browser_wait` should add Lightning-Aware Wait modes for app readiness, record view, modal open/closed, toast, spinner completion, and save result. These waits use browser-side JavaScript heuristics through `agent-browser wait --fn` and return structured outcome details.
+- `save-result` is an outcome classifier, not a success assertion. It should distinguish success toast, error toast, validation error, record view, modal closed, classic error, and ambiguous outcomes.
+- Smart Snapshot Summary should include structured Lightning state derived from the current URL and raw accessibility snapshot, without issuing extra browser JavaScript calls in the first implementation.
+- Annotated screenshots and video recording are deferred until session-scoped evidence, path resolution, Lightning-aware waits, and Lightning state summaries have landed.

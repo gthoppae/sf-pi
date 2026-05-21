@@ -11,7 +11,7 @@ Use Salesforce APIs first for setup and verification. Use SF Browser and agent-b
 
 ## Core loop
 
-1. Open the org/path with `sf_browser_open_org`. Prefer a curated `setup` destination when the target Setup page is known (for example `setup: "agentforce-agents"`) instead of search-and-click navigation.
+1. Open the org/path with `sf_browser_open_org`. Prefer a curated `setup` destination or structured `route` when the target is known (for example `setup: "agentforce-agents"` or `route: { type: "record-view", objectApiName: "Account", recordId: "001..." }`) instead of search-and-click navigation. Use `sf_browser_resolve_path` first when you want to preview or disambiguate navigation.
 2. Run `sf_browser_snapshot` before acting. It is pi-native by default: `outputMode: "summary"` returns compact decision-oriented context with page URL, surface, primary actions, alerts, table/list summaries, and a full raw snapshot artifact.
 3. Use refs from the latest snapshot with `sf_browser_click`, `sf_browser_fill`, `sf_browser_select`, or `sf_browser_press`.
 4. After page-changing actions, run `sf_browser_wait`, then `sf_browser_snapshot` again.
@@ -23,11 +23,11 @@ Refs are short-lived. Treat them as stale after clicks, saves, modal opens, navi
 
 - Prefer snapshot refs over CSS selectors. Salesforce generated ids and internal classes are not stable.
 - For lookup and combobox controls: fill the visible input, wait for options, snapshot, then click the desired option ref.
-- For Setup navigation, prefer curated Setup Destinations over UI search when available. Wait for expected text or URL patterns after navigation; DOMContentLoaded alone is often not enough.
+- For Setup navigation, prefer curated Setup Destinations over UI search when available. Use structured routes for common Lightning pages: `home`, `setup`, `object-list`, `object-new`, and `record-view`. If fuzzy Setup Destination resolution returns multiple candidates, ask the user to choose instead of guessing. `object-new` only opens Salesforce's deterministic new-record URL; org overrides or record-type flows may render differently, so verify with a Lightning wait and snapshot instead of assuming a modal opened. Wait for expected text or URL patterns after navigation; DOMContentLoaded alone is often not enough.
 - For Classic Setup Surface dual-list controls, use `sf_browser_select` on the source listbox, click Add or Remove, snapshot before Save, then verify through API after Save.
 - For save flows, wait for visible confirmation such as a toast, success text, or expected page state, then snapshot again. Treat near-timeout waits as ambiguous and verify before continuing.
 - If expected controls are missing, consider iframe/frame surfaces or use direct `agent-browser` commands as the escape hatch.
-- Use `imageMode: "artifact"` for repeated screenshots or batches; use `thumbnail` when the model should inspect the current screen; use `full` only when visual fidelity matters and the image is small enough. Use `scrollToRef` when evidence needs a lower-page section in view.
+- Browser Evidence is session-scoped. Use `imageMode: "artifact"` for repeated screenshots or batches; use `thumbnail` when the model should inspect the current screen; use `full` only when visual fidelity matters and the image is small enough. Use `scrollToRef` when evidence needs a lower-page section in view. For UI Mutation Fallbacks, capture before/after evidence with clear labels and use `includeSetupAuditTrail: true` on the after-capture when recent Setup Audit Trail context is useful.
 - Keep `dismissOverlays` enabled for Browser Evidence unless the overlay is part of the task. It is best-effort and only targets known non-workflow Salesforce overlays.
 
 ## Setup Runbooks
