@@ -37,6 +37,7 @@ describe("wait classification", () => {
     expect(expression).toContain("success-toast");
     expect(expression).toContain("validation-error");
     expect(expression).toContain("classic-error");
+    expect(expression).toContain("classic-success");
   });
 
   it("uses hardened Salesforce modal/toast/spinner selectors", () => {
@@ -45,6 +46,7 @@ describe("wait classification", () => {
     expect(LIGHTNING_WAIT_HELPERS).toContain('[data-aura-class*="forceToastMessage"]');
     expect(LIGHTNING_WAIT_HELPERS).toContain('[aria-busy="true"]');
     expect(LIGHTNING_WAIT_HELPERS).toContain("[data-error-message]");
+    expect(LIGHTNING_WAIT_HELPERS).toContain("visibleSaveButton");
   });
 
   it("builds separate Lightning outcome expressions for structured details", () => {

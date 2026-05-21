@@ -21,6 +21,7 @@ export type LightningWaitOutcome =
   | "error-toast"
   | "validation-error"
   | "classic-error"
+  | "classic-success"
   | "ambiguous";
 
 export interface LightningOutcomeDetails {
@@ -106,6 +107,19 @@ function validationVisible() {
 function classicErrorVisible() {
   return firstVisible(['#error', '.errorMsg', '.message.errorM3', '.pbError', '.error']);
 }
+function visibleSaveButton() {
+  return Array.from(document.querySelectorAll('input, button')).find(function(el) {
+    if (!visible(el)) return false;
+    const label = textOf(el) || el.value || el.getAttribute('title') || '';
+    return /^\s*save\s*$/i.test(label);
+  });
+}
+function classicSetupSuccess() {
+  if (!/\/lightning\/setup\//.test(location.pathname)) return null;
+  if (modalVisible() || spinnerVisible() || validationVisible() || classicErrorVisible() || visibleSaveButton()) return null;
+  if (!textOf(document.body)) return null;
+  return { selector: 'location.pathname', url: location.pathname };
+}
 function bodyHasErrorText() {
   const text = textOf(document.body);
   if (/please fix the following|review the errors|complete this field|required field|invalid value|unable to save|problem saving/i.test(text)) {
@@ -134,6 +148,8 @@ function classifySaveResult() {
   if (classic) return { outcome: 'classic-error', matched: { selector: classic.selector, text: textOf(classic.el) } };
   const record = recordViewMatch();
   if (record) return { outcome: 'record-view', matched: record };
+  const classicSuccess = classicSetupSuccess();
+  if (classicSuccess) return { outcome: 'classic-success', matched: classicSuccess };
   return { outcome: 'ambiguous' };
 }
 window.__sfPiLightningOutcome = function(mode) {
