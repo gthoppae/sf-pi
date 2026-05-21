@@ -282,10 +282,14 @@ function collectFocusRows(lines: string[], focusTerms: string[]): string[] {
 }
 
 function isAlertLine(line: string): boolean {
+  if (/^- (option|treeitem|link|cell|gridcell|rowheader|columnheader)\b/.test(line)) return false;
+  if (/^- alert/.test(line)) return true;
+  if (!/^- (StaticText|heading|paragraph|text)\b/.test(line)) return false;
   return (
-    /^- alert/.test(line) ||
-    /Please fix the following/i.test(line) ||
-    /\b(error|invalid|insufficient|not allowed)\b/i.test(line) ||
+    /Please fix the following|Review the errors|Complete this field|required field|invalid value/i.test(
+      line,
+    ) ||
+    /\b(insufficient|not allowed)\b/i.test(line) ||
     /can't /i.test(line)
   );
 }
@@ -333,15 +337,23 @@ function formatAlertLine(line: string): string | null {
 }
 
 function cleanRowName(value: string): string {
-  return value.replace(/^Expand\s+(.+)\s+\1$/, "$1");
+  return redactSnapshotText(value.replace(/^Expand\s+(.+)\s+\1$/, "$1"));
 }
 
 function extractQuotedName(line: string): string {
-  return line.match(/"([^"]+)"/)?.[1] ?? formatLine(line).replace(/^- \w+ /, "");
+  const value = line.match(/"([^"]+)"/)?.[1] ?? formatLine(line).replace(/^- \w+ /, "");
+  return redactSnapshotText(value);
 }
 
 function formatLine(line: string): string {
-  return truncateLine(line.replace(/\s+/g, " "), MAX_LINE_BYTES).text;
+  return truncateLine(redactSnapshotText(line).replace(/\s+/g, " "), MAX_LINE_BYTES).text;
+}
+
+function redactSnapshotText(text: string): string {
+  return text
+    .replace(/\bWelcome,\s*[^,"]+/gi, "Welcome, <user>")
+    .replace(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/gi, "<email>")
+    .replace(/https?:\/\/[^\s"]+/gi, "<url>");
 }
 
 function unique(items: string[]): string[] {

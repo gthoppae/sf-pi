@@ -97,16 +97,14 @@ function parseSnapshotState(
     hasSpinner: /\b(spinner|progressbar|loading\.\.\.)\b/i.test(joined),
     hasValidation:
       /^- alert\b/im.test(joined) ||
-      /Please fix the following|Review the errors|Complete this field|required field|invalid value|can't |cannot /i.test(
+      /Please fix the following|Review the errors|Complete this field|required field|invalid value/i.test(
         joined,
       ),
   };
 }
 
 function findToastText(lines: string[]): string | undefined {
-  const toastLine = lines.find((line) =>
-    /toast|was created|was saved|successfully|success/i.test(line),
-  );
+  const toastLine = lines.find((line) => /toast|was created|was saved|successfully/i.test(line));
   if (!toastLine) return undefined;
   return extractQuotedName(toastLine) || cleanLine(toastLine);
 }

@@ -108,7 +108,7 @@ function classicErrorVisible() {
 }
 function bodyHasErrorText() {
   const text = textOf(document.body);
-  if (/please fix the following|review the errors|complete this field|required field|invalid value|can't |cannot |unable to |problem/i.test(text)) {
+  if (/please fix the following|review the errors|complete this field|required field|invalid value|unable to save|problem saving/i.test(text)) {
     return { selector: 'body', text };
   }
   return null;

@@ -92,6 +92,40 @@ describe("snapshot summary", () => {
     expect(summary).toContain("user license doesn't allow");
   });
 
+  it("does not treat navigation/table text containing error words as validation", () => {
+    const snapshot = [
+      '- treeitem "Delegated Authentication Error History" [level=2, ref=e1]',
+      '- option "Revenue Transaction Error Logs" [ref=e2]',
+      '- cell "This object cannot be a Master-Detail relationship." [ref=e3]',
+    ].join("\n");
+
+    const summary = summarizeSnapshot({ snapshot, fullSnapshotPath: "/tmp/snapshot.txt" });
+
+    expect(summary).not.toContain("Alerts / validation");
+    expect(summary).toContain("Validation: none");
+  });
+
+  it("redacts emails and non-page URLs from table and focus summaries", () => {
+    const snapshot = [
+      '- heading "Welcome, Jane," [level=1, ref=e0]',
+      '- rowheader "person@example.com" [ref=e1]',
+      '- cell "https://example.my.site.com/path" [ref=e2]',
+    ].join("\n");
+
+    const summary = summarizeSnapshot({
+      snapshot,
+      fullSnapshotPath: "/tmp/snapshot.txt",
+      focus: ["example"],
+    });
+
+    expect(summary).toContain("Welcome, <user>");
+    expect(summary).toContain("<email>");
+    expect(summary).toContain("<url>");
+    expect(summary).not.toContain("Welcome, Jane");
+    expect(summary).not.toContain("person@example.com");
+    expect(summary).not.toContain("https://example.my.site.com/path");
+  });
+
   it("ignores short focus terms to avoid noisy matches", () => {
     const snapshot = [
       '- link "Skip to Navigation" [ref=e1]',
