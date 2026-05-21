@@ -1,84 +1,75 @@
 ---
 title: "SF LLM Gateway Internal"
-description: "Single pi-native provider for the Salesforce LLM Gateway. Static bootstrap catalog plus dynamic /v1/models discovery, family-aware presets, OpenAI-compat dispatcher that delegates Claude ids to the native Anthropic transport, and footer status with model + context + monthly usage."
+description: "Connect pi to Salesforce LLM Gateway models when your environment supports that provider."
 ---
 
 # SF LLM Gateway Internal
 
-Single pi-native provider for the Salesforce LLM Gateway. Static bootstrap catalog plus dynamic /v1/models discovery, family-aware presets, OpenAI-compat dispatcher that delegates Claude ids to the native Anthropic transport, and footer status with model + context + monthly usage.
+<p class="sfpi-page-lead">Connect pi to Salesforce LLM Gateway models when your environment supports that provider.</p>
 
-## What it is
+<div class="sfpi-action-card"><span>Best for</span><strong>Model provider setup</strong><p>Connect pi to Salesforce LLM Gateway models when your environment supports that provider.</p></div>
 
-Salesforce LLM Gateway provider with model discovery
+## Why you'll use it
 
-## At a glance
+<div class="sfpi-benefit-grid">
+<div class="sfpi-benefit-card">Discovers available gateway models for pi.</div>
+<div class="sfpi-benefit-card">Shows provider and usage status in SF Pi surfaces.</div>
+<div class="sfpi-benefit-card">Keeps provider setup separate from other bundled extensions.</div>
+</div>
 
-| Property         | Value                                                                                                                                        |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------------------------- |
-| Extension id     | `sf-llm-gateway-internal`                                                                                                                    |
-| Category         | Provider                                                                                                                                     |
-| Maturity         | stable                                                                                                                                       |
-| Default state    | on                                                                                                                                           |
-| Runtime surfaces | commands, provider, events                                                                                                                   |
-| Source           | [`extensions/sf-llm-gateway-internal/`](https://github.com/salesforce/sf-pi/tree/main/extensions/sf-llm-gateway-internal)                    |
-| Full README      | [`extensions/sf-llm-gateway-internal/README.md`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-llm-gateway-internal/README.md) |
+## Try it first
 
-## How to use it
-
-Open the command surface from pi:
-
-- `/sf-llm-gateway`
-
-Manage the extension with SF Pi Manager:
+Open gateway panel
 
 ```text
-/sf-pi enable sf-llm-gateway-internal
-/sf-pi disable sf-llm-gateway-internal
-/sf-pi status sf-llm-gateway-internal
+/sf-llm-gateway
 ```
 
-## Runtime surfaces
+You can also manage this extension from the SF Pi home base:
 
-- **Commands:** `/sf-llm-gateway`
-- **Providers:** `sf-llm-gateway-internal`
-- **Events/hooks:** `session_start`, `turn_end`, `model_select`, `after_provider_response`, `session_shutdown`
+```text
+/sf-pi status sf-llm-gateway-internal
+/sf-pi enable sf-llm-gateway-internal
+/sf-pi disable sf-llm-gateway-internal
+```
 
-## Provider surface
+## Common use cases
 
-This extension registers provider functionality with pi:
+- Configure Salesforce LLM Gateway access for pi.
+- Inspect available models and provider health.
+- Debug model routing or usage status.
 
-- `sf-llm-gateway-internal`
+## What you get
 
-## Safety and privacy
+- A pi provider registration for Salesforce LLM Gateway.
+- Model discovery and command-panel diagnostics.
+- Footer status for model and usage context.
+
+## Safety notes
 
 - Tokens are never echoed in panel output; only describeApiKey summaries are shown.
 - Pi's settings.json is mutated through pi-settings.ts helpers with race-aware reads.
 
-## Configuration and state
+## Exact reference
 
-State files:
+<details>
+<summary>Show commands, tools, providers, and hooks</summary>
 
-- `~/.pi/agent/settings.json (provider config + retry guidance)`
-- `&lt;globalAgentDir&gt;/sf-llm-gateway/* (saved api key, base url, monthly usage cache)`
+- **Extension id:** `sf-llm-gateway-internal`
+- **Category:** Provider
+- **Maturity:** stable
+- **Default state:** on
+- **Commands:** `/sf-llm-gateway`
+- **LLM tools:** _none_
+- **Providers:** `sf-llm-gateway-internal`
+- **Events/hooks:** `session_start`, `turn_end`, `model_select`, `after_provider_response`, `session_shutdown`
 
-## Important files
+</details>
 
-- [`index.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-llm-gateway-internal/index.ts)
-- [`lib/discovery.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-llm-gateway-internal/lib/discovery.ts)
-- [`lib/transport.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-llm-gateway-internal/lib/transport.ts)
-- [`lib/models.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-llm-gateway-internal/lib/models.ts)
-- [`lib/config.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-llm-gateway-internal/lib/config.ts)
-- [`lib/config-panel.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-llm-gateway-internal/lib/config-panel.ts)
-- [`lib/command-panel.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-llm-gateway-internal/lib/command-panel.ts)
-- [`lib/monthly-usage.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-llm-gateway-internal/lib/monthly-usage.ts)
-- [`lib/doctor.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-llm-gateway-internal/lib/doctor.ts)
-
-## Learn more
+## For contributors
 
 - [Full extension README](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-llm-gateway-internal/README.md)
 - [Source folder](https://github.com/salesforce/sf-pi/tree/main/extensions/sf-llm-gateway-internal)
-- [Command reference](../commands.md)
-- [Bundled extension inventory](../extensions.md)
 
 ## Troubleshooting
 

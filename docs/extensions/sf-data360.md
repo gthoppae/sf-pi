@@ -1,81 +1,77 @@
 ---
 title: "SF Data 360"
-description: "Data 360 capability facade plus direct REST access through @salesforce/core Connection with API-version pinning, target-org resolution, dry-run, safety confirmation, compact metadata helpers, deterministic observability capabilities, and progressive skill references."
+description: "Give agents a safe, compact way to discover and run Data Cloud / Data 360 workflows."
 ---
 
 # SF Data 360
 
-Data 360 capability facade plus direct REST access through @salesforce/core Connection with API-version pinning, target-org resolution, dry-run, safety confirmation, compact metadata helpers, deterministic observability capabilities, and progressive skill references.
+<p class="sfpi-page-lead">Give agents a safe, compact way to discover and run Data Cloud / Data 360 workflows.</p>
 
-## What it is
+<div class="sfpi-action-card"><span>Best for</span><strong>Data 360 metadata, SQL, and capabilities</strong><p>Give agents a safe, compact way to discover and run Data Cloud / Data 360 workflows.</p></div>
 
-Data Cloud/Data 360 capability facade and direct REST helper — d360 search/examples/execute, d360_api, compact metadata discovery, readiness probe, and progressive-disclosure references
+## Why you'll use it
 
-## At a glance
+<div class="sfpi-benefit-grid">
+<div class="sfpi-benefit-card">Discover Data 360 capabilities without memorizing REST endpoints.</div>
+<div class="sfpi-benefit-card">Use dry-runs and compact summaries before broad or mutating calls.</div>
+<div class="sfpi-benefit-card">Inspect DMO/DLO metadata without dumping large catalogs into context.</div>
+</div>
 
-| Property         | Value                                                                                                              |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Extension id     | `sf-data360`                                                                                                       |
-| Category         | Agent Tool                                                                                                         |
-| Maturity         | stable                                                                                                             |
-| Default state    | on                                                                                                                 |
-| Runtime surfaces | commands, tools, events                                                                                            |
-| Source           | [`extensions/sf-data360/`](https://github.com/salesforce/sf-pi/tree/main/extensions/sf-data360)                    |
-| Full README      | [`extensions/sf-data360/README.md`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-data360/README.md) |
+## Try it first
 
-## How to use it
-
-Open the command surface from pi:
-
-- `/sf-data360`
-
-Manage the extension with SF Pi Manager:
+Open the Data 360 panel
 
 ```text
-/sf-pi enable sf-data360
-/sf-pi disable sf-data360
-/sf-pi status sf-data360
+/sf-data360
 ```
 
-## Runtime surfaces
+You can also manage this extension from the SF Pi home base:
 
-- **Commands:** `/sf-data360`
-- **LLM tools:** `d360`, `d360_api`, `d360_metadata`, `d360_probe`
-- **Events/hooks:** `session_start`, `session_shutdown`, `resources_discover`
+```text
+/sf-pi status sf-data360
+/sf-pi enable sf-data360
+/sf-pi disable sf-data360
+```
 
-## Agent tools
+## Common use cases
 
-Agents can call these tools when the extension is enabled and configured:
+- Probe whether an org has Data 360 surfaces available.
+- List or describe DMO and DLO schemas.
+- Run Data 360 REST calls through Salesforce CLI auth.
+- Use curated capabilities for repeatable Data 360 workflows.
 
-- `d360`
-- `d360_api`
-- `d360_metadata`
-- `d360_probe`
+## What you get
 
-## Safety and privacy
+- Capability search/examples/execute through `d360`.
+- Direct REST escape hatch through `d360_api`.
+- Compact metadata helpers and readiness probes.
+
+## Safety notes
 
 - No MCP runtime or Java subprocess is used.
 - Mutating calls are classified by method/path and confirmed when required.
 - The sf-data360 skill is contributed only while the extension is enabled.
 
-## Important files
+## Exact reference
 
-- [`index.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-data360/index.ts)
-- [`lib/facade-tool.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-data360/lib/facade-tool.ts)
-- [`lib/api-tool.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-data360/lib/api-tool.ts)
-- [`lib/path.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-data360/lib/path.ts)
-- [`lib/safety.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-data360/lib/safety.ts)
-- [`lib/metadata-tool.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-data360/lib/metadata-tool.ts)
-- [`lib/probe-tool.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-data360/lib/probe-tool.ts)
-- [`lib/config-panel.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-data360/lib/config-panel.ts)
-- [`skills/sf-data360/SKILL.md`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-data360/skills/sf-data360/SKILL.md)
+<details>
+<summary>Show commands, tools, providers, and hooks</summary>
 
-## Learn more
+- **Extension id:** `sf-data360`
+- **Category:** Agent Tool
+- **Maturity:** stable
+- **Default state:** on
+- **Commands:** `/sf-data360`
+- **LLM tools:** `d360`, `d360_api`, `d360_metadata`, `d360_probe`
+- **Providers:** _none_
+- **Events/hooks:** `session_start`, `session_shutdown`, `resources_discover`
+
+</details>
+
+## For contributors
 
 - [Full extension README](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-data360/README.md)
 - [Source folder](https://github.com/salesforce/sf-pi/tree/main/extensions/sf-data360)
-- [Command reference](../commands.md)
-- [Bundled extension inventory](../extensions.md)
 
 ## Troubleshooting
 

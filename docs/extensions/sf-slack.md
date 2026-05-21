@@ -1,106 +1,77 @@
 ---
 title: "SF Slack"
-description: "Full Slack integration. Read-only search/thread/history/channel/user/file/canvas plus send-with-confirm. Tools register only after a token resolves (Pi auth store -> SLACK_USER_TOKEN), keeping the system prompt cache stable when Slack is not configured."
+description: "Let agents research Slack context safely and send messages only with explicit user confirmation."
 ---
 
 # SF Slack
 
-Full Slack integration. Read-only search/thread/history/channel/user/file/canvas plus send-with-confirm. Tools register only after a token resolves (Pi auth store -&gt; SLACK_USER_TOKEN), keeping the system prompt cache stable when Slack is not configured.
+<p class="sfpi-page-lead">Let agents research Slack context safely and send messages only with explicit user confirmation.</p>
 
-## What it is
+<div class="sfpi-action-card"><span>Best for</span><strong>Slack search and collaboration</strong><p>Let agents research Slack context safely and send messages only with explicit user confirmation.</p></div>
 
-Slack integration — search messages, read threads, browse channel history
+## Why you'll use it
 
-## At a glance
+<div class="sfpi-benefit-grid">
+<div class="sfpi-benefit-card">Search messages, threads, users, channels, files, and canvases from pi.</div>
+<div class="sfpi-benefit-card">Resolve fuzzy Slack references before searching.</div>
+<div class="sfpi-benefit-card">Keeps sends human-in-the-loop.</div>
+</div>
 
-| Property         | Value                                                                                                          |
-| ---------------- | -------------------------------------------------------------------------------------------------------------- |
-| Extension id     | `sf-slack`                                                                                                     |
-| Category         | Agent Tool                                                                                                     |
-| Maturity         | stable                                                                                                         |
-| Default state    | on                                                                                                             |
-| Runtime surfaces | commands, tools, provider, events                                                                              |
-| Source           | [`extensions/sf-slack/`](https://github.com/salesforce/sf-pi/tree/main/extensions/sf-slack)                    |
-| Full README      | [`extensions/sf-slack/README.md`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-slack/README.md) |
+## Try it first
 
-## How to use it
-
-Open the command surface from pi:
-
-- `/sf-slack`
-
-Manage the extension with SF Pi Manager:
+Open Slack setup/status
 
 ```text
-/sf-pi enable sf-slack
-/sf-pi disable sf-slack
-/sf-pi status sf-slack
+/sf-slack
 ```
 
-## Runtime surfaces
+You can also manage this extension from the SF Pi home base:
 
-- **Commands:** `/sf-slack`
-- **LLM tools:** `slack`, `slack_time_range`, `slack_resolve`, `slack_research`, `slack_channel`, `slack_user`, `slack_file`, `slack_canvas`, `slack_send`
-- **Providers:** `sf-slack`
-- **Events/hooks:** `session_start`, `session_shutdown`, `before_agent_start`
+```text
+/sf-pi status sf-slack
+/sf-pi enable sf-slack
+/sf-pi disable sf-slack
+```
 
-## Agent tools
+## Common use cases
 
-Agents can call these tools when the extension is enabled and configured:
+- Find prior discussions related to a bug or feature.
+- Summarize threads without leaving pi.
+- Resolve people or channels before posting a drafted message.
+- Create or edit canvases when explicitly requested.
 
-- `slack`
-- `slack_time_range`
-- `slack_resolve`
-- `slack_research`
-- `slack_channel`
-- `slack_user`
-- `slack_file`
-- `slack_canvas`
-- `slack_send`
+## What you get
 
-## Provider surface
+- Slack research, history, thread, channel, user, file, canvas, and send tools.
+- Deterministic time-range and entity-resolution helpers.
+- Explicit confirmation before any Slack message is posted.
 
-This extension registers provider functionality with pi:
-
-- `sf-slack`
-
-## Safety and privacy
+## Safety notes
 
 - slack_send requires user confirmation in interactive mode and refuses headless unless SLACK_ALLOW_HEADLESS_SEND=1.
 - Read-only by default; only canvas create/edit and slack_send mutate.
 - Tokens are never displayed unmasked.
 
-## Configuration and state
+## Exact reference
 
-Environment inputs:
+<details>
+<summary>Show commands, tools, providers, and hooks</summary>
 
-- `SLACK_USER_TOKEN`
-- `SLACK_TEAM_ID`
-- `SLACK_ALLOW_HEADLESS_SEND`
+- **Extension id:** `sf-slack`
+- **Category:** Agent Tool
+- **Maturity:** stable
+- **Default state:** on
+- **Commands:** `/sf-slack`
+- **LLM tools:** `slack`, `slack_time_range`, `slack_resolve`, `slack_research`, `slack_channel`, `slack_user`, `slack_file`, `slack_canvas`, `slack_send`
+- **Providers:** `sf-slack`
+- **Events/hooks:** `session_start`, `session_shutdown`, `before_agent_start`
 
-State files:
+</details>
 
-- `Pi auth store via /login sf-slack`
-- `session entries: SlackSendAuditEntry, SlackPreferences`
-
-## Important files
-
-- [`index.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-slack/index.ts)
-- [`lib/auth.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-slack/lib/auth.ts)
-- [`lib/api.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-slack/lib/api.ts)
-- [`lib/tools.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-slack/lib/tools.ts)
-- [`lib/research-tool.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-slack/lib/research-tool.ts)
-- [`lib/send-tool.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-slack/lib/send-tool.ts)
-- [`lib/recipient-confirm.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-slack/lib/recipient-confirm.ts)
-- [`lib/config-panel.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-slack/lib/config-panel.ts)
-- [`lib/preferences-panel.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-slack/lib/preferences-panel.ts)
-
-## Learn more
+## For contributors
 
 - [Full extension README](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-slack/README.md)
 - [Source folder](https://github.com/salesforce/sf-pi/tree/main/extensions/sf-slack)
-- [Command reference](../commands.md)
-- [Bundled extension inventory](../extensions.md)
 
 ## Troubleshooting
 

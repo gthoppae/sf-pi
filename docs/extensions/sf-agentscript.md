@@ -1,61 +1,52 @@
 ---
 title: "SF Agent Script"
-description: "Owns the entire Agent Script lifecycle: authoring assist (compile-on-save), first-class compile tool, multi-turn eval against /einstein/evaluation/v1/tests with planner-trace fetching, and progressive-disclosure skill for the LLM."
+description: "Build, validate, preview, test, and publish Agentforce agents without leaving pi."
 ---
 
 # SF Agent Script
 
-Owns the entire Agent Script lifecycle: authoring assist (compile-on-save), first-class compile tool, multi-turn eval against /einstein/evaluation/v1/tests with planner-trace fetching, and progressive-disclosure skill for the LLM.
+<p class="sfpi-page-lead">Build, validate, preview, test, and publish Agentforce agents without leaving pi.</p>
 
-## What it is
+<div class="sfpi-action-card"><span>Best for</span><strong>Agentforce agent authoring</strong><p>Build, validate, preview, test, and publish Agentforce agents without leaving pi.</p></div>
 
-Single-plugin lifecycle for `.agent` files: in-process compile-on-save diagnostics, an LLM-callable compile tool, multi-turn eval/regression testing against the Salesforce Evaluation API, and a placeholder for the future Agent Script LSP.
+## Why you'll use it
 
-## At a glance
+<div class="sfpi-benefit-grid">
+<div class="sfpi-benefit-card">Catch Agent Script errors before you publish.</div>
+<div class="sfpi-benefit-card">Inspect topics, actions, variables, and references quickly.</div>
+<div class="sfpi-benefit-card">Preview and regression-test agent conversations from the same workflow.</div>
+</div>
 
-| Property         | Value                                                                                                                      |
-| ---------------- | -------------------------------------------------------------------------------------------------------------------------- |
-| Extension id     | `sf-agentscript`                                                                                                           |
-| Category         | Agent Tool                                                                                                                 |
-| Maturity         | stable                                                                                                                     |
-| Default state    | on                                                                                                                         |
-| Runtime surfaces | commands, tools, events                                                                                                    |
-| Source           | [`extensions/sf-agentscript/`](https://github.com/salesforce/sf-pi/tree/main/extensions/sf-agentscript)                    |
-| Full README      | [`extensions/sf-agentscript/README.md`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/README.md) |
+## Try it first
 
-## How to use it
-
-Open the command surface from pi:
-
-- `/sf-agentscript`
-
-Manage the extension with SF Pi Manager:
+Open the Agent Script panel
 
 ```text
-/sf-pi enable sf-agentscript
-/sf-pi disable sf-agentscript
-/sf-pi status sf-agentscript
+/sf-agentscript
 ```
 
-## Runtime surfaces
+You can also manage this extension from the SF Pi home base:
 
-- **Commands:** `/sf-agentscript`
-- **LLM tools:** `agentscript_compile`, `agentscript_create`, `agentscript_inspect`, `agentscript_mutate`, `agentscript_preview`, `agentscript_eval`, `agentscript_lifecycle`
-- **Events/hooks:** `session_start`, `session_shutdown`, `tool_result`
+```text
+/sf-pi status sf-agentscript
+/sf-pi enable sf-agentscript
+/sf-pi disable sf-agentscript
+```
 
-## Agent tools
+## Common use cases
 
-Agents can call these tools when the extension is enabled and configured:
+- Create a new `.agent` bundle from a scaffold.
+- Compile and format Agent Script while editing.
+- Preview a local agent against a Salesforce org.
+- Run repeatable eval specs before activating a new agent version.
 
-- `agentscript_compile`
-- `agentscript_create`
-- `agentscript_inspect`
-- `agentscript_mutate`
-- `agentscript_preview`
-- `agentscript_eval`
-- `agentscript_lifecycle`
+## What you get
 
-## Safety and privacy
+- Compile, create, inspect, mutate, preview, evaluate, publish, and activate tools for agents.
+- Local-first checks before server calls where possible.
+- Planner traces and compact failure summaries for debugging conversations.
+
+## Safety notes
 
 - Compile-on-save stays silent on unsupported files and on failed write/edit results.
 - Eval, trace, and preview API calls go through @salesforce/core Connection so the active org's auth context is reused; no token leaves jsforce.
@@ -64,38 +55,26 @@ Agents can call these tools when the extension is enabled and configured:
 - 5xx-only retry on POST avoids amplifying server-side overload (no Retry-After contract on the Eval API).
 - Preview sessions land under .sfdx/agents/** (sf-guardrail carve-out); rest of .sfdx/** stays blocked.
 
-## Important files
+## Exact reference
 
-- [`index.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/index.ts)
-- [`lib/diagnostics.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/lib/diagnostics.ts)
-- [`lib/feedback.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/lib/feedback.ts)
-- [`lib/sdk.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/lib/sdk.ts)
-- [`lib/inspect.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/lib/inspect.ts)
-- [`lib/mutate.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/lib/mutate.ts)
-- [`lib/tool-types.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/lib/tool-types.ts)
-- [`lib/eval/sfap.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/lib/eval/sfap.ts)
-- [`lib/eval/normalize.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/lib/eval/normalize.ts)
-- [`lib/eval/active-ids.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/lib/eval/active-ids.ts)
-- [`lib/eval/orchestrator.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/lib/eval/orchestrator.ts)
-- [`lib/eval/eval-client.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/lib/eval/eval-client.ts)
-- [`lib/eval/trace-client.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/lib/eval/trace-client.ts)
-- [`lib/eval/render.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/lib/eval/render.ts)
-- [`lib/eval/persist.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/lib/eval/persist.ts)
-- [`lib/preview/client.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/lib/preview/client.ts)
-- [`lib/preview/session-store.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/lib/preview/session-store.ts)
-- [`lib/tools/compile.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/lib/tools/compile.ts)
-- [`lib/tools/inspect.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/lib/tools/inspect.ts)
-- [`lib/tools/mutate.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/lib/tools/mutate.ts)
-- [`lib/tools/preview.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/lib/tools/preview.ts)
-- [`lib/tools/eval.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/lib/tools/eval.ts)
-- [`skills/sf-agentscript/SKILL.md`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/skills/sf-agentscript/SKILL.md)
+<details>
+<summary>Show commands, tools, providers, and hooks</summary>
 
-## Learn more
+- **Extension id:** `sf-agentscript`
+- **Category:** Agent Tool
+- **Maturity:** stable
+- **Default state:** on
+- **Commands:** `/sf-agentscript`
+- **LLM tools:** `agentscript_compile`, `agentscript_create`, `agentscript_inspect`, `agentscript_mutate`, `agentscript_preview`, `agentscript_eval`, `agentscript_lifecycle`
+- **Providers:** _none_
+- **Events/hooks:** `session_start`, `session_shutdown`, `tool_result`
+
+</details>
+
+## For contributors
 
 - [Full extension README](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-agentscript/README.md)
 - [Source folder](https://github.com/salesforce/sf-pi/tree/main/extensions/sf-agentscript)
-- [Command reference](../commands.md)
-- [Bundled extension inventory](../extensions.md)
 
 ## Troubleshooting
 

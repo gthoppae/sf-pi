@@ -14,10 +14,10 @@ export default defineConfig({
   head: [["meta", { name: "theme-color", content: "#00d7ff" }]],
   themeConfig: {
     nav: [
-      { text: "Guide", link: "/install" },
+      { text: "Start", link: "/" },
       { text: "Extensions", link: "/extensions" },
       { text: "Commands", link: "/commands" },
-      { text: "Contributing", link: "/contributing" },
+      { text: "Troubleshooting", link: "/troubleshooting" },
     ],
     sidebar: [
       {
@@ -29,21 +29,21 @@ export default defineConfig({
         ],
       },
       {
-        text: "Reference",
+        text: "Use SF Pi",
         items: [
-          { text: "Bundled Extensions", link: "/extensions" },
+          { text: "Browse extensions", link: "/extensions" },
           { text: "Command Reference", link: "/commands" },
           { text: "Privacy & Telemetry", link: "/privacy" },
           { text: "Troubleshooting", link: "/troubleshooting" },
         ],
       },
       {
-        text: "Extension pages",
-        collapsed: true,
+        text: "Browse extensions",
         items: extensionSidebarItems,
       },
       {
-        text: "Contributor docs",
+        text: "Contributor reference",
+        collapsed: true,
         items: [
           { text: "Contributing", link: "/contributing" },
           { text: "Human Orientation", link: "/human-orientation" },

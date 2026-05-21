@@ -1,73 +1,70 @@
 ---
 title: "SF Welcome"
-description: "Two-column startup splash with model/cost/environment status and release freshness on the left, plus announcements/recommended extensions/recent sessions on the right. Dismissable overlay (default) or persistent header (quietStartup), plus /sf-welcome and /sf-setup-fonts commands."
+description: "Start each pi session with a friendly SF Pi status summary and useful next steps."
 ---
 
 # SF Welcome
 
-Two-column startup splash with model/cost/environment status and release freshness on the left, plus announcements/recommended extensions/recent sessions on the right. Dismissable overlay (default) or persistent header (quietStartup), plus /sf-welcome and /sf-setup-fonts commands.
+<p class="sfpi-page-lead">Start each pi session with a friendly SF Pi status summary and useful next steps.</p>
 
-## What it is
+<div class="sfpi-action-card"><span>Best for</span><strong>First-run and session overview</strong><p>Start each pi session with a friendly SF Pi status summary and useful next steps.</p></div>
 
-Salesforce-branded splash screen with environment status, release freshness, and community info
+## Why you'll use it
 
-## At a glance
+<div class="sfpi-benefit-grid">
+<div class="sfpi-benefit-card">Shows environment and privacy posture at launch.</div>
+<div class="sfpi-benefit-card">Surfaces recommendations and announcements without forcing a command.</div>
+<div class="sfpi-benefit-card">Makes new SF Pi sessions feel intentional and discoverable.</div>
+</div>
 
-| Property         | Value                                                                                                              |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------ |
-| Extension id     | `sf-welcome`                                                                                                       |
-| Category         | UI                                                                                                                 |
-| Maturity         | stable                                                                                                             |
-| Default state    | on                                                                                                                 |
-| Runtime surfaces | commands, events                                                                                                   |
-| Source           | [`extensions/sf-welcome/`](https://github.com/salesforce/sf-pi/tree/main/extensions/sf-welcome)                    |
-| Full README      | [`extensions/sf-welcome/README.md`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-welcome/README.md) |
+## Try it first
 
-## How to use it
-
-Open the command surface from pi:
-
-- `/sf-welcome`
-- `/sf-setup-fonts`
-
-Manage the extension with SF Pi Manager:
+Open welcome surface
 
 ```text
-/sf-pi enable sf-welcome
-/sf-pi disable sf-welcome
-/sf-pi status sf-welcome
+/sf-welcome
 ```
 
-## Runtime surfaces
+You can also manage this extension from the SF Pi home base:
 
+```text
+/sf-pi status sf-welcome
+/sf-pi enable sf-welcome
+/sf-pi disable sf-welcome
+```
+
+## Common use cases
+
+- Review setup status at the start of a session.
+- Install fonts when glyphs do not render correctly.
+- See recommended next steps after installing SF Pi.
+
+## What you get
+
+- Startup splash or quiet header behavior.
+- Release freshness, environment, privacy, and recommendation rows.
+- Font setup helper.
+
+## Exact reference
+
+<details>
+<summary>Show commands, tools, providers, and hooks</summary>
+
+- **Extension id:** `sf-welcome`
+- **Category:** UI
+- **Maturity:** stable
+- **Default state:** on
 - **Commands:** `/sf-welcome`, `/sf-setup-fonts`
+- **LLM tools:** _none_
+- **Providers:** _none_
 - **Events/hooks:** `session_start`, `agent_start`, `tool_call`, `session_shutdown`
 
-## Configuration and state
+</details>
 
-State files:
-
-- `~/.pi/agent/sf-welcome-state.json`
-- `&lt;globalAgentDir&gt;/sf-pi/sf-welcome/pi-release-status.json`
-
-## Important files
-
-- [`index.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-welcome/index.ts)
-- [`lib/splash-component.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-welcome/lib/splash-component.ts)
-- [`lib/splash-data.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-welcome/lib/splash-data.ts)
-- [`lib/recommendations-status.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-welcome/lib/recommendations-status.ts)
-- [`lib/release-status.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-welcome/lib/release-status.ts)
-- [`lib/sf-cli-status.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-welcome/lib/sf-cli-status.ts)
-- [`lib/sf-skills-status.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-welcome/lib/sf-skills-status.ts)
-- [`lib/extension-health.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-welcome/lib/extension-health.ts)
-- [`lib/font-installer.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-welcome/lib/font-installer.ts)
-
-## Learn more
+## For contributors
 
 - [Full extension README](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-welcome/README.md)
 - [Source folder](https://github.com/salesforce/sf-pi/tree/main/extensions/sf-welcome)
-- [Command reference](../commands.md)
-- [Bundled extension inventory](../extensions.md)
 
 ## Troubleshooting
 

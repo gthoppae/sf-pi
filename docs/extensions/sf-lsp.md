@@ -1,68 +1,75 @@
 ---
 title: "SF LSP"
-description: "Advisory LSP diagnostics on write/edit for Apex/LWC/Agent Script files. Surfaces appear as a working indicator, transcript row, top-bar health segment (via sf-lsp-health registry), and a /sf-lsp doctor + activity panel."
+description: "Surface advisory diagnostics for Apex, LWC, and Agent Script files as you edit in pi."
 ---
 
 # SF LSP
 
-Advisory LSP diagnostics on write/edit for Apex/LWC/Agent Script files. Surfaces appear as a working indicator, transcript row, top-bar health segment (via sf-lsp-health registry), and a /sf-lsp doctor + activity panel.
+<p class="sfpi-page-lead">Surface advisory diagnostics for Apex, LWC, and Agent Script files as you edit in pi.</p>
 
-## What it is
+<div class="sfpi-action-card"><span>Best for</span><strong>Code diagnostics</strong><p>Surface advisory diagnostics for Apex, LWC, and Agent Script files as you edit in pi.</p></div>
 
-Real-time Salesforce LSP diagnostics on write/edit with a working-indicator spinner, transcript rows, and a permanent top-bar health segment in sf-devbar
+## Why you'll use it
 
-## At a glance
+<div class="sfpi-benefit-grid">
+<div class="sfpi-benefit-card">Get quick feedback after file writes and edits.</div>
+<div class="sfpi-benefit-card">See LSP health without leaving pi.</div>
+<div class="sfpi-benefit-card">Keep diagnostics advisory so they help without blocking every workflow.</div>
+</div>
 
-| Property         | Value                                                                                                      |
-| ---------------- | ---------------------------------------------------------------------------------------------------------- |
-| Extension id     | `sf-lsp`                                                                                                   |
-| Category         | Assistive                                                                                                  |
-| Maturity         | stable                                                                                                     |
-| Default state    | on                                                                                                         |
-| Runtime surfaces | commands, events                                                                                           |
-| Source           | [`extensions/sf-lsp/`](https://github.com/salesforce/sf-pi/tree/main/extensions/sf-lsp)                    |
-| Full README      | [`extensions/sf-lsp/README.md`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-lsp/README.md) |
+## Try it first
 
-## How to use it
-
-Open the command surface from pi:
-
-- `/sf-lsp`
-
-Manage the extension with SF Pi Manager:
+Open LSP status
 
 ```text
-/sf-pi enable sf-lsp
-/sf-pi disable sf-lsp
-/sf-pi status sf-lsp
+/sf-lsp
 ```
 
-## Runtime surfaces
+You can also manage this extension from the SF Pi home base:
 
-- **Commands:** `/sf-lsp`
-- **Events/hooks:** `session_start`, `session_shutdown`, `tool_result`
+```text
+/sf-pi status sf-lsp
+/sf-pi enable sf-lsp
+/sf-pi disable sf-lsp
+```
 
-## Safety and privacy
+## Common use cases
+
+- Check Apex, LWC, or Agent Script diagnostics after editing.
+- Run a doctor command when language tooling is not responding.
+- Track LSP activity in status surfaces.
+
+## What you get
+
+- Advisory diagnostics on write/edit.
+- Language-server discovery for supported Salesforce file types.
+- A status panel for health and activity.
+
+## Safety notes
 
 - Never overrides the built-in write/edit tools (pi cross-extension conflict guard).
 - Defers .agent file diagnostics to sf-agentscript when that extension is loaded.
 
-## Important files
+## Exact reference
 
-- [`index.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-lsp/index.ts)
-- [`lib/lsp-client.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-lsp/lib/lsp-client.ts)
-- [`lib/feedback.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-lsp/lib/feedback.ts)
-- [`lib/file-classify.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-lsp/lib/file-classify.ts)
-- [`lib/activity.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-lsp/lib/activity.ts)
-- [`lib/working-indicator.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-lsp/lib/working-indicator.ts)
-- [`lib/command-panel.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-lsp/lib/command-panel.ts)
+<details>
+<summary>Show commands, tools, providers, and hooks</summary>
 
-## Learn more
+- **Extension id:** `sf-lsp`
+- **Category:** Assistive
+- **Maturity:** stable
+- **Default state:** on
+- **Commands:** `/sf-lsp`
+- **LLM tools:** _none_
+- **Providers:** _none_
+- **Events/hooks:** `session_start`, `session_shutdown`, `tool_result`
+
+</details>
+
+## For contributors
 
 - [Full extension README](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-lsp/README.md)
 - [Source folder](https://github.com/salesforce/sf-pi/tree/main/extensions/sf-lsp)
-- [Command reference](../commands.md)
-- [Bundled extension inventory](../extensions.md)
 
 ## Troubleshooting
 

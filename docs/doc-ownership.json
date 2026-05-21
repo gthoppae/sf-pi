@@ -17,18 +17,22 @@
     "source": ["package.json scripts", ".github/workflows/*", "repo workflow"],
     "checks": ["npm run docs:health:check"]
   },
+  "docs/extension-copy.json": {
+    "source": ["reviewed public-safe extension positioning copy"],
+    "checks": ["npm run generate-catalog:check", "npm run docs:build"]
+  },
   "docs/extensions.md": {
-    "source": ["extensions/*/manifest.json", "catalog/index.json"],
+    "source": ["extensions/*/manifest.json", "catalog/index.json", "docs/extension-copy.json"],
     "generated": true,
     "checks": ["npm run generate-catalog:check", "npm run docs:build"]
   },
   "docs/extensions/*.md": {
-    "source": ["extensions/*/manifest.json", "catalog/index.json"],
+    "source": ["extensions/*/manifest.json", "catalog/index.json", "docs/extension-copy.json"],
     "generated": true,
     "checks": ["npm run generate-catalog:check", "npm run docs:build"]
   },
   "docs/.vitepress/generated-extension-sidebar.ts": {
-    "source": ["extensions/*/manifest.json", "catalog/index.json"],
+    "source": ["extensions/*/manifest.json", "catalog/index.json", "docs/extension-copy.json"],
     "generated": true,
     "checks": ["npm run generate-catalog:check", "npm run docs:build"]
   },

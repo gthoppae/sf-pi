@@ -1,68 +1,70 @@
 ---
 title: "SF Skills"
-description: "Skills manager + passive top-right live-context HUD overlay. Three datatable tabs (Active / Discover / Stats), source detection for global and project Claude/Codex/Cursor roots, an installer for forcedotcom/afv-library that wires the curated SF skills into settings.skills[], persistent per-skill usage counters split by global vs project, and a prune action for stale settings entries + orphan managed clones. Every enable/disable is a native pi settings.skills[] add/remove — no SKILL.md files are ever modified."
+description: "See and manage Salesforce skills that are active in the LLM context."
 ---
 
 # SF Skills
 
-Skills manager + passive top-right live-context HUD overlay. Three datatable tabs (Active / Discover / Stats), source detection for global and project Claude/Codex/Cursor roots, an installer for forcedotcom/afv-library that wires the curated SF skills into settings.skills[], persistent per-skill usage counters split by global vs project, and a prune action for stale settings entries + orphan managed clones. Every enable/disable is a native pi settings.skills[] add/remove — no SKILL.md files are ever modified.
+<p class="sfpi-page-lead">See and manage Salesforce skills that are active in the LLM context.</p>
 
-## What it is
+<div class="sfpi-action-card"><span>Best for</span><strong>Skill visibility and setup</strong><p>See and manage Salesforce skills that are active in the LLM context.</p></div>
 
-Manage skills end-to-end: live-context HUD, tabbed datatable (Active/Discover/Stats), Claude/Codex/Cursor source detection, forcedotcom/afv-library install + auto-update, per-skill usage counters, and prune.
+## Why you'll use it
 
-## At a glance
+<div class="sfpi-benefit-grid">
+<div class="sfpi-benefit-card">Shows which Salesforce skills are active right now.</div>
+<div class="sfpi-benefit-card">Helps install and manage curated Salesforce skill libraries.</div>
+<div class="sfpi-benefit-card">Uses native pi settings instead of shadow state.</div>
+</div>
 
-| Property         | Value                                                                                                            |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Extension id     | `sf-skills`                                                                                                      |
-| Category         | UI                                                                                                               |
-| Maturity         | stable                                                                                                           |
-| Default state    | on                                                                                                               |
-| Runtime surfaces | commands, events                                                                                                 |
-| Source           | [`extensions/sf-skills/`](https://github.com/salesforce/sf-pi/tree/main/extensions/sf-skills)                    |
-| Full README      | [`extensions/sf-skills/README.md`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-skills/README.md) |
+## Try it first
 
-## How to use it
-
-Open the command surface from pi:
-
-- `/sf-skills`
-
-Manage the extension with SF Pi Manager:
+Open skills manager
 
 ```text
-/sf-pi enable sf-skills
-/sf-pi disable sf-skills
-/sf-pi status sf-skills
+/sf-skills
 ```
 
-## Runtime surfaces
+You can also manage this extension from the SF Pi home base:
 
+```text
+/sf-pi status sf-skills
+/sf-pi enable sf-skills
+/sf-pi disable sf-skills
+```
+
+## Common use cases
+
+- Check what Salesforce guidance the agent can currently see.
+- Install or prune managed Salesforce skills.
+- Inspect skill usage and source scope.
+
+## What you get
+
+- A skills manager panel.
+- Passive live-context HUD.
+- Global/project skill source detection.
+
+## Exact reference
+
+<details>
+<summary>Show commands, tools, providers, and hooks</summary>
+
+- **Extension id:** `sf-skills`
+- **Category:** UI
+- **Maturity:** stable
+- **Default state:** on
 - **Commands:** `/sf-skills`
+- **LLM tools:** _none_
+- **Providers:** _none_
 - **Events/hooks:** `session_start`, `message_end`, `session_tree`, `session_compact`, `before_agent_start`, `session_shutdown`
 
-## Important files
+</details>
 
-- [`index.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-skills/index.ts)
-- [`lib/hud-component.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-skills/lib/hud-component.ts)
-- [`lib/skill-state.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-skills/lib/skill-state.ts)
-- [`lib/table-data.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-skills/lib/table-data.ts)
-- [`lib/table-overlay/index.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-skills/lib/table-overlay/index.ts)
-- [`lib/source-labels.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-skills/lib/source-labels.ts)
-- [`lib/classify.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-skills/lib/classify.ts)
-- [`lib/defaults.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-skills/lib/defaults.ts)
-- [`lib/skills-command.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-skills/lib/skills-command.ts)
-- [`lib/settings-coverage.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-skills/lib/settings-coverage.ts)
-- [`lib/usage-store.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-skills/lib/usage-store.ts)
-- [`lib/prune.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-skills/lib/prune.ts)
-
-## Learn more
+## For contributors
 
 - [Full extension README](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-skills/README.md)
 - [Source folder](https://github.com/salesforce/sf-pi/tree/main/extensions/sf-skills)
-- [Command reference](../commands.md)
-- [Bundled extension inventory](../extensions.md)
 
 ## Troubleshooting
 

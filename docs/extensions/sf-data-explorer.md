@@ -1,48 +1,52 @@
 ---
 title: "SF Data Explorer"
-description: "Keyboard-first read-only Salesforce data explorer with object/field browsing, editable query text, query execution, result detail view, JSON/CSV export, shortcut help, and explorer switching. Uses sf-pi @salesforce/core connection plumbing; no LLM required."
+description: "Browse Salesforce and Data 360 data read-only from a keyboard-first pi interface."
 ---
 
 # SF Data Explorer
 
-Keyboard-first read-only Salesforce data explorer with object/field browsing, editable query text, query execution, result detail view, JSON/CSV export, shortcut help, and explorer switching. Uses sf-pi @salesforce/core connection plumbing; no LLM required.
+<p class="sfpi-page-lead">Browse Salesforce and Data 360 data read-only from a keyboard-first pi interface.</p>
 
-## What it is
+<div class="sfpi-action-card"><span>Best for</span><strong>Read-only data exploration</strong><p>Browse Salesforce and Data 360 data read-only from a keyboard-first pi interface.</p></div>
 
-Read-only interactive TUI explorer for SOQL, SOSL, and Data 360 SQL using sf-pi Salesforce transport plumbing.
+## Why you'll use it
 
-## At a glance
+<div class="sfpi-benefit-grid">
+<div class="sfpi-benefit-card">Explore objects, fields, and query results without writing throwaway scripts.</div>
+<div class="sfpi-benefit-card">Keep exploration read-only by design.</div>
+<div class="sfpi-benefit-card">Switch between SOQL, SOSL, and Data 360 SQL workflows from one UI.</div>
+</div>
 
-| Property         | Value                                                                                                                          |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Extension id     | `sf-data-explorer`                                                                                                             |
-| Category         | UI                                                                                                                             |
-| Maturity         | experimental                                                                                                                   |
-| Default state    | on                                                                                                                             |
-| Runtime surfaces | commands, events                                                                                                               |
-| Source           | [`extensions/sf-data-explorer/`](https://github.com/salesforce/sf-pi/tree/main/extensions/sf-data-explorer)                    |
-| Full README      | [`extensions/sf-data-explorer/README.md`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-data-explorer/README.md) |
+## Try it first
 
-## How to use it
-
-Open the command surface from pi:
-
-- `/sf-data-explorer`
-
-Manage the extension with SF Pi Manager:
+Open the explorer
 
 ```text
-/sf-pi enable sf-data-explorer
-/sf-pi disable sf-data-explorer
-/sf-pi status sf-data-explorer
+/sf-data-explorer
 ```
 
-## Runtime surfaces
+You can also manage this extension from the SF Pi home base:
 
-- **Commands:** `/sf-data-explorer`
-- **Events/hooks:** `session_start`, `session_shutdown`
+```text
+/sf-pi status sf-data-explorer
+/sf-pi enable sf-data-explorer
+/sf-pi disable sf-data-explorer
+```
 
-## Safety and privacy
+## Common use cases
+
+- Inspect object fields before writing a query.
+- Run small read-only SOQL or SOSL checks.
+- Preview query results and export JSON or CSV when useful.
+- Explore Data 360 SQL results without asking the LLM to hold large tables.
+
+## What you get
+
+- A TUI data explorer with object and field browsing.
+- Editable query text, result detail views, and export shortcuts.
+- Read-only guardrails for safer exploration.
+
+## Safety notes
 
 - Read-only v1: only describe, query, search, compact Data 360 metadata GETs, and Data 360 SELECT SQL calls are issued.
 - Core SOQL execution validates SELECT-only query text before calling /query.
@@ -51,22 +55,26 @@ Manage the extension with SF Pi Manager:
 - Uses sf-pi target-org and API-version resolution; no hardcoded API version.
 - No raw access tokens are surfaced in UI, exports, or logs.
 
-## Important files
+## Exact reference
 
-- [`index.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-data-explorer/index.ts)
-- [`lib/transport.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-data-explorer/lib/transport.ts)
-- [`lib/command.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-data-explorer/lib/command.ts)
-- [`lib/ui/explorer-spa.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-data-explorer/lib/ui/explorer-spa.ts)
-- [`lib/modes/soql.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-data-explorer/lib/modes/soql.ts)
-- [`lib/modes/sosl.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-data-explorer/lib/modes/sosl.ts)
-- [`lib/modes/data360-sql.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-data-explorer/lib/modes/data360-sql.ts)
+<details>
+<summary>Show commands, tools, providers, and hooks</summary>
 
-## Learn more
+- **Extension id:** `sf-data-explorer`
+- **Category:** UI
+- **Maturity:** experimental
+- **Default state:** on
+- **Commands:** `/sf-data-explorer`
+- **LLM tools:** _none_
+- **Providers:** _none_
+- **Events/hooks:** `session_start`, `session_shutdown`
+
+</details>
+
+## For contributors
 
 - [Full extension README](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-data-explorer/README.md)
 - [Source folder](https://github.com/salesforce/sf-pi/tree/main/extensions/sf-data-explorer)
-- [Command reference](../commands.md)
-- [Bundled extension inventory](../extensions.md)
 
 ## Troubleshooting
 

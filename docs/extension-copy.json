@@ -1,0 +1,338 @@
+{
+  "sf-agentscript": {
+    "shortName": "Agent Script",
+    "intentGroup": "Build agents",
+    "promise": "Build, validate, preview, test, and publish Agentforce agents without leaving pi.",
+    "bestFor": "Agentforce agent authoring",
+    "benefits": [
+      "Catch Agent Script errors before you publish.",
+      "Inspect topics, actions, variables, and references quickly.",
+      "Preview and regression-test agent conversations from the same workflow."
+    ],
+    "tryFirst": { "label": "Open the Agent Script panel", "code": "/sf-agentscript" },
+    "useCases": [
+      "Create a new `.agent` bundle from a scaffold.",
+      "Compile and format Agent Script while editing.",
+      "Preview a local agent against a Salesforce org.",
+      "Run repeatable eval specs before activating a new agent version."
+    ],
+    "whatYouGet": [
+      "Compile, create, inspect, mutate, preview, evaluate, publish, and activate tools for agents.",
+      "Local-first checks before server calls where possible.",
+      "Planner traces and compact failure summaries for debugging conversations."
+    ]
+  },
+  "sf-brain": {
+    "shortName": "Brain",
+    "intentGroup": "Work safely",
+    "promise": "Give the agent a compact Salesforce operating guide so it chooses safer APIs and verification loops.",
+    "bestFor": "Salesforce agent guidance",
+    "benefits": [
+      "Keeps Salesforce safety rules available without flooding every prompt.",
+      "Routes agents to the right SF Pi surface when deeper help is needed.",
+      "Encourages retrieve-before-edit and describe-before-query behavior."
+    ],
+    "tryFirst": { "label": "No command needed", "code": "Install SF Pi and start a pi session." },
+    "useCases": [
+      "Help an agent decide between Metadata API, Tooling API, REST, SOQL, or anonymous Apex.",
+      "Keep org-safety conventions present across Salesforce work.",
+      "Point agents to repo-local references without loading everything upfront."
+    ],
+    "whatYouGet": [
+      "A once-per-session Salesforce operator kernel.",
+      "A compact reference map for deeper SF Pi and Salesforce workflows.",
+      "No user-facing command surface because the extension works in the background."
+    ]
+  },
+  "sf-browser": {
+    "shortName": "Browser",
+    "intentGroup": "Work with Salesforce orgs",
+    "promise": "Use Salesforce Setup and Lightning UI as a safe last-mile tool when APIs are not enough.",
+    "bestFor": "Salesforce UI fallback and evidence",
+    "benefits": [
+      "Open authenticated Salesforce pages without exposing login URLs.",
+      "Inspect Lightning and Setup screens with compact, agent-friendly snapshots.",
+      "Capture browser evidence when a UI step needs visual proof."
+    ],
+    "tryFirst": { "label": "Open the browser panel", "code": "/sf-browser" },
+    "useCases": [
+      "Verify a Setup screen after an API or metadata change.",
+      "Navigate Salesforce UI when there is no stable API for the task.",
+      "Click, fill, select, press keys, and wait for Lightning state using browser refs.",
+      "Capture before/after evidence for UI fallback work."
+    ],
+    "whatYouGet": [
+      "Salesforce-aware browser open, snapshot, click, fill, select, press, wait, and evidence tools.",
+      "Curated Setup destinations and deterministic Salesforce path resolution.",
+      "Artifact-first screenshots so the transcript stays readable."
+    ]
+  },
+  "sf-data-explorer": {
+    "shortName": "Data Explorer",
+    "intentGroup": "Work with Salesforce orgs",
+    "promise": "Browse Salesforce and Data 360 data read-only from a keyboard-first pi interface.",
+    "bestFor": "Read-only data exploration",
+    "benefits": [
+      "Explore objects, fields, and query results without writing throwaway scripts.",
+      "Keep exploration read-only by design.",
+      "Switch between SOQL, SOSL, and Data 360 SQL workflows from one UI."
+    ],
+    "tryFirst": { "label": "Open the explorer", "code": "/sf-data-explorer" },
+    "useCases": [
+      "Inspect object fields before writing a query.",
+      "Run small read-only SOQL or SOSL checks.",
+      "Preview query results and export JSON or CSV when useful.",
+      "Explore Data 360 SQL results without asking the LLM to hold large tables."
+    ],
+    "whatYouGet": [
+      "A TUI data explorer with object and field browsing.",
+      "Editable query text, result detail views, and export shortcuts.",
+      "Read-only guardrails for safer exploration."
+    ]
+  },
+  "sf-data360": {
+    "shortName": "Data 360",
+    "intentGroup": "Work with Data Cloud",
+    "promise": "Give agents a safe, compact way to discover and run Data Cloud / Data 360 workflows.",
+    "bestFor": "Data 360 metadata, SQL, and capabilities",
+    "benefits": [
+      "Discover Data 360 capabilities without memorizing REST endpoints.",
+      "Use dry-runs and compact summaries before broad or mutating calls.",
+      "Inspect DMO/DLO metadata without dumping large catalogs into context."
+    ],
+    "tryFirst": { "label": "Open the Data 360 panel", "code": "/sf-data360" },
+    "useCases": [
+      "Probe whether an org has Data 360 surfaces available.",
+      "List or describe DMO and DLO schemas.",
+      "Run Data 360 REST calls through Salesforce CLI auth.",
+      "Use curated capabilities for repeatable Data 360 workflows."
+    ],
+    "whatYouGet": [
+      "Capability search/examples/execute through `d360`.",
+      "Direct REST escape hatch through `d360_api`.",
+      "Compact metadata helpers and readiness probes."
+    ]
+  },
+  "sf-devbar": {
+    "shortName": "DevBar",
+    "intentGroup": "Work with Salesforce orgs",
+    "promise": "Keep model, org, git, context, and extension status visible while you work in pi.",
+    "bestFor": "Session awareness",
+    "benefits": [
+      "See your active Salesforce org without running extra commands.",
+      "Keep model and context status visible at a glance.",
+      "Use quick status commands when something feels off."
+    ],
+    "tryFirst": { "label": "Inspect dev status", "code": "/sf-devbar" },
+    "useCases": [
+      "Confirm which Salesforce org pi is pointed at.",
+      "Check whether SF Pi status surfaces are active.",
+      "Use `/sf-org` before org-aware work."
+    ],
+    "whatYouGet": [
+      "Top and footer status surfaces for pi sessions.",
+      "Project-scoped Salesforce org information.",
+      "Quick commands for org and DevBar status."
+    ]
+  },
+  "sf-feedback": {
+    "shortName": "Feedback",
+    "intentGroup": "Collaborate and improve",
+    "promise": "Report SF Pi issues with useful, sanitized diagnostics instead of starting from a blank bug report.",
+    "bestFor": "GitHub issue feedback",
+    "benefits": [
+      "Collects helpful context without exposing private data by default.",
+      "Keeps users in control before anything is submitted.",
+      "Makes bug reports easier for maintainers to act on."
+    ],
+    "tryFirst": { "label": "Open feedback flow", "code": "/sf-feedback" },
+    "useCases": [
+      "File a bug with environment and extension status context.",
+      "Draft a feature request from inside pi.",
+      "Share reproducible information while keeping sensitive details out."
+    ],
+    "whatYouGet": [
+      "Guided feedback flow.",
+      "Public-safe diagnostic collection.",
+      "Optional GitHub issue creation when configured."
+    ]
+  },
+  "sf-guardrail": {
+    "shortName": "Guardrail",
+    "intentGroup": "Work safely",
+    "promise": "Add Salesforce-aware safety checks around risky files, shell commands, org mutations, and production work.",
+    "bestFor": "Safer Salesforce operations",
+    "benefits": [
+      "Blocks sensitive local file edits that should never happen from an agent.",
+      "Prompts before dangerous shell and production org operations.",
+      "Teaches the agent the active safety categories each session."
+    ],
+    "tryFirst": { "label": "Review guardrail status", "code": "/sf-guardrail" },
+    "useCases": [
+      "Prevent accidental edits to Salesforce CLI state or secret-like files.",
+      "Require confirmation before production deploys or data mutations.",
+      "Audit which guardrails are active in a pi session."
+    ],
+    "whatYouGet": [
+      "File-protection policies.",
+      "Dangerous-command confirmation.",
+      "Production-aware Salesforce operation confirmation."
+    ]
+  },
+  "sf-llm-gateway-internal": {
+    "shortName": "LLM Gateway",
+    "intentGroup": "Personalize pi",
+    "promise": "Connect pi to Salesforce LLM Gateway models when your environment supports that provider.",
+    "bestFor": "Model provider setup",
+    "benefits": [
+      "Discovers available gateway models for pi.",
+      "Shows provider and usage status in SF Pi surfaces.",
+      "Keeps provider setup separate from other bundled extensions."
+    ],
+    "tryFirst": { "label": "Open gateway panel", "code": "/sf-llm-gateway" },
+    "useCases": [
+      "Configure Salesforce LLM Gateway access for pi.",
+      "Inspect available models and provider health.",
+      "Debug model routing or usage status."
+    ],
+    "whatYouGet": [
+      "A pi provider registration for Salesforce LLM Gateway.",
+      "Model discovery and command-panel diagnostics.",
+      "Footer status for model and usage context."
+    ]
+  },
+  "sf-lsp": {
+    "shortName": "LSP",
+    "intentGroup": "Build agents",
+    "promise": "Surface advisory diagnostics for Apex, LWC, and Agent Script files as you edit in pi.",
+    "bestFor": "Code diagnostics",
+    "benefits": [
+      "Get quick feedback after file writes and edits.",
+      "See LSP health without leaving pi.",
+      "Keep diagnostics advisory so they help without blocking every workflow."
+    ],
+    "tryFirst": { "label": "Open LSP status", "code": "/sf-lsp" },
+    "useCases": [
+      "Check Apex, LWC, or Agent Script diagnostics after editing.",
+      "Run a doctor command when language tooling is not responding.",
+      "Track LSP activity in status surfaces."
+    ],
+    "whatYouGet": [
+      "Advisory diagnostics on write/edit.",
+      "Language-server discovery for supported Salesforce file types.",
+      "A status panel for health and activity."
+    ]
+  },
+  "sf-ohana-spinner": {
+    "shortName": "Ohana Spinner",
+    "intentGroup": "Personalize pi",
+    "promise": "Make waiting for agent work feel more polished with Salesforce-themed thinking indicators.",
+    "bestFor": "Session polish",
+    "benefits": [
+      "Adds a friendly visual cue while the agent is working.",
+      "Keeps waiting-state behavior lightweight and configurable.",
+      "Works passively once enabled."
+    ],
+    "tryFirst": { "label": "Manage from SF Pi", "code": "/sf-pi" },
+    "useCases": [
+      "Add a branded working indicator to pi sessions.",
+      "Switch between calm and Ohana-style spinner modes.",
+      "Keep long-running agent turns easier to follow."
+    ],
+    "whatYouGet": [
+      "A Salesforce-themed working indicator.",
+      "Small mode preference surfaced through SF Pi configuration.",
+      "No command required during normal use."
+    ]
+  },
+  "sf-pi-manager": {
+    "shortName": "Manager",
+    "intentGroup": "Personalize pi",
+    "promise": "Use one home base to discover, enable, disable, configure, and diagnose the SF Pi bundle.",
+    "bestFor": "Extension management",
+    "benefits": [
+      "Shows every bundled extension in one place.",
+      "Lets users enable or disable optional surfaces by scope.",
+      "Provides status, recommendations, announcements, and doctor checks."
+    ],
+    "tryFirst": { "label": "Open the SF Pi home base", "code": "/sf-pi" },
+    "useCases": [
+      "See which extensions are enabled.",
+      "Turn optional extensions on or off.",
+      "Install recommended companion extensions.",
+      "Run package-level status and doctor checks."
+    ],
+    "whatYouGet": [
+      "The central SF Pi command panel.",
+      "Enable/disable and status commands.",
+      "Recommended extension and announcement surfaces."
+    ]
+  },
+  "sf-skills": {
+    "shortName": "Skills",
+    "intentGroup": "Personalize pi",
+    "promise": "See and manage Salesforce skills that are active in the LLM context.",
+    "bestFor": "Skill visibility and setup",
+    "benefits": [
+      "Shows which Salesforce skills are active right now.",
+      "Helps install and manage curated Salesforce skill libraries.",
+      "Uses native pi settings instead of shadow state."
+    ],
+    "tryFirst": { "label": "Open skills manager", "code": "/sf-skills" },
+    "useCases": [
+      "Check what Salesforce guidance the agent can currently see.",
+      "Install or prune managed Salesforce skills.",
+      "Inspect skill usage and source scope."
+    ],
+    "whatYouGet": [
+      "A skills manager panel.",
+      "Passive live-context HUD.",
+      "Global/project skill source detection."
+    ]
+  },
+  "sf-slack": {
+    "shortName": "Slack",
+    "intentGroup": "Collaborate and improve",
+    "promise": "Let agents research Slack context safely and send messages only with explicit user confirmation.",
+    "bestFor": "Slack search and collaboration",
+    "benefits": [
+      "Search messages, threads, users, channels, files, and canvases from pi.",
+      "Resolve fuzzy Slack references before searching.",
+      "Keeps sends human-in-the-loop."
+    ],
+    "tryFirst": { "label": "Open Slack setup/status", "code": "/sf-slack" },
+    "useCases": [
+      "Find prior discussions related to a bug or feature.",
+      "Summarize threads without leaving pi.",
+      "Resolve people or channels before posting a drafted message.",
+      "Create or edit canvases when explicitly requested."
+    ],
+    "whatYouGet": [
+      "Slack research, history, thread, channel, user, file, canvas, and send tools.",
+      "Deterministic time-range and entity-resolution helpers.",
+      "Explicit confirmation before any Slack message is posted."
+    ]
+  },
+  "sf-welcome": {
+    "shortName": "Welcome",
+    "intentGroup": "Personalize pi",
+    "promise": "Start each pi session with a friendly SF Pi status summary and useful next steps.",
+    "bestFor": "First-run and session overview",
+    "benefits": [
+      "Shows environment and privacy posture at launch.",
+      "Surfaces recommendations and announcements without forcing a command.",
+      "Makes new SF Pi sessions feel intentional and discoverable."
+    ],
+    "tryFirst": { "label": "Open welcome surface", "code": "/sf-welcome" },
+    "useCases": [
+      "Review setup status at the start of a session.",
+      "Install fonts when glyphs do not render correctly.",
+      "See recommended next steps after installing SF Pi."
+    ],
+    "whatYouGet": [
+      "Startup splash or quiet header behavior.",
+      "Release freshness, environment, privacy, and recommendation rows.",
+      "Font setup helper."
+    ]
+  }
+}

@@ -34,6 +34,7 @@ const README_PATH = path.join(ROOT, "README.md");
 const ARCHITECTURE_PATH = path.join(ROOT, "ARCHITECTURE.md");
 const COMMANDS_DOC_PATH = path.join(DOCS_DIR, "commands.md");
 const EXTENSIONS_DOC_PATH = path.join(DOCS_DIR, "extensions.md");
+const EXTENSION_COPY_PATH = path.join(DOCS_DIR, "extension-copy.json");
 const EXTENSION_DOCS_DIR = path.join(DOCS_DIR, "extensions");
 const EXTENSION_SIDEBAR_PATH = path.join(DOCS_DIR, ".vitepress", "generated-extension-sidebar.ts");
 const AGENT_ORIENTATION_DOC_PATH = path.join(DOCS_DIR, "agent-orientation.md");
@@ -67,6 +68,14 @@ const EXT_FILE_STRUCTURE_END_MARKER = "<!-- GENERATED:file-structure:end -->";
 const README_CATEGORY_ORDER = ["manager", "provider", "agent-tool", "safety", "assistive", "ui"];
 const VALID_CATEGORIES = new Set(README_CATEGORY_ORDER);
 const VALID_MATURITIES = new Set(["stable", "beta", "experimental"]);
+const EXTENSION_INTENT_ORDER = [
+  "Build agents",
+  "Work with Salesforce orgs",
+  "Work with Data Cloud",
+  "Work safely",
+  "Collaborate and improve",
+  "Personalize pi",
+];
 // Extensions whose only doc surface is the manifest description — they have
 // no slash command, no LLM tool, and no provider, so populating docs.* would
 // be busywork. The lint below only requires docs.summary + docs.primaryFiles
@@ -286,6 +295,55 @@ function sortByCategoryThenName(manifests) {
   });
 }
 
+function sortByIntentThenName(manifests, extensionCopy) {
+  return [...manifests].sort((left, right) => {
+    const leftGroup = extensionCopy[left.manifest.id]?.intentGroup ?? "";
+    const rightGroup = extensionCopy[right.manifest.id]?.intentGroup ?? "";
+    const groupDelta =
+      EXTENSION_INTENT_ORDER.indexOf(leftGroup) - EXTENSION_INTENT_ORDER.indexOf(rightGroup);
+    if (groupDelta !== 0) return groupDelta;
+    return left.manifest.name.localeCompare(right.manifest.name);
+  });
+}
+
+function readExtensionCopy(manifests) {
+  const copy = JSON.parse(readFileSync(EXTENSION_COPY_PATH, "utf8"));
+  for (const { manifest } of manifests) {
+    const item = copy[manifest.id];
+    if (!item) {
+      console.error(`❌ docs/extension-copy.json is missing ${manifest.id}.`);
+      process.exit(1);
+    }
+    for (const field of ["shortName", "intentGroup", "promise", "bestFor"]) {
+      if (typeof item[field] !== "string" || item[field].length === 0) {
+        console.error(
+          `❌ docs/extension-copy.json ${manifest.id}.${field} must be a non-empty string.`,
+        );
+        process.exit(1);
+      }
+    }
+    for (const field of ["benefits", "useCases", "whatYouGet"]) {
+      if (!Array.isArray(item[field]) || item[field].length === 0) {
+        console.error(
+          `❌ docs/extension-copy.json ${manifest.id}.${field} must be a non-empty array.`,
+        );
+        process.exit(1);
+      }
+    }
+    if (
+      !item.tryFirst ||
+      typeof item.tryFirst.label !== "string" ||
+      typeof item.tryFirst.code !== "string"
+    ) {
+      console.error(
+        `❌ docs/extension-copy.json ${manifest.id}.tryFirst must include label and code.`,
+      );
+      process.exit(1);
+    }
+  }
+  return copy;
+}
+
 function defaultLabel(manifest) {
   if (manifest.alwaysActive) return "always-on";
   return manifest.defaultEnabled ? "on" : "opt-in";
@@ -307,21 +365,8 @@ function categoryHeading(category) {
     .join(" ");
 }
 
-function runtimeSurfaces(manifest) {
-  const surfaces = [];
-  if (Array.isArray(manifest.commands) && manifest.commands.length > 0) surfaces.push("commands");
-  if (Array.isArray(manifest.tools) && manifest.tools.length > 0) surfaces.push("tools");
-  if (Array.isArray(manifest.providers) && manifest.providers.length > 0) surfaces.push("provider");
-  if (Array.isArray(manifest.events) && manifest.events.length > 0) surfaces.push("events");
-  return surfaces.length > 0 ? surfaces.join(", ") : "none";
-}
-
 function markdownText(value) {
   return String(value).replaceAll("<", "&lt;").replaceAll(">", "&gt;");
-}
-
-function markdownTableText(value) {
-  return markdownText(value).replaceAll("|", "\\|");
 }
 
 function generatedList(items) {
@@ -334,11 +379,7 @@ function sourceFileLink(dir, file) {
 }
 
 function extensionDocLink(dir) {
-  return `./extensions/${dir}.md`;
-}
-
-function commandLine(command) {
-  return `\`${command}\``;
+  return `./extensions/${dir}`;
 }
 
 function generateReadmeBundledExtensions(manifests) {
@@ -453,195 +494,162 @@ function generateCommandsDoc(manifests) {
   return lines.join("\n");
 }
 
-function generateExtensionsDoc(manifests) {
-  const sorted = sortByCategoryThenName(manifests);
+function htmlText(value) {
+  return markdownText(value).replaceAll("&", "&amp;").replaceAll('"', "&quot;");
+}
+
+function renderCodeChip(text) {
+  return `<code class="sfpi-code-chip">${htmlText(text)}</code>`;
+}
+
+function generateExtensionsDoc(manifests, extensionCopy) {
+  const sorted = sortByIntentThenName(manifests, extensionCopy);
   const lines = [
     "---",
-    "title: Bundled Extensions",
-    "description: Generated inventory of SF Pi bundled extensions and their runtime surfaces.",
+    "title: Browse SF Pi Extensions",
+    "description: Pick the SF Pi extension that matches what you want to do next.",
     "---",
     "",
-    "# Bundled Extensions",
+    "# Browse SF Pi extensions",
     "",
-    "> **Auto-generated from `extensions/*/manifest.json`.**",
-    "> Edit the manifests and run `npm run generate-catalog` — do not edit this file by hand.",
+    "SF Pi is useful because it is a bundle: each extension adds a focused Salesforce workflow to pi. Pick the outcome you want, then open the extension page for the first command and common use cases.",
     "",
-    "This page lists the extensions shipped with SF Pi. For the canonical machine-readable inventory, see",
-    `[\`catalog/index.json\`](${sourceLink("catalog/index.json")}).`,
-    "",
-    "**Default** values: `on` means enabled on install, `opt-in` means disabled until enabled, and `always-on` means managed by SF Pi itself.",
+    `<div class="sfpi-callout"><strong>New here?</strong> Start with <a href="./quickstart.html">Quickstart</a>, then come back and choose the extension that matches your first task.</div>`,
     "",
   ];
 
-  for (const category of README_CATEGORY_ORDER) {
-    const inCategory = sorted.filter(({ manifest }) => manifest.category === category);
-    if (inCategory.length === 0) continue;
+  for (const group of EXTENSION_INTENT_ORDER) {
+    const inGroup = sorted.filter(
+      ({ manifest }) => extensionCopy[manifest.id]?.intentGroup === group,
+    );
+    if (inGroup.length === 0) continue;
 
-    const heading = categoryHeading(category);
-    lines.push(`## ${heading}`);
-    lines.push("");
-    lines.push("| Extension | Maturity | Default | Runtime surfaces | Summary |");
-    lines.push("| --- | --- | --- | --- | --- |");
-
-    for (const { dir, manifest } of inCategory) {
-      const maturity = manifest.maturity ?? "stable";
-      const summary = markdownTableText(manifest.docs?.summary ?? manifest.description);
+    lines.push(`## ${group}`, "", '<div class="sfpi-card-grid">');
+    for (const { dir, manifest } of inGroup) {
+      const copy = extensionCopy[manifest.id];
+      const command =
+        Array.isArray(manifest.commands) && manifest.commands.length > 0
+          ? manifest.commands[0]
+          : null;
       lines.push(
-        `| [${manifest.name}](${extensionDocLink(dir)}) | ${maturity} | ${defaultLabel(manifest)} | ${markdownTableText(runtimeSurfaces(manifest))} | ${summary} |`,
+        `<a class="sfpi-extension-card" href="${extensionDocLink(dir)}">`,
+        `  <span class="sfpi-card-kicker">${htmlText(copy.bestFor)}</span>`,
+        `  <strong>${htmlText(copy.shortName)}</strong>`,
+        `  <span>${htmlText(copy.promise)}</span>`,
+        `  <span class="sfpi-card-meta">${command ? renderCodeChip(command) : "Works in the background"}</span>`,
+        `</a>`,
       );
     }
-
-    lines.push("");
+    lines.push("</div>", "");
   }
 
   lines.push(
-    "## Source of truth",
+    "## Full reference",
     "",
-    "Extension facts come from each `extensions/<id>/manifest.json` file. The generated catalog, command reference, root README tables, and this page are refreshed together by `npm run generate-catalog`.",
+    "Need the generated manifest facts? The canonical machine-readable inventory is",
+    `[\`catalog/index.json\`](${sourceLink("catalog/index.json")}).`,
   );
 
   return lines.join("\n");
 }
 
-function generateExtensionDetailDoc(dir, manifest) {
-  const docs = manifest.docs && typeof manifest.docs === "object" ? manifest.docs : {};
+function generateExtensionDetailDoc(dir, manifest, copy) {
   const commands = Array.isArray(manifest.commands) ? manifest.commands : [];
   const tools = Array.isArray(manifest.tools) ? manifest.tools : [];
   const providers = Array.isArray(manifest.providers) ? manifest.providers : [];
   const events = Array.isArray(manifest.events) ? manifest.events : [];
-  const primaryFiles = Array.isArray(docs.primaryFiles) ? docs.primaryFiles : [];
-  const stateFiles = Array.isArray(docs.stateFiles) ? docs.stateFiles : [];
-  const env = Array.isArray(docs.env) ? docs.env : [];
-  const safety = Array.isArray(docs.safety) ? docs.safety : [];
+  const safety = Array.isArray(manifest.docs?.safety) ? manifest.docs.safety : [];
 
   const lines = [
     "---",
     `title: ${JSON.stringify(manifest.name)}`,
-    `description: ${JSON.stringify(docs.summary ?? manifest.description)}`,
+    `description: ${JSON.stringify(copy.promise)}`,
     "---",
     "",
     `# ${manifest.name}`,
     "",
-    markdownText(docs.summary ?? manifest.description),
+    `<p class="sfpi-page-lead">${htmlText(copy.promise)}</p>`,
     "",
-    "## What it is",
+    `<div class="sfpi-action-card"><span>Best for</span><strong>${htmlText(copy.bestFor)}</strong><p>${htmlText(copy.promise)}</p></div>`,
     "",
-    markdownText(manifest.description),
+    "## Why you'll use it",
     "",
-    "## At a glance",
-    "",
-    "| Property | Value |",
-    "| --- | --- |",
-    `| Extension id | \`${manifest.id}\` |`,
-    `| Category | ${categoryHeading(manifest.category)} |`,
-    `| Maturity | ${manifest.maturity ?? "stable"} |`,
-    `| Default state | ${defaultLabel(manifest)} |`,
-    `| Runtime surfaces | ${markdownTableText(runtimeSurfaces(manifest))} |`,
-    `| Source | [\`extensions/${dir}/\`](${sourceTreeLink(`extensions/${dir}`)}) |`,
-    `| Full README | [\`extensions/${dir}/README.md\`](${sourceFileLink(dir, "README.md")}) |`,
-    "",
-    "## How to use it",
-    "",
+    '<div class="sfpi-benefit-grid">',
   ];
 
-  if (commands.length > 0) {
-    lines.push("Open the command surface from pi:", "");
-    for (const command of commands) lines.push(`- ${commandLine(command)}`);
-    lines.push("");
-  } else if (manifest.alwaysActive || events.length > 0) {
-    lines.push(
-      "This extension works through session hooks rather than a direct slash command. Install SF Pi and keep the extension enabled to use it.",
-      "",
-    );
-  } else {
-    lines.push("This extension has no direct command surface. Manage it through `/sf-pi`.", "");
+  for (const benefit of copy.benefits) {
+    lines.push(`<div class="sfpi-benefit-card">${htmlText(benefit)}</div>`);
   }
+  lines.push("</div>", "");
 
-  if (!manifest.alwaysActive) {
+  lines.push(
+    "## Try it first",
+    "",
+    markdownText(copy.tryFirst.label),
+    "",
+    "```text",
+    copy.tryFirst.code,
+    "```",
+    "",
+  );
+
+  if (!manifest.alwaysActive && commands.length > 0) {
     lines.push(
-      "Manage the extension with SF Pi Manager:",
+      "You can also manage this extension from the SF Pi home base:",
       "",
       "```text",
+      `/sf-pi status ${manifest.id}`,
       `/sf-pi enable ${manifest.id}`,
       `/sf-pi disable ${manifest.id}`,
-      `/sf-pi status ${manifest.id}`,
       "```",
       "",
     );
-  } else {
+  } else if (!manifest.alwaysActive) {
     lines.push(
-      "This extension is always active because it owns package-level management behavior.",
+      "You can manage this extension from the SF Pi home base:",
+      "",
+      "```text",
+      `/sf-pi status ${manifest.id}`,
+      `/sf-pi enable ${manifest.id}`,
+      `/sf-pi disable ${manifest.id}`,
+      "```",
       "",
     );
   }
 
-  lines.push("## Runtime surfaces", "");
-  if (commands.length > 0) lines.push(`- **Commands:** ${generatedList(commands)}`);
-  if (tools.length > 0) lines.push(`- **LLM tools:** ${generatedList(tools)}`);
-  if (providers.length > 0) lines.push(`- **Providers:** ${generatedList(providers)}`);
-  if (events.length > 0) lines.push(`- **Events/hooks:** ${generatedList(events)}`);
-  if (!commands.length && !tools.length && !providers.length && !events.length) {
-    lines.push("- _No direct runtime surfaces declared in the manifest._");
-  }
+  lines.push("## Common use cases", "");
+  for (const useCase of copy.useCases) lines.push(`- ${markdownText(useCase)}`);
+  lines.push("", "## What you get", "");
+  for (const item of copy.whatYouGet) lines.push(`- ${markdownText(item)}`);
   lines.push("");
 
-  if (tools.length > 0) {
-    lines.push(
-      "## Agent tools",
-      "",
-      "Agents can call these tools when the extension is enabled and configured:",
-      "",
-    );
-    for (const tool of tools) lines.push(`- \`${markdownText(tool)}\``);
-    lines.push("");
-  }
-
-  if (providers.length > 0) {
-    lines.push(
-      "## Provider surface",
-      "",
-      "This extension registers provider functionality with pi:",
-      "",
-    );
-    for (const provider of providers) lines.push(`- \`${markdownText(provider)}\``);
-    lines.push("");
-  }
-
   if (safety.length > 0) {
-    lines.push("## Safety and privacy", "");
+    lines.push("## Safety notes", "");
     for (const item of safety) lines.push(`- ${markdownText(item)}`);
     lines.push("");
   }
 
-  if (env.length > 0 || stateFiles.length > 0) {
-    lines.push("## Configuration and state", "");
-    if (env.length > 0) {
-      lines.push("Environment inputs:", "");
-      for (const item of env) lines.push(`- \`${markdownText(item)}\``);
-      lines.push("");
-    }
-    if (stateFiles.length > 0) {
-      lines.push("State files:", "");
-      for (const item of stateFiles) lines.push(`- \`${markdownText(item)}\``);
-      lines.push("");
-    }
-  }
-
-  if (primaryFiles.length > 0) {
-    lines.push("## Important files", "");
-    for (const file of primaryFiles) {
-      lines.push(`- [\`${file}\`](${sourceFileLink(dir, file)})`);
-    }
-    lines.push("");
-  }
-
   lines.push(
-    "## Learn more",
+    "## Exact reference",
+    "",
+    "<details>",
+    "<summary>Show commands, tools, providers, and hooks</summary>",
+    "",
+    `- **Extension id:** \`${manifest.id}\``,
+    `- **Category:** ${categoryHeading(manifest.category)}`,
+    `- **Maturity:** ${manifest.maturity ?? "stable"}`,
+    `- **Default state:** ${defaultLabel(manifest)}`,
+    `- **Commands:** ${generatedList(commands)}`,
+    `- **LLM tools:** ${generatedList(tools)}`,
+    `- **Providers:** ${generatedList(providers)}`,
+    `- **Events/hooks:** ${generatedList(events)}`,
+    "",
+    "</details>",
+    "",
+    "## For contributors",
     "",
     `- [Full extension README](${sourceFileLink(dir, "README.md")})`,
     `- [Source folder](${sourceTreeLink(`extensions/${dir}`)})`,
-    "- [Command reference](../commands.md)",
-    "- [Bundled extension inventory](../extensions.md)",
     "",
     "## Troubleshooting",
     "",
@@ -651,8 +659,8 @@ function generateExtensionDetailDoc(dir, manifest) {
   return lines.join("\n");
 }
 
-function generateExtensionSidebar(manifests) {
-  const sorted = sortByCategoryThenName(manifests);
+function generateExtensionSidebar(manifests, extensionCopy) {
+  const sorted = sortByIntentThenName(manifests, extensionCopy);
   const lines = [
     "// AUTO-GENERATED — do not edit manually.",
     "// Source of truth: extensions/<id>/manifest.json",
@@ -662,7 +670,7 @@ function generateExtensionSidebar(manifests) {
   ];
   for (const { dir, manifest } of sorted) {
     lines.push(
-      `  { text: ${JSON.stringify(manifest.name)}, link: ${JSON.stringify(`/extensions/${dir}`)} },`,
+      `  { text: ${JSON.stringify(extensionCopy[manifest.id].shortName)}, link: ${JSON.stringify(`/extensions/${dir}`)} },`,
     );
   }
   lines.push("];", "");
@@ -783,6 +791,7 @@ function generateFolderLayout(manifests) {
     "\u2502   \u2514\u2500\u2500 index.json              \u2190 GENERATED machine-readable index",
     "\u251c\u2500\u2500 docs/",
     "\u2502   \u251c\u2500\u2500 .vitepress/             \u2190 VitePress config/theme + generated sidebar for GitHub Pages docs",
+    "\u2502   \u251c\u2500\u2500 extension-copy.json     \u2190 Hand-authored public-safe copy for extension docs",
     "\u2502   \u251c\u2500\u2500 extensions.md           \u2190 GENERATED bundled-extension site inventory",
     "\u2502   \u251c\u2500\u2500 extensions/              \u2190 GENERATED one page per bundled extension",
     "\u2502   \u251c\u2500\u2500 commands.md             \u2190 GENERATED per-extension command reference",
@@ -1131,13 +1140,13 @@ async function writeOrCheckCommandsDoc(manifests) {
   writeOrCheck(COMMANDS_DOC_PATH, formatted, "docs/commands.md");
 }
 
-async function writeOrCheckExtensionsDoc(manifests) {
-  const raw = generateExtensionsDoc(manifests);
+async function writeOrCheckExtensionsDoc(manifests, extensionCopy) {
+  const raw = generateExtensionsDoc(manifests, extensionCopy);
   const formatted = await prettier.format(raw, { parser: "markdown" });
   writeOrCheck(EXTENSIONS_DOC_PATH, formatted, "docs/extensions.md");
 }
 
-async function writeOrCheckExtensionDetailDocs(manifests) {
+async function writeOrCheckExtensionDetailDocs(manifests, extensionCopy) {
   mkdirSync(EXTENSION_DOCS_DIR, { recursive: true });
   const expectedFiles = new Set(manifests.map(({ dir }) => `${dir}.md`));
 
@@ -1155,7 +1164,7 @@ async function writeOrCheckExtensionDetailDocs(manifests) {
   }
 
   for (const { dir, manifest } of manifests) {
-    const raw = generateExtensionDetailDoc(dir, manifest);
+    const raw = generateExtensionDetailDoc(dir, manifest, extensionCopy[manifest.id]);
     const formatted = await prettier.format(raw, { parser: "markdown" });
     writeOrCheck(
       path.join(EXTENSION_DOCS_DIR, `${dir}.md`),
@@ -1165,8 +1174,8 @@ async function writeOrCheckExtensionDetailDocs(manifests) {
   }
 }
 
-async function writeOrCheckExtensionSidebar(manifests) {
-  const raw = generateExtensionSidebar(manifests);
+async function writeOrCheckExtensionSidebar(manifests, extensionCopy) {
+  const raw = generateExtensionSidebar(manifests, extensionCopy);
   const formatted = await prettier.format(raw, { parser: "typescript" });
   writeOrCheck(EXTENSION_SIDEBAR_PATH, formatted, "docs/.vitepress/generated-extension-sidebar.ts");
 }
@@ -1176,6 +1185,7 @@ async function writeOrCheckExtensionSidebar(manifests) {
 // -------------------------------------------------------------------------------------------------
 
 const manifests = discoverManifests();
+const extensionCopy = readExtensionCopy(manifests);
 
 if (manifests.length === 0) {
   console.error("❌ No valid manifests found in extensions/*/manifest.json");
@@ -1200,11 +1210,11 @@ await writeOrCheckArchitecture(manifests);
 
 await writeOrCheckCommandsDoc(manifests);
 
-await writeOrCheckExtensionsDoc(manifests);
+await writeOrCheckExtensionsDoc(manifests, extensionCopy);
 
-await writeOrCheckExtensionDetailDocs(manifests);
+await writeOrCheckExtensionDetailDocs(manifests, extensionCopy);
 
-await writeOrCheckExtensionSidebar(manifests);
+await writeOrCheckExtensionSidebar(manifests, extensionCopy);
 
 await writeOrCheckAgentOrientationDoc(manifests);
 

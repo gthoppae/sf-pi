@@ -3,68 +3,77 @@ layout: home
 title: SF Pi documentation
 hero:
   name: SF Pi
-  text: Salesforce-focused extensions for pi
-  tagline: Safer Salesforce development, richer agent tooling, and discoverable runtime surfaces inside the pi coding agent.
+  text: Salesforce extensions for pi, ready when you are
+  tagline: Install one bundle and get safer Salesforce workflows, helpful agent tools, and friendly setup surfaces inside the pi coding agent.
   actions:
     - theme: brand
-      text: Install SF Pi
-      link: /install
-    - theme: alt
-      text: Quickstart
+      text: Start in 5 minutes
       link: /quickstart
     - theme: alt
-      text: View on GitHub
-      link: https://github.com/salesforce/sf-pi
+      text: Browse extensions
+      link: /extensions
+    - theme: alt
+      text: Install
+      link: /install
 features:
-  - title: Agent-ready Salesforce tools
-    details: Agent Script, Data 360, Salesforce Browser, and Slack tools are exposed as typed pi runtime surfaces.
-  - title: Safety first
-    details: Salesforce-aware guardrails, generated docs, and public-safe checks keep day-to-day work reviewable.
-  - title: Built from the repo
-    details: Documentation, extension metadata, generated inventories, and source live together in one GitHub repository.
+  - title: One bundle, many focused tools
+    details: Pick the extension that matches your task — Agent Script, Browser, Data 360, Slack, Guardrail, and more.
+  - title: Built for Salesforce work
+    details: Org context, production-aware guardrails, Data 360 helpers, Agentforce authoring, and Salesforce UI fallback paths.
+  - title: Friendly by default
+    details: Start with slash commands and guided panels; exact tool and source references stay available when you need them.
 ---
 
-# SF Pi documentation
+# Welcome to SF Pi
 
-SF Pi is a bundle of opinionated Salesforce extensions for the
-[pi coding agent](https://pi.dev). It helps developers and agents work with
-Salesforce projects through slash commands, LLM tools, status surfaces,
-provider wiring, skills, and safety guidance.
+SF Pi is a bundle of Salesforce-focused extensions for the
+[pi coding agent](https://pi.dev). It gives developers and agents a safer,
+more discoverable way to work with Salesforce projects from one terminal UI.
 
-> **TL;DR** — install pi, run `pi install git:github.com/salesforce/sf-pi`,
-> restart pi or run `/reload`, then open `/sf-pi` to inspect the bundled
-> extensions.
+<div class="sfpi-callout"><strong>TL;DR</strong> Install pi, run <code>pi install git:github.com/salesforce/sf-pi</code>, reload pi, then open <code>/sf-pi</code>.</div>
 
-## Where to start
+## Your first five minutes
 
-- **[Install](./install.md)** — Node.js, pi, sf-pi, fonts, and recommended extensions.
-- **[Quickstart](./quickstart.md)** — first commands to verify the package is alive.
-- **[Bundled Extensions](./extensions.md)** — what ships in the package and which surfaces each extension exposes.
-- **[Command Reference](./commands.md)** — every slash command generated from extension manifests.
-- **[Privacy & telemetry](./privacy.md)** — what sf-pi does and does not collect.
-- **[Troubleshooting](./troubleshooting.md)** — common install, runtime, and extension issues.
+<div class="sfpi-card-grid">
+<a class="sfpi-extension-card" href="./install.html">
+  <span class="sfpi-card-kicker">Step 1</span>
+  <strong>Install the bundle</strong>
+  <span>Add SF Pi as a pi package and reload your session.</span>
+  <span class="sfpi-card-meta"><code class="sfpi-code-chip">pi install git:github.com/salesforce/sf-pi</code></span>
+</a>
+<a class="sfpi-extension-card" href="./quickstart.html">
+  <span class="sfpi-card-kicker">Step 2</span>
+  <strong>Open the home base</strong>
+  <span>Use the manager to see what is enabled and where to go next.</span>
+  <span class="sfpi-card-meta"><code class="sfpi-code-chip">/sf-pi</code></span>
+</a>
+<a class="sfpi-extension-card" href="./extensions.html">
+  <span class="sfpi-card-kicker">Step 3</span>
+  <strong>Pick your first extension</strong>
+  <span>Browse by what you want to do: build agents, work with orgs, use Data 360, research Slack, or personalize pi.</span>
+  <span class="sfpi-card-meta">Open catalog →</span>
+</a>
+</div>
 
-## What SF Pi does
+## Popular starting points
 
-- **Agent Script lifecycle** — compile, inspect, mutate, preview, evaluate, publish, and activate `.agent` files.
-- **Data 360 workflows** — discover Data Cloud/Data 360 capabilities, call REST endpoints safely, inspect metadata, and run readiness probes.
-- **Salesforce Browser automation** — open Salesforce orgs, inspect Lightning/Setup UI, interact with refs, wait for Lightning state, and capture browser evidence.
-- **Slack research** — search, summarize, resolve Slack entities, read files/canvases, and send only with explicit human confirmation.
-- **Guardrails and operator guidance** — enforce file safety, production-aware confirmations, and Salesforce API selection rules.
-- **Developer UI** — status bars, welcome splash, skills HUD, LSP diagnostics, data explorer, and a central extension manager.
+- **Building Agentforce agents?** Start with [Agent Script](./extensions/sf-agentscript.md).
+- **Need Salesforce UI fallback or screenshots?** Start with [Browser](./extensions/sf-browser.md).
+- **Working with Data Cloud / Data 360?** Start with [Data 360](./extensions/sf-data360.md).
+- **Want safer org operations?** Start with [Guardrail](./extensions/sf-guardrail.md) and [`/sf-org`](./commands.md#ui).
+- **Need to research team context?** Start with [Slack](./extensions/sf-slack.md).
 
-## Runtime surfaces
+## What SF Pi adds to pi
 
-| Surface            | Use it for                                                                       | Start here                                  |
-| ------------------ | -------------------------------------------------------------------------------- | ------------------------------------------- |
-| **Slash commands** | Human-facing controls and panels in pi                                           | [`/sf-pi`](./commands.md#manager)           |
-| **LLM tools**      | Agent-callable Salesforce, Data 360, Agent Script, browser, and Slack operations | [Bundled Extensions](./extensions.md)       |
-| **Provider**       | Salesforce LLM Gateway model routing when configured                             | [`/sf-llm-gateway`](./commands.md#provider) |
-| **Status/UI**      | Welcome, status bars, skills HUD, LSP activity, and data exploration             | [Bundled Extensions](./extensions.md#ui)    |
-| **Safety hooks**   | File, shell, org, and production-aware guardrails                                | [`SF Guardrail`](./extensions.md#safety)    |
+<div class="sfpi-benefit-grid">
+<div class="sfpi-benefit-card"><strong>Slash commands</strong><br />Human-friendly panels like <code>/sf-pi</code>, <code>/sf-data360</code>, <code>/sf-browser</code>, and <code>/sf-agentscript</code>.</div>
+<div class="sfpi-benefit-card"><strong>Agent tools</strong><br />Typed tools for Agent Script, Salesforce Browser, Data 360, and Slack workflows.</div>
+<div class="sfpi-benefit-card"><strong>Safety guidance</strong><br />Guardrails for risky files, dangerous shell commands, and production Salesforce operations.</div>
+<div class="sfpi-benefit-card"><strong>Status surfaces</strong><br />Welcome splash, DevBar, LSP status, Skills HUD, and Salesforce org awareness.</div>
+</div>
 
-## Get help
+## Keep going
 
-- File issues: [github.com/salesforce/sf-pi/issues](https://github.com/salesforce/sf-pi/issues)
-- Source: [github.com/salesforce/sf-pi](https://github.com/salesforce/sf-pi)
-- Contributor guide: [Contributing](./contributing.md)
+- [Quickstart](./quickstart.md) — verify SF Pi and try your first commands.
+- [Browse extensions](./extensions.md) — choose a workflow by intent.
+- [Troubleshooting](./troubleshooting.md) — recover from install, org, font, or auth issues.

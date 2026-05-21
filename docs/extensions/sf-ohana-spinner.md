@@ -1,64 +1,70 @@
 ---
 title: "SF Ohana Spinner"
-description: "Pi setWorkingIndicator-driven spinner with Ohana and Calm modes. Pi manages start/stop based on streaming activity; this extension owns frame generation and a small mode preference."
+description: "Make waiting for agent work feel more polished with Salesforce-themed thinking indicators."
 ---
 
 # SF Ohana Spinner
 
-Pi setWorkingIndicator-driven spinner with Ohana and Calm modes. Pi manages start/stop based on streaming activity; this extension owns frame generation and a small mode preference.
+<p class="sfpi-page-lead">Make waiting for agent work feel more polished with Salesforce-themed thinking indicators.</p>
 
-## What it is
+<div class="sfpi-action-card"><span>Best for</span><strong>Session polish</strong><p>Make waiting for agent work feel more polished with Salesforce-themed thinking indicators.</p></div>
 
-Salesforce-themed rainbow spinner during LLM thinking
+## Why you'll use it
 
-## At a glance
+<div class="sfpi-benefit-grid">
+<div class="sfpi-benefit-card">Adds a friendly visual cue while the agent is working.</div>
+<div class="sfpi-benefit-card">Keeps waiting-state behavior lightweight and configurable.</div>
+<div class="sfpi-benefit-card">Works passively once enabled.</div>
+</div>
 
-| Property         | Value                                                                                                                          |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------------ |
-| Extension id     | `sf-ohana-spinner`                                                                                                             |
-| Category         | UI                                                                                                                             |
-| Maturity         | stable                                                                                                                         |
-| Default state    | on                                                                                                                             |
-| Runtime surfaces | events                                                                                                                         |
-| Source           | [`extensions/sf-ohana-spinner/`](https://github.com/salesforce/sf-pi/tree/main/extensions/sf-ohana-spinner)                    |
-| Full README      | [`extensions/sf-ohana-spinner/README.md`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-ohana-spinner/README.md) |
+## Try it first
 
-## How to use it
-
-This extension works through session hooks rather than a direct slash command. Install SF Pi and keep the extension enabled to use it.
-
-Manage the extension with SF Pi Manager:
+Manage from SF Pi
 
 ```text
-/sf-pi enable sf-ohana-spinner
-/sf-pi disable sf-ohana-spinner
-/sf-pi status sf-ohana-spinner
+/sf-pi
 ```
 
-## Runtime surfaces
+You can manage this extension from the SF Pi home base:
 
+```text
+/sf-pi status sf-ohana-spinner
+/sf-pi enable sf-ohana-spinner
+/sf-pi disable sf-ohana-spinner
+```
+
+## Common use cases
+
+- Add a branded working indicator to pi sessions.
+- Switch between calm and Ohana-style spinner modes.
+- Keep long-running agent turns easier to follow.
+
+## What you get
+
+- A Salesforce-themed working indicator.
+- Small mode preference surfaced through SF Pi configuration.
+- No command required during normal use.
+
+## Exact reference
+
+<details>
+<summary>Show commands, tools, providers, and hooks</summary>
+
+- **Extension id:** `sf-ohana-spinner`
+- **Category:** UI
+- **Maturity:** stable
+- **Default state:** on
+- **Commands:** _none_
+- **LLM tools:** _none_
+- **Providers:** _none_
 - **Events/hooks:** `session_start`, `session_shutdown`
 
-## Configuration and state
+</details>
 
-State files:
-
-- `settings.json → sfPi.ohanaSpinner.mode`
-
-## Important files
-
-- [`index.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-ohana-spinner/index.ts)
-- [`lib/config-panel.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-ohana-spinner/lib/config-panel.ts)
-- [`lib/settings.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-ohana-spinner/lib/settings.ts)
-- [`lib/messages.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-ohana-spinner/lib/messages.ts)
-- [`lib/rainbow.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-ohana-spinner/lib/rainbow.ts)
-
-## Learn more
+## For contributors
 
 - [Full extension README](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-ohana-spinner/README.md)
 - [Source folder](https://github.com/salesforce/sf-pi/tree/main/extensions/sf-ohana-spinner)
-- [Command reference](../commands.md)
-- [Bundled extension inventory](../extensions.md)
 
 ## Troubleshooting
 

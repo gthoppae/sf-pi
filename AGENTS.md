@@ -39,6 +39,7 @@ For shared code (used by multiple extensions), start at
 - `CONTRIBUTING.md` — contributor workflow and commands
 - `README.md` — user-facing install and usage guide
 - `ROADMAP.md` — shipped / in-flight / non-goals
+- `docs/extension-copy.json` — hand-authored public-safe extension positioning copy for generated docs
 - `docs/extensions.md` — GENERATED bundled-extension site inventory
 - `docs/extensions/*.md` — GENERATED per-extension documentation pages
 - `docs/commands.md` — GENERATED per-extension command reference

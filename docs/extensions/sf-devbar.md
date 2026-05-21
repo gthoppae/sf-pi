@@ -1,62 +1,70 @@
 ---
 title: "SF DevBar"
-description: "Two non-blocking status bars: a top widget with model/thinking/git/context, and a custom footer with project-scoped org info, monthly LLM-gateway budget, and active extension counts."
+description: "Keep model, org, git, context, and extension status visible while you work in pi."
 ---
 
 # SF DevBar
 
-Two non-blocking status bars: a top widget with model/thinking/git/context, and a custom footer with project-scoped org info, monthly LLM-gateway budget, and active extension counts.
+<p class="sfpi-page-lead">Keep model, org, git, context, and extension status visible while you work in pi.</p>
 
-## What it is
+<div class="sfpi-action-card"><span>Best for</span><strong>Session awareness</strong><p>Keep model, org, git, context, and extension status visible while you work in pi.</p></div>
 
-Bespoke Salesforce developer status bar with org context, model info, git, and context window progress
+## Why you'll use it
 
-## At a glance
+<div class="sfpi-benefit-grid">
+<div class="sfpi-benefit-card">See your active Salesforce org without running extra commands.</div>
+<div class="sfpi-benefit-card">Keep model and context status visible at a glance.</div>
+<div class="sfpi-benefit-card">Use quick status commands when something feels off.</div>
+</div>
 
-| Property         | Value                                                                                                            |
-| ---------------- | ---------------------------------------------------------------------------------------------------------------- |
-| Extension id     | `sf-devbar`                                                                                                      |
-| Category         | UI                                                                                                               |
-| Maturity         | stable                                                                                                           |
-| Default state    | on                                                                                                               |
-| Runtime surfaces | commands, events                                                                                                 |
-| Source           | [`extensions/sf-devbar/`](https://github.com/salesforce/sf-pi/tree/main/extensions/sf-devbar)                    |
-| Full README      | [`extensions/sf-devbar/README.md`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-devbar/README.md) |
+## Try it first
 
-## How to use it
-
-Open the command surface from pi:
-
-- `/sf-devbar`
-- `/sf-org`
-
-Manage the extension with SF Pi Manager:
+Inspect dev status
 
 ```text
-/sf-pi enable sf-devbar
-/sf-pi disable sf-devbar
-/sf-pi status sf-devbar
+/sf-devbar
 ```
 
-## Runtime surfaces
+You can also manage this extension from the SF Pi home base:
 
+```text
+/sf-pi status sf-devbar
+/sf-pi enable sf-devbar
+/sf-pi disable sf-devbar
+```
+
+## Common use cases
+
+- Confirm which Salesforce org pi is pointed at.
+- Check whether SF Pi status surfaces are active.
+- Use `/sf-org` before org-aware work.
+
+## What you get
+
+- Top and footer status surfaces for pi sessions.
+- Project-scoped Salesforce org information.
+- Quick commands for org and DevBar status.
+
+## Exact reference
+
+<details>
+<summary>Show commands, tools, providers, and hooks</summary>
+
+- **Extension id:** `sf-devbar`
+- **Category:** UI
+- **Maturity:** stable
+- **Default state:** on
 - **Commands:** `/sf-devbar`, `/sf-org`
+- **LLM tools:** _none_
+- **Providers:** _none_
 - **Events/hooks:** `session_start`, `session_shutdown`, `model_select`, `thinking_level_select`, `turn_start`, `turn_end`, `agent_end`, `before_agent_start`
 
-## Important files
+</details>
 
-- [`index.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-devbar/index.ts)
-- [`lib/top-bar.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-devbar/lib/top-bar.ts)
-- [`lib/bottom-bar.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-devbar/lib/bottom-bar.ts)
-- [`lib/git-changes.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-devbar/lib/git-changes.ts)
-- [`lib/settings-reader.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-devbar/lib/settings-reader.ts)
-
-## Learn more
+## For contributors
 
 - [Full extension README](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-devbar/README.md)
 - [Source folder](https://github.com/salesforce/sf-pi/tree/main/extensions/sf-devbar)
-- [Command reference](../commands.md)
-- [Bundled extension inventory](../extensions.md)
 
 ## Troubleshooting
 

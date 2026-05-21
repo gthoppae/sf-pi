@@ -1,72 +1,68 @@
 ---
 title: "SF Pi Manager"
-description: "Core manager for the sf-pi package. Provides /sf-pi list/enable/disable/status/display/recommended/announcements/skills/doctor commands plus the interactive TUI overlay. alwaysActive: enable/disable is mediated through this extension only."
+description: "Use one home base to discover, enable, disable, configure, and diagnose the SF Pi bundle."
 ---
 
 # SF Pi Manager
 
-Core manager for the sf-pi package. Provides /sf-pi list/enable/disable/status/display/recommended/announcements/skills/doctor commands plus the interactive TUI overlay. alwaysActive: enable/disable is mediated through this extension only.
+<p class="sfpi-page-lead">Use one home base to discover, enable, disable, configure, and diagnose the SF Pi bundle.</p>
 
-## What it is
+<div class="sfpi-action-card"><span>Best for</span><strong>Extension management</strong><p>Use one home base to discover, enable, disable, configure, and diagnose the SF Pi bundle.</p></div>
 
-Core manager — provides /sf-pi commands
+## Why you'll use it
 
-## At a glance
+<div class="sfpi-benefit-grid">
+<div class="sfpi-benefit-card">Shows every bundled extension in one place.</div>
+<div class="sfpi-benefit-card">Lets users enable or disable optional surfaces by scope.</div>
+<div class="sfpi-benefit-card">Provides status, recommendations, announcements, and doctor checks.</div>
+</div>
 
-| Property         | Value                                                                                                                    |
-| ---------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| Extension id     | `sf-pi-manager`                                                                                                          |
-| Category         | Manager                                                                                                                  |
-| Maturity         | stable                                                                                                                   |
-| Default state    | always-on                                                                                                                |
-| Runtime surfaces | commands, events                                                                                                         |
-| Source           | [`extensions/sf-pi-manager/`](https://github.com/salesforce/sf-pi/tree/main/extensions/sf-pi-manager)                    |
-| Full README      | [`extensions/sf-pi-manager/README.md`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-pi-manager/README.md) |
+## Try it first
 
-## How to use it
+Open the SF Pi home base
 
-Open the command surface from pi:
+```text
+/sf-pi
+```
 
-- `/sf-pi`
+## Common use cases
 
-This extension is always active because it owns package-level management behavior.
+- See which extensions are enabled.
+- Turn optional extensions on or off.
+- Install recommended companion extensions.
+- Run package-level status and doctor checks.
 
-## Runtime surfaces
+## What you get
 
-- **Commands:** `/sf-pi`
-- **Events/hooks:** `session_start`, `session_shutdown`
+- The central SF Pi command panel.
+- Enable/disable and status commands.
+- Recommended extension and announcement surfaces.
 
-## Safety and privacy
+## Safety notes
 
 - Owns the WRITE side of pi's package filter list via lib/common/sf-pi-package-state.ts.
 - alwaysActive cannot be disabled through the standard toggle action.
 
-## Configuration and state
+## Exact reference
 
-State files:
+<details>
+<summary>Show commands, tools, providers, and hooks</summary>
 
-- `~/.pi/agent/settings.json (sf-pi package filter list)`
-- `&lt;globalAgentDir&gt;/state/sf-pi/recommendations.json`
-- `&lt;globalAgentDir&gt;/state/sf-pi/announcements.json`
+- **Extension id:** `sf-pi-manager`
+- **Category:** Manager
+- **Maturity:** stable
+- **Default state:** always-on
+- **Commands:** `/sf-pi`
+- **LLM tools:** _none_
+- **Providers:** _none_
+- **Events/hooks:** `session_start`, `session_shutdown`
 
-## Important files
+</details>
 
-- [`index.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-pi-manager/index.ts)
-- [`lib/overlay.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-pi-manager/lib/overlay.ts)
-- [`lib/extension-details.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-pi-manager/lib/extension-details.ts)
-- [`lib/render.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-pi-manager/lib/render.ts)
-- [`lib/announcements.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-pi-manager/lib/announcements.ts)
-- [`lib/recommendations.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-pi-manager/lib/recommendations.ts)
-- [`lib/doctor-command.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-pi-manager/lib/doctor-command.ts)
-- [`lib/skill-sources-command.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-pi-manager/lib/skill-sources-command.ts)
-- [`lib/config-panel.ts`](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-pi-manager/lib/config-panel.ts)
-
-## Learn more
+## For contributors
 
 - [Full extension README](https://github.com/salesforce/sf-pi/blob/main/extensions/sf-pi-manager/README.md)
 - [Source folder](https://github.com/salesforce/sf-pi/tree/main/extensions/sf-pi-manager)
-- [Command reference](../commands.md)
-- [Bundled extension inventory](../extensions.md)
 
 ## Troubleshooting
 
