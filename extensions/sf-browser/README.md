@@ -6,6 +6,12 @@ SF Browser is an experimental developer-assistive Bundled Extension for Salesfor
 
 It is not a general browser framework, a Playwright replacement, or a stable Salesforce UI automation contract.
 
+## SF Browser vs UI Testing Frameworks
+
+Use SF Browser for agent-driven last-mile UI work: opening authenticated Salesforce pages, taking compact snapshots, performing small fallback interactions, and capturing Browser Evidence when APIs or owning SF Pi extensions cannot fully answer the question.
+
+Use purpose-built UI testing frameworks for repeatable CI regression suites. Page-object and locator-based tools are better suited for durable test code, cross-release maintenance, role/browser matrices, and test reporting. SF Browser can help investigate or document a UI state, but it should not become the source of truth for automated regression tests.
+
 ## Runtime Flow
 
 ```

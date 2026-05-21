@@ -9,6 +9,8 @@ SF Browser is an experimental developer-assistive surface for Salesforce UI last
 
 Use Salesforce APIs first for setup and verification. Use SF Browser and agent-browser only for UI surfaces that are not reachable or trustworthy through APIs.
 
+For repeatable CI regression testing, route users to purpose-built UI testing tooling such as page-object or locator-based frameworks. SF Browser is for last-mile UI work, Browser Evidence, and UI fallback paths; it is not the source of truth for durable automated test suites.
+
 ## Core loop
 
 1. Open the org/path with `sf_browser_open_org`. Prefer a curated `setup` destination or structured `route` when the target is known (for example `setup: "agentforce-agents"` or `route: { type: "record-view", objectApiName: "Account", recordId: "001..." }`) instead of search-and-click navigation. Use `sf_browser_resolve_path` first when you want to preview or disambiguate navigation.

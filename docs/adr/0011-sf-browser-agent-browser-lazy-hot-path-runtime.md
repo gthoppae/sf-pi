@@ -7,7 +7,7 @@ SF Browser is an experimental developer-assistive Bundled Extension for Salesfor
 - SF Browser does not pursue feature parity with `agent-browser`.
 - SF Browser does not mediate normal browser actions with v1 permission gates.
 - `agent-browser` is detected and invoked only after explicit command or tool intent.
-- Browser Evidence stores full-resolution screenshots privately under `browser-artifacts/latest/`, tracks captures with a lightweight index, and returns bounded image content only through explicit evidence capture modes.
+- Browser Evidence stores full-resolution screenshots privately under a per-session `browser-artifacts/sessions/<session-id>/` directory, tracks captures with a lightweight index, and returns bounded image content only through explicit evidence capture modes. The legacy `browser-artifacts/latest/` location is only a pointer to the current session's evidence directory.
 - Salesforce Browser Contracts live in tool descriptions, tool results, help, and optional progressive skills rather than complex runtime logic.
 - SF Browser v1 uses one default named `agent-browser` session instead of per-org or per-conversation browser sessions.
 - Click and fill tools are ref-first in v1; semantic locator hardening remains a future decision, with direct `agent-browser` usage as the escape hatch.
@@ -27,7 +27,7 @@ The first Agentforce setup check showed that SF Browser needs more Salesforce-sp
 
 ## Follow-up decisions from Salesforce automation reliability review
 
-A later review of Salesforce Lightning automation patterns refined SF Browser's reliability direction while preserving the ADR's original boundary: SF Browser remains a composable Salesforce-aware affordance layer over `agent-browser`, not a Playwright replacement, workflow DSL, or UI testing framework.
+A later review of Salesforce Lightning automation patterns refined SF Browser's reliability direction while preserving the ADR's original boundary: SF Browser remains a composable Salesforce-aware affordance layer over `agent-browser`, not a Playwright replacement, workflow DSL, or UI testing framework. Repeatable CI regression testing should use purpose-built UI testing tooling such as page-object or locator-based frameworks; SF Browser should stay focused on agent-driven last-mile work, evidence, and UI fallback paths.
 
 - Browser Evidence should be session-scoped. Canonical evidence artifacts live under a per-pi-session directory, while the legacy `latest` location may remain as a compatibility pointer to the current session. Screenshots should not be duplicated between locations.
 - Mutation transparency should be evidence-based, not approval-based. UI-only Salesforce setup/configuration changes remain frictionless; agents capture before/after Browser Evidence with clear labels, and may request best-effort Setup Audit Trail context on evidence capture.
