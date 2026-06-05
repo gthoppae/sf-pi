@@ -14,6 +14,10 @@ export const extensionSidebarItems = [
   { text: "Guardrail", link: "/extensions/sf-guardrail" },
   { text: "Herdr", link: "/extensions/sf-herdr" },
   { text: "Feedback", link: "/extensions/sf-feedback" },
+  {
+    text: "Google Workspace",
+    link: "/extensions/sf-google-workspace-internal",
+  },
   { text: "Slack", link: "/extensions/sf-slack" },
   { text: "LLM Gateway", link: "/extensions/sf-llm-gateway-internal" },
   { text: "Ohana Spinner", link: "/extensions/sf-ohana-spinner" },

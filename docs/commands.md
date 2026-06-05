@@ -66,6 +66,14 @@ _Data Cloud/Data 360 v2 family tools — discover, connect, prepare, harmonize, 
 - Commands: `/sf-data360`
 - Tools: `data360_discover`, `data360_connect`, `data360_prepare`, `data360_harmonize`, `data360_segment`, `data360_activate`, `data360_query`, `data360_semantic`, `data360_observe`, `data360_orchestrate`, `data360_api`
 
+### [SF Google Workspace Internal](./extensions/sf-google-workspace-internal)
+
+_Salesforce-internal Google Workspace read tools through mcp-adaptor with compact first-class Pi wrappers._
+
+- Default: **opt-in**
+- Commands: `/sf-google-workspace`
+- Tools: `google_workspace_status`, `google_drive_search`, `google_workspace_read_tool_search`, `google_workspace_read_tool_describe`, `google_workspace_read_tool_call`, `google_workspace_tool_search`, `google_workspace_call`, `google_drive_check_public_access`, `google_drive_get_file_content`, `google_drive_get_file_download_url`, `google_drive_get_file_permissions`, `google_drive_get_shareable_link`, `google_drive_list_docs_in_folder`, `google_drive_list_items`, `google_drive_list_spreadsheets`, `google_drive_search_docs`, `google_docs_debug_table_structure`, `google_docs_get_as_markdown`, `google_docs_get_content`, `google_docs_inspect_structure`, `google_docs_list_comments`, `google_sheets_get_info`, `google_sheets_list_comments`, `google_sheets_read_values`, `google_slides_get_page`, `google_slides_get_page_thumbnail`, `google_slides_get_presentation`, `google_slides_list_comments`, `google_calendar_get_events`, `google_calendar_list_calendars`, `google_calendar_query_freebusy`, `google_gmail_get_attachment_content`, `google_gmail_get_message`, `google_gmail_get_messages_batch`, `google_gmail_get_thread`, `google_gmail_get_threads_batch`, `google_gmail_list_filters`, `google_gmail_list_labels`, `google_gmail_search_messages`
+
 ### [SF Herdr](./extensions/sf-herdr)
 
 _Dynamic Herdr lane planning for Salesforce workflows without replacing the upstream Herdr tool._

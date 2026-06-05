@@ -115,6 +115,29 @@
       "Read-only guardrails for safer exploration."
     ]
   },
+  "sf-google-workspace-internal": {
+    "shortName": "Google Workspace",
+    "intentGroup": "Collaborate and improve",
+    "promise": "Let agents read Salesforce-internal Google Workspace through mcp-adaptor without dumping the full MCP catalog into context.",
+    "bestFor": "Google Drive, Calendar, Gmail, Docs, Sheets, and Slides reads",
+    "benefits": [
+      "Uses Salesforce mcp-adaptor and DX MCP Gateway instead of direct Google OAuth handling.",
+      "Keeps the model prompt compact with first-class wrappers and read-only progressive disclosure.",
+      "Provides a standard sf-pi panel and manager config screen for setup and status checks."
+    ],
+    "tryFirst": { "label": "Open the Google Workspace panel", "code": "/sf-google-workspace" },
+    "useCases": [
+      "Check tomorrow's calendar or query free/busy availability.",
+      "Search Drive files, list Sheets, or read known Docs/Slides by ID.",
+      "Search Gmail messages or inspect labels using read-only tools.",
+      "Discover one Google Workspace read tool schema without loading the full MCP catalog."
+    ],
+    "whatYouGet": [
+      "First-class read wrappers for Drive, Docs, Sheets, Slides, Calendar, and Gmail.",
+      "Curated read-tool search/describe/call helpers with write-like tools excluded.",
+      "A full MCP catalog escape hatch guarded by write-name checks for development/debugging."
+    ]
+  },
   "sf-data360": {
     "shortName": "Data 360",
     "intentGroup": "Work with Data Cloud",

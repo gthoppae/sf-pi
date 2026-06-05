@@ -30,6 +30,7 @@ sf-pi/
 │   ├── sf-data360/
 │   ├── sf-devbar/
 │   ├── sf-feedback/
+│   ├── sf-google-workspace-internal/
 │   ├── sf-guardrail/
 │   ├── sf-herdr/
 │   ├── sf-llm-gateway-internal/

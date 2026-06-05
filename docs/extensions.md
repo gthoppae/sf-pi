@@ -98,6 +98,12 @@ SF Pi is useful because it is a bundle: each extension adds a focused Salesforce
   <span>Report SF Pi issues with useful, sanitized diagnostics instead of starting from a blank bug report.</span>
   <span class="sfpi-card-meta"><code class="sfpi-code-chip">/sf-feedback</code></span>
 </a>
+<a class="sfpi-extension-card" href="./extensions/sf-google-workspace-internal">
+  <span class="sfpi-card-kicker">Google Drive, Calendar, Gmail, Docs, Sheets, and Slides reads</span>
+  <strong>Google Workspace</strong>
+  <span>Let agents read Salesforce-internal Google Workspace through mcp-adaptor without dumping the full MCP catalog into context.</span>
+  <span class="sfpi-card-meta"><code class="sfpi-code-chip">/sf-google-workspace</code></span>
+</a>
 <a class="sfpi-extension-card" href="./extensions/sf-slack">
   <span class="sfpi-card-kicker">Slack search and collaboration</span>
   <strong>Slack</strong>

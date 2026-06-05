@@ -103,6 +103,23 @@ export const SF_PI_REGISTRY: readonly SfPiExtension[] = [
     commands: ["/sf-feedback"],
   },
   {
+    id: "sf-google-workspace-internal",
+    name: "SF Google Workspace Internal",
+    description: "Salesforce-internal Google Workspace read tools through mcp-adaptor with compact first-class Pi wrappers.",
+    file: "extensions/sf-google-workspace-internal/index.ts",
+    category: "agent-tool",
+    maturity: "experimental",
+    defaultEnabled: false,
+    commands: ["/sf-google-workspace"],
+    tools: ["google_workspace_status","google_drive_search","google_workspace_read_tool_search","google_workspace_read_tool_describe","google_workspace_read_tool_call","google_workspace_tool_search","google_workspace_call","google_drive_check_public_access","google_drive_get_file_content","google_drive_get_file_download_url","google_drive_get_file_permissions","google_drive_get_shareable_link","google_drive_list_docs_in_folder","google_drive_list_items","google_drive_list_spreadsheets","google_drive_search_docs","google_docs_debug_table_structure","google_docs_get_as_markdown","google_docs_get_content","google_docs_inspect_structure","google_docs_list_comments","google_sheets_get_info","google_sheets_list_comments","google_sheets_read_values","google_slides_get_page","google_slides_get_page_thumbnail","google_slides_get_presentation","google_slides_list_comments","google_calendar_get_events","google_calendar_list_calendars","google_calendar_query_freebusy","google_gmail_get_attachment_content","google_gmail_get_message","google_gmail_get_messages_batch","google_gmail_get_thread","google_gmail_get_threads_batch","google_gmail_list_filters","google_gmail_list_labels","google_gmail_search_messages"],
+    events: ["session_start","session_shutdown","resources_discover"],
+    configurable: true,
+    getConfigPanel: async () => {
+      const mod = await import("../extensions/sf-google-workspace-internal/lib/config-panel.ts");
+      return mod.createConfigPanel;
+    },
+  },
+  {
     id: "sf-guardrail",
     name: "SF Guardrail",
     description: "Salesforce-aware safety hooks — file protection policies, dangerous-command gating, and org-aware confirmation for production deploys, apex runs, and data mutations",
