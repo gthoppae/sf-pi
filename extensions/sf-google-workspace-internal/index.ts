@@ -8,7 +8,8 @@
  */
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import type { ExtensionAPI, ExtensionCommandContext } from "@earendil-works/pi-coding-agent";
+import type { ExtensionAPI, ExtensionCommandContext, Theme } from "@earendil-works/pi-coding-agent";
+import { Text } from "@earendil-works/pi-tui";
 import type { TSchema } from "typebox";
 
 import { openCommandPanel, type CommandPanelAction } from "../../lib/common/command-panel.ts";
@@ -202,6 +203,84 @@ const BASE_COMMAND_ACTIONS: CommandPanelAction<GoogleWorkspaceCommandAction>[] =
   },
 ];
 
+type ToolRenderResultLike = {
+  content?: Array<{ type?: string; text?: string }>;
+  details?: Record<string, unknown>;
+};
+
+function renderToolCall(label: string, args: unknown, theme: Theme): Text {
+  const summary = summarizeToolArgs(args);
+  return new Text(
+    theme.fg("toolTitle", theme.bold(`${label} `)) + theme.fg("muted", summary || "run"),
+    0,
+    0,
+  );
+}
+
+function renderToolResult(result: ToolRenderResultLike, theme: Theme, noun = "result"): Text {
+  const details = result.details || {};
+  if (details.ok === false) {
+    return new Text(
+      theme.fg("error", `✗ ${firstText(result) || String(details.error || "failed")}`),
+      0,
+      0,
+    );
+  }
+  const count = typeof details.count === "number" ? details.count : undefined;
+  const totalTools = typeof details.total_tools === "number" ? details.total_tools : undefined;
+  const totalReadTools =
+    typeof details.total_read_tools === "number" ? details.total_read_tools : undefined;
+  const hasMore = details.has_more === true;
+  let text =
+    count == null
+      ? theme.fg("success", "✓ Completed")
+      : theme.fg("success", `✓ ${count} ${noun}${count === 1 ? "" : "s"}`);
+  if (totalReadTools != null) text += theme.fg("dim", ` from ${totalReadTools} read tools`);
+  if (totalTools != null) text += theme.fg("dim", ` from ${totalTools} MCP tools`);
+  if (hasMore) text += theme.fg("accent", " · more available");
+  return new Text(text, 0, 0);
+}
+
+function summarizeToolArgs(args: unknown): string {
+  if (!args || typeof args !== "object") return "";
+  const record = args as Record<string, unknown>;
+  if (typeof record.query === "string" && record.query) return `· "${record.query}"`;
+  if (typeof record.date === "string" && record.date) return `· ${record.date}`;
+  if (typeof record.tool_name === "string" && record.tool_name) {
+    const extra =
+      record.arguments && typeof record.arguments === "object"
+        ? ` · ${summarizeToolArgs(record.arguments)}`.trimEnd()
+        : "";
+    return `· ${friendlyName(record.tool_name)}${extra}`;
+  }
+  const parts = Object.entries(record)
+    .filter(([, value]) => value !== undefined && value !== null && value !== "")
+    .slice(0, 3)
+    .map(([key, value]) => `${friendlyName(key)}=${formatArgValue(value)}`);
+  return parts.length ? `· ${parts.join(" · ")}` : "";
+}
+
+function formatArgValue(value: unknown): string {
+  if (typeof value === "string") {
+    return value.length > 40 ? `${value.slice(0, 37)}…` : value;
+  }
+  if (typeof value === "number" || typeof value === "boolean") return String(value);
+  if (Array.isArray(value)) return `${value.length} item${value.length === 1 ? "" : "s"}`;
+  return "object";
+}
+
+function friendlyName(value: string): string {
+  return value
+    .replace(/^google_/, "")
+    .replace(/_/g, " ")
+    .replace(/\b\w/g, (char) => char.toUpperCase());
+}
+
+function firstText(result: ToolRenderResultLike): string {
+  const first = result.content?.find((entry) => entry.type === "text" && entry.text);
+  return first?.text || "";
+}
+
 function buildCommandActions(cwd: string): CommandPanelAction<GoogleWorkspaceCommandAction>[] {
   const toggle = buildToggleExtensionAction({ extensionId: EXTENSION_ID, cwd });
   return toggle ? [...BASE_COMMAND_ACTIONS, toggle] : BASE_COMMAND_ACTIONS;
@@ -261,6 +340,8 @@ function registerGoogleWorkspaceTools(pi: ExtensionAPI): void {
       "If google_workspace_status reports auth failure, tell the user to run mcp-adaptor auth, then mcp-adaptor auth --provider google-workspace-readonly --env prod, then mcp-adaptor auth --validate.",
     ],
     parameters: EMPTY_PARAMS,
+    renderCall: (args, theme) => renderToolCall("Google Workspace Status", args, theme),
+    renderResult: (result, _opts, theme) => renderToolResult(result, theme),
     async execute() {
       const text = await buildStatusText();
       return { content: [{ type: "text", text }], details: { ok: true } };
@@ -278,6 +359,8 @@ function registerGoogleWorkspaceTools(pi: ExtensionAPI): void {
       "Prefer read/list/search/get tools. Write-like Google Workspace MCP tools are blocked unless GWS_ALLOW_MCP_WRITE=true.",
     ],
     parameters: TOOL_SEARCH_PARAMS,
+    renderCall: (args, theme) => renderToolCall("Google Workspace Tool Search", args, theme),
+    renderResult: (result, _opts, theme) => renderToolResult(result, theme, "tool"),
     async execute(
       _toolCallId: string,
       params: { query: string; limit?: number; include_schema?: boolean },
@@ -305,6 +388,8 @@ function registerGoogleWorkspaceTools(pi: ExtensionAPI): void {
       "Use google_drive_search page_token only when the user asks for more results; the visible output hides the long Google pagination token but details include it.",
     ],
     parameters: DRIVE_SEARCH_PARAMS,
+    renderCall: (args, theme) => renderToolCall("Google Drive Search", args, theme),
+    renderResult: (result, _opts, theme) => renderToolResult(result, theme, "Drive file"),
     async execute(
       _toolCallId: string,
       params: {
@@ -343,6 +428,8 @@ function registerGoogleWorkspaceTools(pi: ExtensionAPI): void {
       "This returns only allowlisted read tools — no write/modify/send/manage tools are included.",
     ],
     parameters: READ_TOOL_SEARCH_PARAMS,
+    renderCall: (args, theme) => renderToolCall("Google Workspace Read Tool Search", args, theme),
+    renderResult: (result, _opts, theme) => renderToolResult(result, theme, "read tool"),
     async execute(
       _toolCallId: string,
       params: { query: string; limit?: number; include_schema?: boolean },
@@ -388,6 +475,8 @@ function registerGoogleWorkspaceTools(pi: ExtensionAPI): void {
       "For write operations, use google_workspace_call with GWS_ALLOW_MCP_WRITE=true.",
     ],
     parameters: READ_TOOL_DESCRIBE_PARAMS,
+    renderCall: (args, theme) => renderToolCall("Google Workspace Read Tool Describe", args, theme),
+    renderResult: (result, _opts, theme) => renderToolResult(result, theme),
     async execute(_toolCallId: string, params: { tool_name: string }) {
       const requestedToolName = params.tool_name;
       const wrapper = getWrapperByPiName(requestedToolName);
@@ -442,6 +531,8 @@ function registerGoogleWorkspaceTools(pi: ExtensionAPI): void {
       "For write operations, use google_workspace_call with GWS_ALLOW_MCP_WRITE=true.",
     ],
     parameters: READ_TOOL_CALL_PARAMS,
+    renderCall: (args, theme) => renderToolCall("Google Workspace Read Tool Call", args, theme),
+    renderResult: (result, _opts, theme) => renderToolResult(result, theme),
     async execute(
       _toolCallId: string,
       params: { tool_name: string; arguments: Record<string, unknown> },
@@ -478,6 +569,8 @@ function registerGoogleWorkspaceTools(pi: ExtensionAPI): void {
       "Never request or expose Google OAuth tokens; this tool uses mcp-adaptor's approved Salesforce auth path.",
     ],
     parameters: TOOL_CALL_PARAMS,
+    renderCall: (args, theme) => renderToolCall("Google Workspace Call", args, theme),
+    renderResult: (result, _opts, theme) => renderToolResult(result, theme),
     async execute(
       _toolCallId: string,
       params: { tool_name: string; arguments: Record<string, unknown> },
@@ -504,6 +597,11 @@ async function handleGoogleWorkspaceCommand(
   args: string,
 ): Promise<void> {
   const sub = args.trim() as GoogleWorkspaceCommandAction | "";
+
+  if (!isSfPiExtensionEnabled(ctx.cwd, EXTENSION_ID)) {
+    await showDisabledMessage(ctx);
+    return;
+  }
 
   if (!sub) {
     if (!ctx.hasUI) {
@@ -557,7 +655,6 @@ async function handlePanelAction(
       await openInfoPanel(ctx, {
         title: "SF Google Workspace help",
         body: buildCommandHelpText(),
-        severity: "info",
       });
       return;
     case "lifecycle.toggle":
@@ -568,9 +665,24 @@ async function handlePanelAction(
   }
 }
 
+async function showDisabledMessage(ctx: ExtensionCommandContext): Promise<void> {
+  await openInfoPanel(ctx, {
+    title: "SF Google Workspace is disabled",
+    body: [
+      "SF Google Workspace Internal is disabled for this Pi session.",
+      "",
+      "Enable it before using /sf-google-workspace:",
+      "  /sf-pi enable sf-google-workspace-internal",
+      "  /reload",
+      "",
+      "If this command appeared while disabled, restart Pi after removing stale local copies of the old standalone extension.",
+    ].join("\n"),
+  });
+}
+
 async function showStatus(ctx: ExtensionCommandContext): Promise<void> {
   const text = await buildStatusText();
-  await openInfoPanel(ctx, { title: "SF Google Workspace status", body: text, severity: "info" });
+  await openInfoPanel(ctx, { title: "SF Google Workspace status", body: text });
 }
 
 async function showReadTools(ctx: ExtensionCommandContext): Promise<void> {
@@ -617,6 +729,8 @@ function registerReadWrapperTools(pi: ExtensionAPI): void {
       label: spec.label,
       description: spec.description,
       parameters: spec.parameters,
+      renderCall: (args, theme) => renderToolCall(spec.label, args, theme),
+      renderResult: (result, _opts, theme) => renderToolResult(result, theme),
       async execute(_toolCallId: string, params: Record<string, unknown>) {
         return executeReadWrapper(spec, params);
       },
@@ -626,7 +740,27 @@ function registerReadWrapperTools(pi: ExtensionAPI): void {
 
 async function buildStatusText(): Promise<string> {
   const cfg = resolveMcpTransportConfig();
-  const auth = await validateMcpAuth(cfg);
+  let auth: { ok: boolean; stdout: string; stderr: string };
+  try {
+    auth = await validateMcpAuth(cfg);
+  } catch (err) {
+    const message = sanitizeForLog(err instanceof Error ? err.message : String(err));
+    return [
+      "Salesforce Google Workspace MCP status",
+      `- adaptor: ${cfg.adaptorPath}`,
+      `- server: ${cfg.server}`,
+      "- auth: unavailable",
+      `- error: ${message}`,
+      "",
+      "Setup if mcp-adaptor is missing or auth fails:",
+      "1. Install Salesforce mcp-adaptor in this container/runtime",
+      "2. ~/.mcp-adaptor/bin/mcp-adaptor auth",
+      "3. ~/.mcp-adaptor/bin/mcp-adaptor auth --provider google-workspace-readonly --env prod",
+      "4. ~/.mcp-adaptor/bin/mcp-adaptor auth --validate",
+      "",
+      "Override the binary path with GWS_MCP_ADAPTOR or MCP_ADAPTOR_PATH if needed.",
+    ].join("\n");
+  }
   let toolCount: number | null = null;
   let listError: unknown;
   if (auth.ok) {

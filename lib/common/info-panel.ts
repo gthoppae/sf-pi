@@ -70,6 +70,8 @@ class InfoPanelComponent {
   // keywords (`exit`, `quit`). Reset by Enter/Esc/q so partial matches do not
   // survive across panels.
   private closeKeywordBuffer = "";
+  private scrollOffset = 0;
+  private lastBodyHeight = 1;
 
   constructor(
     private readonly theme: Theme,
@@ -90,6 +92,30 @@ class InfoPanelComponent {
       this.done();
       return;
     }
+    if (matchesKey(data, "up") || data === "k") {
+      this.scrollBy(-1);
+      return;
+    }
+    if (matchesKey(data, "down") || data === "j") {
+      this.scrollBy(1);
+      return;
+    }
+    if (data === "\x1b[5~") {
+      this.scrollBy(-this.lastBodyHeight);
+      return;
+    }
+    if (data === "\x1b[6~" || data === " ") {
+      this.scrollBy(this.lastBodyHeight);
+      return;
+    }
+    if (matchesKey(data, "home")) {
+      this.scrollOffset = 0;
+      return;
+    }
+    if (matchesKey(data, "end")) {
+      this.scrollOffset = Number.MAX_SAFE_INTEGER;
+      return;
+    }
     // Detect typed `exit` / `quit` so users who reach for those keywords by
     // muscle memory don’t get stuck inside the popup. Same contract as
     // GroupedActionList in command-panel.ts.
@@ -108,9 +134,18 @@ class InfoPanelComponent {
 
   render(width: number): string[] {
     const innerWidth = Math.max(20, width - 4);
+    const terminalRows = process.stdout.rows || 32;
+    const maxRows = Math.max(10, Math.floor(terminalRows * 0.75));
+    const bodyHeight = Math.max(3, maxRows - 5);
+    this.lastBodyHeight = bodyHeight;
+
     const lines: string[] = [];
     const borderChars = this.borderChars();
     const title = `${iconForSeverity(this.options.severity, this.glyphs)} ${this.options.title}`;
+    const bodyLines = this.bodyLines(innerWidth);
+    const maxOffset = Math.max(0, bodyLines.length - bodyHeight);
+    this.scrollOffset = Math.min(Math.max(0, this.scrollOffset), maxOffset);
+    const visibleBodyLines = bodyLines.slice(this.scrollOffset, this.scrollOffset + bodyHeight);
 
     lines.push(
       this.borderLine(borderChars.topLeft, borderChars.horizontal, borderChars.topRight, width),
@@ -125,14 +160,10 @@ class InfoPanelComponent {
       ),
     );
 
-    for (const rawLine of this.options.body.split(/\r?\n/)) {
-      if (!rawLine.trim()) {
-        lines.push(this.contentLine("", width));
-        continue;
-      }
-      for (const wrapped of wrapTextWithAnsi(rawLine, innerWidth)) {
-        lines.push(this.contentLine(`  ${this.theme.fg("text", wrapped)}`, width));
-      }
+    for (let index = 0; index < bodyHeight; index++) {
+      const raw = visibleBodyLines[index] ?? "";
+      const scrollBar = this.scrollBar(index, bodyHeight, maxOffset);
+      lines.push(this.contentLine(`  ${this.theme.fg("text", raw)}`, width, scrollBar));
     }
 
     lines.push(
@@ -147,7 +178,10 @@ class InfoPanelComponent {
       this.contentLine(
         ` ${this.theme.fg(
           "dim",
-          this.options.footer ?? "Enter/Esc / type 'exit' return to the previous panel",
+          this.options.footer ??
+            (maxOffset > 0
+              ? "↑↓/j/k scroll · PgUp/PgDn page · Home/End jump · Enter/Esc / type 'exit' close"
+              : "Enter/Esc / type 'exit' return to the previous panel"),
         )}`,
         width,
       ),
@@ -164,6 +198,30 @@ class InfoPanelComponent {
   }
 
   invalidate(): void {}
+
+  private bodyLines(innerWidth: number): string[] {
+    const lines: string[] = [];
+    for (const rawLine of this.options.body.split(/\r?\n/)) {
+      if (!rawLine.trim()) {
+        lines.push("");
+        continue;
+      }
+      lines.push(...wrapTextWithAnsi(rawLine, innerWidth));
+    }
+    return lines;
+  }
+
+  private scrollBy(delta: number): void {
+    this.scrollOffset = Math.max(0, this.scrollOffset + delta);
+  }
+
+  private scrollBar(index: number, bodyHeight: number, maxOffset: number): string {
+    if (maxOffset <= 0) return "";
+    const absolute = this.scrollOffset + index;
+    if (absolute === 0) return this.theme.fg("accent", "▲");
+    if (absolute >= maxOffset + bodyHeight - 1) return this.theme.fg("accent", "▼");
+    return this.theme.fg("dim", "│");
+  }
 
   private borderChars(): {
     topLeft: string;
@@ -207,12 +265,13 @@ class InfoPanelComponent {
     return this.bg(content);
   }
 
-  private contentLine(content: string, width: number): string {
+  private contentLine(content: string, width: number, scrollBar = ""): string {
     const chars = this.borderChars();
-    const innerWidth = Math.max(0, width - 2);
+    const scrollBarWidth = scrollBar ? 1 : 0;
+    const innerWidth = Math.max(0, width - 2 - scrollBarWidth);
     const padded = this.pad(truncateToWidth(content, innerWidth, ""), innerWidth);
     return this.bg(
-      `${this.colorBorder(chars.vertical)}${padded}${this.colorBorder(chars.vertical)}`,
+      `${this.colorBorder(chars.vertical)}${padded}${scrollBar}${this.colorBorder(chars.vertical)}`,
     );
   }
 
