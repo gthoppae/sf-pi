@@ -123,6 +123,21 @@ GWS_MCP_KEEPALIVE_IDLE_MS=300000 # idle shutdown timeout; default 5 minutes
 
 Keepalive mode does not add MCP schemas to the model prompt. It only reuses the hidden stdio bridge after the first Google Workspace tool call and is cleaned up on session shutdown/reload.
 
+## Keepalive vs. host-native MCP
+
+`GWS_MCP_KEEPALIVE=1` is a transport optimization inside this extension. It is intentionally **not** the same as configuring Pi, Claude Code, or another host as a general MCP client for Google Workspace.
+
+| Aspect              | This extension with keepalive                                                                 | Host-native MCP client                                                      |
+| ------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------- |
+| User setup          | No visible MCP server config; uses Salesforce `mcp-adaptor` path                              | User/host config points directly at an MCP server                           |
+| Model-visible tools | Compact native Pi wrappers only                                                               | Usually every MCP tool/schema is exposed to the host/model                  |
+| Context impact      | No full Google Workspace MCP catalog in the prompt                                            | Can add broad tool/schema context unless the host filters it                |
+| Process lifecycle   | One hidden `mcp-adaptor serve --server google_workspace` process, lazy + idle-timeout cleanup | Host owns MCP server lifecycle and reconnect behavior                       |
+| Security boundary   | Google auth remains owned by `mcp-adaptor`/keyring; extension never sees OAuth tokens         | Depends on host MCP config and server implementation                        |
+| Write surface       | Read wrappers by default; generic write-like calls are guarded                                | Whatever MCP tools the host exposes are callable unless separately filtered |
+
+So keepalive improves latency by avoiding repeated `mcp-adaptor` spawn/init work, while preserving the extension's main design goal: Google Workspace remains a **hidden Salesforce transport**, and the agent still sees a small, curated Pi tool surface.
+
 ## Command panel
 
 Run without arguments to open the standard SF Pi command panel:
