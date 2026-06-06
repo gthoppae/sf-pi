@@ -43,6 +43,7 @@ import {
   filterReadMcpTools,
   formatCompactReadToolList,
   formatReadToolDescribe,
+  READ_MCP_TOOLS,
   ReadToolNotAllowedError,
 } from "./lib/read-tools.ts";
 import { executeReadWrapper, getWrapperByPiName, READ_WRAPPER_SPECS } from "./lib/read-wrappers.ts";
@@ -53,6 +54,8 @@ const __dirname = path.dirname(__filename);
 
 const EXTENSION_ID = "sf-google-workspace-internal";
 const COMMAND_NAME = "sf-google-workspace";
+const CORE_NATIVE_TOOL_COUNT = 7;
+const FIRST_CLASS_READ_ENTRYPOINT_COUNT = READ_WRAPPER_SPECS.length + 1;
 
 const EMPTY_PARAMS = {
   type: "object",
@@ -687,16 +690,25 @@ async function showStatus(ctx: ExtensionCommandContext): Promise<void> {
 
 async function showReadTools(ctx: ExtensionCommandContext): Promise<void> {
   const tools = filterReadMcpTools(await listMcpTools());
-  const text = formatCompactReadToolList(searchTools(tools, "", 50));
-  ctx.ui.setEditorText(text);
-  ctx.ui.notify("SF Google Workspace read tools copied to editor.", "info");
+  const text = [
+    "Curated read-only Google Workspace MCP tools",
+    `Showing ${tools.length} live tools matched from the MCP catalog; ${READ_MCP_TOOLS.size} tools are allowlisted by this extension.`,
+    "",
+    formatCompactReadToolList(searchTools(tools, "", 50)),
+  ].join("\n");
+  await openInfoPanel(ctx, { title: "SF Google Workspace read tools", body: text });
 }
 
 async function showFullCatalog(ctx: ExtensionCommandContext): Promise<void> {
   const tools = await listMcpTools();
-  const text = formatMcpToolList(searchTools(tools, "", 50));
-  ctx.ui.setEditorText(text);
-  ctx.ui.notify("Google Workspace MCP catalog sample copied to editor.", "info");
+  const sample = searchTools(tools, "", 50);
+  const text = [
+    "Full Google Workspace MCP catalog sample",
+    `Showing first ${sample.length} of ${tools.length} MCP server tools. These tools are not registered directly in Pi; use the compact wrappers/read facade first.`,
+    "",
+    formatMcpToolList(sample),
+  ].join("\n");
+  await openInfoPanel(ctx, { title: "Google Workspace MCP catalog", body: text });
 }
 
 function buildCommandHelpText(): string {
@@ -761,11 +773,14 @@ async function buildStatusText(): Promise<string> {
       "Override the binary path with GWS_MCP_ADAPTOR or MCP_ADAPTOR_PATH if needed.",
     ].join("\n");
   }
-  let toolCount: number | null = null;
+  let mcpCatalogToolCount: number | null = null;
+  let liveReadToolCount: number | null = null;
   let listError: unknown;
   if (auth.ok) {
     try {
-      toolCount = (await listMcpTools(cfg)).length;
+      const catalogTools = await listMcpTools(cfg);
+      mcpCatalogToolCount = catalogTools.length;
+      liveReadToolCount = filterReadMcpTools(catalogTools).length;
     } catch (err) {
       listError = sanitizeForLog(err instanceof Error ? err.message : String(err));
     }
@@ -778,7 +793,16 @@ async function buildStatusText(): Promise<string> {
     `- auth: ${auth.ok ? "ok" : "failed"}`,
     auth.stdout ? `- auth stdout: ${auth.stdout}` : "",
     auth.stderr ? `- auth stderr: ${auth.stderr}` : "",
-    toolCount == null ? "" : `- tools: ${toolCount}`,
+    mcpCatalogToolCount == null
+      ? ""
+      : `- MCP catalog tools available on server: ${mcpCatalogToolCount}`,
+    `- Pi tools exposed by this extension: ${CORE_NATIVE_TOOL_COUNT + READ_WRAPPER_SPECS.length}`,
+    `- first-class read entry points exposed: ${FIRST_CLASS_READ_ENTRYPOINT_COUNT}`,
+    `- curated read MCP allowlist: ${READ_MCP_TOOLS.size}`,
+    liveReadToolCount == null
+      ? ""
+      : `- live curated read MCP tools found in catalog: ${liveReadToolCount}`,
+    "- full MCP catalog tools are not registered directly in Pi; use google_workspace_tool_search/google_workspace_call only as guarded escape hatches.",
     listError ? `- tools/list error: ${JSON.stringify(listError)}` : "",
     "",
     "Setup if auth fails:",
