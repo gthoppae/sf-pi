@@ -14,6 +14,8 @@ test("resolveMcpTransportConfig defaults to google_workspace", () => {
   const cfg = resolveMcpTransportConfig({ HOME: "/home/agent" });
   assert.equal(cfg.server, "google_workspace");
   assert.equal(cfg.timeoutMs, 60_000);
+  assert.equal(cfg.keepAlive, false);
+  assert.equal(cfg.keepAliveIdleMs, 300_000);
   assert.ok(cfg.adaptorPath.endsWith("/.mcp-adaptor/bin/mcp-adaptor"));
 });
 
@@ -22,10 +24,19 @@ test("resolveMcpTransportConfig honors env overrides", () => {
     GWS_MCP_ADAPTOR: "/tmp/mcp-adaptor",
     GWS_MCP_SERVER: "google_workspace_custom",
     GWS_MCP_TIMEOUT_MS: "1234",
+    GWS_MCP_KEEPALIVE: "1",
+    GWS_MCP_KEEPALIVE_IDLE_MS: "4567",
   });
   assert.equal(cfg.adaptorPath, "/tmp/mcp-adaptor");
   assert.equal(cfg.server, "google_workspace_custom");
   assert.equal(cfg.timeoutMs, 1234);
+  assert.equal(cfg.keepAlive, true);
+  assert.equal(cfg.keepAliveIdleMs, 4567);
+});
+
+test("resolveMcpTransportConfig supports transport mode keepalive", () => {
+  const cfg = resolveMcpTransportConfig({ GWS_MCP_TRANSPORT_MODE: "keepalive" });
+  assert.equal(cfg.keepAlive, true);
 });
 
 test("searchTools filters names and descriptions", () => {

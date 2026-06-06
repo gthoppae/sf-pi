@@ -29,10 +29,12 @@ import {
   assertMcpToolAllowed,
   callMcpTool,
   formatMcpToolList,
+  getMcpRuntimeStatus,
   listMcpTools,
   resolveMcpTransportConfig,
   sanitizeMcpResult,
   searchTools,
+  shutdownMcpKeepAlive,
   stringifyBounded,
   validateMcpAuth,
 } from "./lib/mcp.ts";
@@ -301,11 +303,15 @@ export default function sfGoogleWorkspaceInternal(pi: ExtensionAPI): void {
   }
 
   pi.on("session_start", (event, ctx) => {
-    if (event.reason === "reload") toolsRegistered = false;
+    if (event.reason === "reload") {
+      toolsRegistered = false;
+      shutdownMcpKeepAlive();
+    }
     if (isSfPiExtensionEnabled(ctx.cwd, EXTENSION_ID)) ensureToolsRegistered();
   });
   pi.on("session_shutdown", () => {
     toolsRegistered = false;
+    shutdownMcpKeepAlive();
   });
   pi.on("resources_discover", (event) => {
     if (!isSfPiExtensionEnabled(event.cwd, EXTENSION_ID)) return;
@@ -627,11 +633,16 @@ async function openGoogleWorkspacePanel(ctx: ExtensionCommandContext): Promise<v
   await openCommandPanel(ctx, {
     title: "SF Google Workspace",
     subtitle: "Salesforce-internal Google Workspace through mcp-adaptor; compact wrappers first.",
-    statusLines: [
-      "Transport: ~/.mcp-adaptor/bin/mcp-adaptor serve --server google_workspace",
-      "Model flow: first-class wrappers → read search/describe/call → full catalog only as escape hatch.",
-      "Auth: Salesforce mcp-adaptor provider google-workspace-readonly or google-workspace-rw.",
-    ],
+    statusLines: () => {
+      const cfg = resolveMcpTransportConfig();
+      const runtime = getMcpRuntimeStatus(cfg);
+      return [
+        `Transport: ${runtime.mode}${runtime.running ? ` keepalive pid ${runtime.pid}` : ""}`,
+        "Backend: ~/.mcp-adaptor/bin/mcp-adaptor serve --server google_workspace",
+        "Model flow: first-class wrappers → read search/describe/call → full catalog only as escape hatch.",
+        "Auth: Salesforce mcp-adaptor provider google-workspace-readonly or google-workspace-rw.",
+      ];
+    },
     actions: () => buildCommandActions(ctx.cwd),
     closeValue: "close",
     onAction: (action) => handlePanelAction(ctx, action),
@@ -730,6 +741,10 @@ function buildCommandHelpText(): string {
     "  ~/.mcp-adaptor/bin/mcp-adaptor auth --provider google-workspace-readonly --env prod",
     "  ~/.mcp-adaptor/bin/mcp-adaptor auth --validate",
     "",
+    "Optional performance mode:",
+    "  GWS_MCP_KEEPALIVE=1              Reuse one lazy mcp-adaptor process per Pi session",
+    "  GWS_MCP_KEEPALIVE_IDLE_MS=300000 Kill keepalive bridge after idle timeout",
+    "",
     "Avoid full catalog tools for routine read tasks.",
   ].join("\n");
 }
@@ -786,10 +801,20 @@ async function buildStatusText(): Promise<string> {
     }
   }
 
+  const runtime = getMcpRuntimeStatus(cfg);
+
   return [
     "Salesforce Google Workspace MCP status",
     `- adaptor: ${cfg.adaptorPath}`,
     `- server: ${cfg.server}`,
+    `- transport mode: ${runtime.mode}`,
+    runtime.mode === "keepalive"
+      ? `- keepalive bridge: ${runtime.running ? `running (pid ${runtime.pid})` : "idle/not started"}`
+      : "",
+    runtime.mode === "keepalive" ? `- keepalive idle timeout: ${runtime.idleTimeoutMs}ms` : "",
+    runtime.mode === "keepalive" ? `- keepalive requests served: ${runtime.requestCount}` : "",
+    runtime.lastUsedAt ? `- keepalive last used: ${runtime.lastUsedAt}` : "",
+    runtime.lastError ? `- keepalive last error: ${runtime.lastError}` : "",
     `- auth: ${auth.ok ? "ok" : "failed"}`,
     auth.stdout ? `- auth stdout: ${auth.stdout}` : "",
     auth.stderr ? `- auth stderr: ${auth.stderr}` : "",
@@ -809,6 +834,10 @@ async function buildStatusText(): Promise<string> {
     "1. ~/.mcp-adaptor/bin/mcp-adaptor auth",
     "2. ~/.mcp-adaptor/bin/mcp-adaptor auth --provider google-workspace-readonly --env prod",
     "3. ~/.mcp-adaptor/bin/mcp-adaptor auth --validate",
+    "",
+    "Optional performance mode:",
+    "- Set GWS_MCP_KEEPALIVE=1 to lazily keep one mcp-adaptor process alive after the first Google Workspace tool call.",
+    "- Set GWS_MCP_KEEPALIVE_IDLE_MS=300000 to control idle shutdown timing.",
   ]
     .filter(Boolean)
     .join("\n");

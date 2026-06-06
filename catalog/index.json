@@ -497,7 +497,7 @@
     "entry": "extensions/sf-google-workspace-internal/index.ts",
     "hasReadme": true,
     "hasTests": true,
-    "srcLoc": 2446
+    "srcLoc": 2719
   },
   {
     "id": "sf-guardrail",

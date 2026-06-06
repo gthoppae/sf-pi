@@ -65,7 +65,17 @@ class SfGoogleWorkspaceConfigPanel implements Focusable {
     );
     lines.push(pad(`   ${t.fg("text", "Adaptor")}       ${t.fg("dim", cfg.adaptorPath)}`));
     lines.push(pad(`   ${t.fg("text", "Server")}        ${t.fg("dim", cfg.server)}`));
+    lines.push(
+      pad(
+        `   ${t.fg("text", "Mode")}          ${t.fg("dim", cfg.keepAlive ? "keepalive (lazy, opt-in)" : "one-shot (default)")}`,
+      ),
+    );
     lines.push(pad(`   ${t.fg("text", "Timeout")}       ${t.fg("dim", `${cfg.timeoutMs}ms`)}`));
+    lines.push(
+      pad(
+        `   ${t.fg("text", "Idle timeout")}  ${t.fg("dim", `${cfg.keepAliveIdleMs}ms (when GWS_MCP_KEEPALIVE=1)`)}`,
+      ),
+    );
     lines.push(pad(""));
 
     lines.push(pad(` ${t.fg("muted", "When enabled:")}`));
@@ -89,6 +99,13 @@ class SfGoogleWorkspaceConfigPanel implements Focusable {
         `   ${toolDot(t, enabled)} ${t.fg("text", "Deferred")}          ${t.fg("dim", `${DEFERRED_READ_WRAPPER_SPECS.length} Forms/Tasks wrappers, ${DEFERRED_READ_MCP_TOOLS.size} underlying tools`)}`,
       ),
     );
+    lines.push(pad(""));
+
+    lines.push(pad(` ${t.fg("muted", "Performance mode:")}`));
+    lines.push(
+      pad(`   ${t.fg("dim", "•")} Set GWS_MCP_KEEPALIVE=1 to reuse one lazy bridge process`),
+    );
+    lines.push(pad(`   ${t.fg("dim", "•")} Set GWS_MCP_KEEPALIVE_IDLE_MS to tune idle shutdown`));
     lines.push(pad(""));
 
     lines.push(pad(` ${t.fg("muted", "Setup:")}`));

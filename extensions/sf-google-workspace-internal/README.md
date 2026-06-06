@@ -47,8 +47,9 @@ session_start / resources_discover when enabled
   └─ includes the shared lifecycle toggle row
 
 Google Workspace tool call
-  ├─ spawns ~/.mcp-adaptor/bin/mcp-adaptor serve --server google_workspace
-  ├─ sends a one-shot MCP tools/list or tools/call request
+  ├─ default: spawns ~/.mcp-adaptor/bin/mcp-adaptor for one MCP request
+  ├─ optional: GWS_MCP_KEEPALIVE=1 lazily starts one reusable bridge process
+  ├─ sends an MCP tools/list or tools/call request
   ├─ sanitizes returned content before surfacing it to the model
   └─ bounds visible output to avoid context bloat
 ```
@@ -113,6 +114,15 @@ On a Salesforce-managed macOS setup with DevBar / AI Marketplace installed:
 
 For read/write experimentation, authenticate `google-workspace-rw`, but this extension currently exposes only read wrappers by default. Generic write-like calls are blocked unless `GWS_ALLOW_MCP_WRITE=true`.
 
+Optional performance mode:
+
+```bash
+GWS_MCP_KEEPALIVE=1              # lazily reuse one mcp-adaptor process per Pi session
+GWS_MCP_KEEPALIVE_IDLE_MS=300000 # idle shutdown timeout; default 5 minutes
+```
+
+Keepalive mode does not add MCP schemas to the model prompt. It only reuses the hidden stdio bridge after the first Google Workspace tool call and is cleaned up on session shutdown/reload.
+
 ## Command panel
 
 Run without arguments to open the standard SF Pi command panel:
@@ -137,7 +147,7 @@ The panel includes the standard lifecycle toggle row and uses `openInfoPanel` fo
 `manifest.json` sets `configurable: true`, so the SF Pi manager can open a read-only config/status panel. The panel shows:
 
 - whether the extension is enabled for the active scope
-- resolved `mcp-adaptor` path, server, and timeout
+- resolved `mcp-adaptor` path, server, timeout, and transport mode
 - active/deferred read-wrapper counts
 - setup commands
 - safety invariants
