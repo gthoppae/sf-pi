@@ -635,6 +635,7 @@ Jump to an extension's Troubleshooting section to see the full fix. This index i
 
 - `/sf-google-workspace status` says mcp-adaptor is missing
 - Auth validation fails
+- Auth validates, but every Google Workspace tool returns `upstream HTTP 401 ... run 'devbar auth login'`
 - The agent uses the full catalog for routine reads
 - A write-like MCP tool is refused
 

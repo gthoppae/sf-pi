@@ -254,6 +254,44 @@ Confirm DevBar / AI Marketplace installed mcp-adaptor at `~/.mcp-adaptor/bin/mcp
 **Auth validation fails:**
 Run `~/.mcp-adaptor/bin/mcp-adaptor auth`, then `~/.mcp-adaptor/bin/mcp-adaptor auth --provider google-workspace-readonly --env prod`, then `~/.mcp-adaptor/bin/mcp-adaptor auth --validate`. On macOS, credentials should persist through the Go keyring / macOS Keychain.
 
+**Auth validates, but every Google Workspace tool returns `upstream HTTP 401 ... run 'devbar auth login'`:**
+`mcp-adaptor auth --validate` can pass while `mcp-adaptor serve --server google_workspace` is still routed through a stale local DevBar/DX MCP proxy. The telltale stderr looks like this:
+
+```text
+proxy detected
+upstream=http://127.0.0.1:13316/proxy/mcp/server/google_workspace/mcp
+auth_ok=false
+```
+
+That means the Google provider token is stored, but the local proxy layer is unauthenticated and is rejecting requests before they reach the Google Workspace MCP backend. Clear stale proxy/adaptor processes and retry:
+
+```bash
+pkill -f 'mcp-adaptor serve --server google_workspace' || true
+pkill -f '127.0.0.1:13316' || true
+pkill -f 'proxy/mcp/server/google_workspace' || true
+pkill -f 'devbar' || true
+```
+
+Then validate the raw MCP path with a bounded smoke test:
+
+```bash
+cat > /tmp/gws-mcp-smoke.jsonl <<'EOF'
+{"jsonrpc":"2.0","id":1,"method":"initialize","params":{"protocolVersion":"2024-11-05","capabilities":{},"clientInfo":{"name":"manual-smoke","version":"0.0.1"}}}
+{"jsonrpc":"2.0","method":"notifications/initialized","params":{}}
+{"jsonrpc":"2.0","id":2,"method":"tools/list","params":{}}
+EOF
+
+timeout 20s ~/.mcp-adaptor/bin/mcp-adaptor serve --server google_workspace \
+  < /tmp/gws-mcp-smoke.jsonl \
+  > /tmp/gws-mcp-smoke.out \
+  2> /tmp/gws-mcp-smoke.err
+
+cat /tmp/gws-mcp-smoke.err
+jq -r 'select(.id==2) | .result.tools | length' /tmp/gws-mcp-smoke.out
+```
+
+A healthy run returns the live Google Workspace tool count (for example, `85`) and no `auth_ok=false` proxy line. If the raw smoke test works, restart or `/reload` Pi and retry `/sf-google-workspace status`.
+
 **The agent uses the full catalog for routine reads:**
 Prefer first-class wrappers first, then `google_workspace_read_tool_search` and `google_workspace_read_tool_describe`. The full `google_workspace_tool_search` / `google_workspace_call` path is for debugging and extension development.
 
